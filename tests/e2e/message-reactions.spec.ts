@@ -100,15 +100,28 @@ test("reaction mutations are accessible, authoritative, persistent, and realtime
   expect(addResponse.ok()).toBe(true);
   const payload = (await addResponse.json()) as {
     event: { type: string; payload: { emoji?: string; count?: number } };
-    reactions: Array<{ emoji: string; count: number; reacted_by_me: boolean }>;
+    reactions: Array<{
+      emoji: string;
+      count: number;
+      reacted_by_me: boolean;
+      users?: Array<{ id: string; display_name: string }>;
+    }>;
   };
   expect(payload.event.type).toBe("reaction.added");
   expect(payload.event.payload).toMatchObject({ emoji: "👍", count: 1 });
-  expect(payload.reactions).toEqual([{ emoji: "👍", count: 1, reacted_by_me: true }]);
+  expect(payload.reactions).toHaveLength(1);
+  expect(payload.reactions[0]).toMatchObject({ emoji: "👍", count: 1, reacted_by_me: true });
+  const reactors = payload.reactions[0].users ?? [];
+  expect(reactors).toHaveLength(1);
+  expect(reactors[0].id).toBeTruthy();
+  expect(reactors[0].display_name).toBeTruthy();
 
-  const reaction = row.getByRole("button", { name: "👍 — 1 reaction" });
+  const reaction = row.getByRole("button", { name: "👍, 1 reaction" });
   await expect(reaction).toBeVisible();
   await expect(reaction).toHaveAttribute("aria-pressed", "true");
+  // The viewer's own reaction is attributed back to them by name.
+  await expect(reaction).toHaveAttribute("aria-label", /You reacted with 👍/);
+  await expect(reaction).toHaveAttribute("data-tooltip", /You reacted with 👍/);
   if (process.env.REACTION_PROOF_PATH) {
     await row.scrollIntoViewIfNeeded();
     await page.screenshot({ path: process.env.REACTION_PROOF_PATH, fullPage: true });
@@ -117,7 +130,7 @@ test("reaction mutations are accessible, authoritative, persistent, and realtime
   await page.reload();
   await waitForAppReady(page);
   const persistedRow = page.locator(`[data-message-id="${messageID}"]`);
-  await expect(persistedRow.getByRole("button", { name: "👍 — 1 reaction" })).toBeVisible();
+  await expect(persistedRow.getByRole("button", { name: "👍, 1 reaction" })).toBeVisible();
 
   let messageRefreshes = 0;
   page.on("request", (request) => {
@@ -130,7 +143,7 @@ test("reaction mutations are accessible, authoritative, persistent, and realtime
     `/api/messages/${messageID}/reactions/${encodeURIComponent("👍")}`,
   );
   expect(removeResponse.ok()).toBe(true);
-  await expect(persistedRow.getByRole("button", { name: "👍 — 1 reaction" })).toHaveCount(0);
+  await expect(persistedRow.getByRole("button", { name: "👍, 1 reaction" })).toHaveCount(0);
   expect(messageRefreshes).toBe(0);
 });
 
@@ -253,7 +266,7 @@ test("hover toolbar stays inside the scrollport for a row at the top edge", asyn
 
   // The flipped toolbar is still fully interactive.
   await target.getByRole("button", { name: "React with 👍" }).click();
-  await expect(target.getByRole("button", { name: "👍 — 1 reaction" })).toBeVisible();
+  await expect(target.getByRole("button", { name: "👍, 1 reaction" })).toBeVisible();
 });
 
 test("right-edge message action tooltips stay inside the message viewport", async ({ page }) => {
@@ -358,7 +371,7 @@ test("touch long-press opens a message action sheet", async ({ browser, page }) 
   await sheet.getByRole("button", { name: "React with ✅" }).click();
   await expect(sheet).toBeHidden();
   await expect(trigger).toBeFocused();
-  await expect(row.getByRole("button", { name: "✅ — 1 reaction" })).toBeVisible();
+  await expect(row.getByRole("button", { name: "✅, 1 reaction" })).toBeVisible();
 
   // Long-press (click held past the 450ms threshold) opens the bottom sheet.
   const content = row.locator(".message-content");
@@ -386,7 +399,7 @@ test("touch long-press opens a message action sheet", async ({ browser, page }) 
   await touchLongPress(content);
   await sheet.getByRole("button", { name: "React with 👍" }).click();
   await expect(sheet).toBeHidden();
-  await expect(row.getByRole("button", { name: "👍 — 1 reaction" })).toBeVisible();
+  await expect(row.getByRole("button", { name: "👍, 1 reaction" })).toBeVisible();
 
   // A quick tap (no hold) still opens the thread instead of the sheet.
   await content.click();
@@ -601,10 +614,10 @@ test("a newer realtime event wins over a delayed mutation response", async ({ pa
     `/api/messages/${messageID}/reactions/${encodeURIComponent("👍")}`,
   );
   expect(removal.ok()).toBe(true);
-  await expect(row.getByRole("button", { name: "👍 — 1 reaction" })).toHaveCount(0);
+  await expect(row.getByRole("button", { name: "👍, 1 reaction" })).toHaveCount(0);
   releaseResponse();
   await expect(row.getByRole("button", { name: "Add reaction" })).toBeEnabled();
-  await expect(row.getByRole("button", { name: "👍 — 1 reaction" })).toHaveCount(0);
+  await expect(row.getByRole("button", { name: "👍, 1 reaction" })).toHaveCount(0);
 });
 
 test("ambiguous failures recover server state and preserve newer realtime reactions", async ({
@@ -624,7 +637,7 @@ test("ambiguous failures recover server state and preserve newer realtime reacti
     });
   });
   await pickReaction(row, "👍");
-  await expect(row.getByRole("button", { name: "👍 — 1 reaction" })).toBeVisible();
+  await expect(row.getByRole("button", { name: "👍, 1 reaction" })).toBeVisible();
   await expect(row.getByRole("status")).toHaveCount(0);
   await expect(row.getByRole("button", { name: "Add reaction" })).toBeEnabled();
 
@@ -633,7 +646,7 @@ test("ambiguous failures recover server state and preserve newer realtime reacti
     `/api/messages/${messageID}/reactions/${encodeURIComponent("👍")}`,
   );
   expect(cleanup.ok()).toBe(true);
-  await expect(row.getByRole("button", { name: "👍 — 1 reaction" })).toHaveCount(0);
+  await expect(row.getByRole("button", { name: "👍, 1 reaction" })).toHaveCount(0);
 
   let releaseFailure!: () => void;
   const failureGate = new Promise<void>((resolve) => {
@@ -656,15 +669,15 @@ test("ambiguous failures recover server state and preserve newer realtime reacti
   });
 
   await pickReaction(row, "👍");
-  await expect(row.getByRole("button", { name: "👍 — 1 reaction" })).toBeVisible();
+  await expect(row.getByRole("button", { name: "👍, 1 reaction" })).toBeVisible();
   const newerReaction = await page.request.post(`/api/messages/${messageID}/reactions`, {
     data: { emoji: "❤️" },
   });
   expect(newerReaction.ok()).toBe(true);
-  await expect(row.getByRole("button", { name: "❤️ — 1 reaction" })).toBeVisible();
+  await expect(row.getByRole("button", { name: "❤️, 1 reaction" })).toBeVisible();
   releaseFailure();
-  await expect(row.getByRole("button", { name: "👍 — 1 reaction" })).toHaveCount(0);
-  await expect(row.getByRole("button", { name: "❤️ — 1 reaction" })).toBeVisible();
+  await expect(row.getByRole("button", { name: "👍, 1 reaction" })).toHaveCount(0);
+  await expect(row.getByRole("button", { name: "❤️, 1 reaction" })).toBeVisible();
   await expect(row.getByRole("status")).toContainText("failed");
 });
 
@@ -749,12 +762,11 @@ for (const scenario of [
       release.resolve();
       await expect(target).toBeInViewport();
       if (scenario.count === 0) {
-        await expect(target.getByRole("button", { name: /👀 —/ })).toHaveCount(0);
+        await expect(target.getByRole("button", { name: /👀,/ })).toHaveCount(0);
         return;
       }
       const reaction = target.getByRole("button", {
-        name: `👀 — ${scenario.count} reaction${scenario.count === 1 ? "" : "s"}`,
-        exact: true,
+        name: `👀, ${scenario.count} reaction${scenario.count === 1 ? "" : "s"}`,
       });
       await expect(reaction).toHaveAttribute("aria-pressed", String(scenario.own));
       const firstAction = page.waitForRequest((request) =>
@@ -763,12 +775,11 @@ for (const scenario of [
       await reaction.press("Enter");
       expect((await firstAction).method()).toBe(scenario.own ? "DELETE" : "POST");
       const count = scenario.count + (scenario.own ? -1 : 1);
-      if (count === 0) await expect(target.getByRole("button", { name: /👀 —/ })).toHaveCount(0);
+      if (count === 0) await expect(target.getByRole("button", { name: /👀,/ })).toHaveCount(0);
       else
         await expect(
           target.getByRole("button", {
-            name: `👀 — ${count} reaction${count === 1 ? "" : "s"}`,
-            exact: true,
+            name: `👀, ${count} reaction${count === 1 ? "" : "s"}`,
           }),
         ).toHaveAttribute("aria-pressed", String(!scenario.own));
     } finally {
@@ -797,14 +808,14 @@ test("thread roots and replies share reaction controls and realtime state", asyn
   await expect(threadReply.getByRole("button", { name: "Add reaction" })).toBeVisible();
 
   await pickReaction(threadRoot, "🚀");
-  await expect(threadRoot.getByRole("button", { name: "🚀 — 1 reaction" })).toBeVisible();
-  await expect(rootRow.getByRole("button", { name: "🚀 — 1 reaction" })).toBeVisible();
+  await expect(threadRoot.getByRole("button", { name: "🚀, 1 reaction" })).toBeVisible();
+  await expect(rootRow.getByRole("button", { name: "🚀, 1 reaction" })).toBeVisible();
 
   const replyReaction = await page.request.post(`/api/messages/${reply.id}/reactions`, {
     data: { emoji: "✅" },
   });
   expect(replyReaction.ok()).toBe(true);
-  await expect(threadReply.getByRole("button", { name: "✅ — 1 reaction" })).toBeVisible();
+  await expect(threadReply.getByRole("button", { name: "✅, 1 reaction" })).toBeVisible();
 });
 
 test("touch thread messages use accessible action sheets instead of persistent controls", async ({
@@ -859,7 +870,7 @@ test("touch thread messages use accessible action sheets instead of persistent c
   await sheet.getByRole("button", { name: "React with 👍" }).click();
   await expect(sheet).toBeHidden();
   await expect(rootMore).toBeFocused();
-  await expect(threadRoot.getByRole("button", { name: "👍 — 1 reaction" })).toBeVisible();
+  await expect(threadRoot.getByRole("button", { name: "👍, 1 reaction" })).toBeVisible();
 
   await touchLongPress(threadReply.locator(".markdown"));
   await expect(sheet).toBeVisible();

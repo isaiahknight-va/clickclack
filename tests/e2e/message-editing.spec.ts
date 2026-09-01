@@ -218,7 +218,7 @@ test("message edits persist in channels and threads", async ({ page }) => {
     data: { emoji: "✅" },
   });
   expect(reactionResponse.ok()).toBe(true);
-  await expect(channelRow.getByRole("button", { name: "✅ — 1 reaction" })).toBeVisible();
+  await expect(channelRow.getByRole("button", { name: "✅, 1 reaction" })).toBeVisible();
   await openTimelineEditor(channelRow);
   const channelEditor = channelRow.getByLabel("Edit message");
   await expect(channelEditor).toBeFocused();
@@ -244,7 +244,7 @@ test("message edits persist in channels and threads", async ({ page }) => {
   await expect(channelRow.locator(".markdown")).toContainText(`Edited channel message ${suffix}`);
   await expect(channelRow.locator(".markdown table")).toContainText("preserved");
   await expect(channelRow.getByText("(edited)")).toBeVisible();
-  await expect(channelRow.getByRole("button", { name: "✅ — 1 reaction" })).toBeVisible();
+  await expect(channelRow.getByRole("button", { name: "✅, 1 reaction" })).toBeVisible();
 
   await page.reload();
   await waitForAppReady(page);
@@ -252,7 +252,7 @@ test("message edits persist in channels and threads", async ({ page }) => {
   await expect(channelRow.locator(".markdown")).toContainText(`Edited channel message ${suffix}`);
   await expect(channelRow.locator(".markdown table")).toContainText("preserved");
   await expect(channelRow.getByText("(edited)")).toBeVisible();
-  await expect(channelRow.getByRole("button", { name: "✅ — 1 reaction" })).toBeVisible();
+  await expect(channelRow.getByRole("button", { name: "✅, 1 reaction" })).toBeVisible();
 
   await channelRow.hover();
   await channelRow.getByRole("button", { name: "Open thread" }).click();

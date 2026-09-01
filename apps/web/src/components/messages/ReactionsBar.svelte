@@ -1,10 +1,12 @@
 <script lang="ts">
   import EmojiPicker from "./EmojiPicker.svelte";
+  import { reactionAriaLabel, reactionAttributionText } from "../../lib/reaction-attribution";
   import type { ReactionSummary } from "../../lib/types";
 
   let {
     messageId,
     reactions = [],
+    currentUserID = "",
     pending = false,
     error = "",
     disabled = false,
@@ -12,6 +14,7 @@
   }: {
     messageId: string;
     reactions: ReactionSummary[];
+    currentUserID?: string;
     pending?: boolean;
     error?: string;
     disabled?: boolean;
@@ -23,6 +26,59 @@
       (a, b) => b.count - a.count || a.emoji.localeCompare(b.emoji),
     ),
   );
+
+  // Hover reveals reactors on a pointer; touch has no hover, so a long press
+  // reveals the same text and swallows the tap that would have toggled.
+  const LONG_PRESS_MS = 450;
+  let revealedEmoji = $state("");
+  let pressTimer: ReturnType<typeof setTimeout> | undefined;
+  let suppressClick = false;
+
+  function cancelPress() {
+    if (pressTimer !== undefined) {
+      clearTimeout(pressTimer);
+      pressTimer = undefined;
+    }
+  }
+
+  function startPress(event: PointerEvent, emoji: string) {
+    if (event.pointerType === "mouse") return;
+    cancelPress();
+    suppressClick = false;
+    pressTimer = setTimeout(() => {
+      pressTimer = undefined;
+      suppressClick = true;
+      revealedEmoji = emoji;
+    }, LONG_PRESS_MS);
+  }
+
+  function endPress() {
+    cancelPress();
+  }
+
+  function handleChipClick(emoji: string) {
+    if (suppressClick) {
+      suppressClick = false;
+      return;
+    }
+    revealedEmoji = "";
+    onToggle(emoji);
+  }
+
+  function dismissReveal() {
+    revealedEmoji = "";
+  }
+
+  $effect(() => {
+    if (!revealedEmoji) return;
+    const close = () => (revealedEmoji = "");
+    document.addEventListener("pointerdown", close, { capture: true });
+    document.addEventListener("scroll", close, true);
+    return () => {
+      document.removeEventListener("pointerdown", close, { capture: true });
+      document.removeEventListener("scroll", close, true);
+    };
+  });
 
   let showPicker = $state(false);
   let pickerWrapRef = $state<HTMLDivElement>();
@@ -65,21 +121,33 @@
 
 {#if groupedEntries.length > 0 || error}
   <div class="reactions-bar">
-    {#each groupedEntries as { emoji, count, reacted_by_me }}
-      <button
-        class="reaction-btn"
-        class:me={reacted_by_me}
-        onclick={() => onToggle(emoji)}
-        disabled={disabled || pending}
-        aria-pressed={reacted_by_me}
-        aria-label="{emoji} — {count} reaction{count !== 1 ? 's' : ''}"
-        title="{emoji}"
-      >
-        <span class="reaction-emoji">{emoji}</span>
-        {#if count > 1}
-          <span class="reaction-count">{count}</span>
+    {#each groupedEntries as reaction (reaction.emoji)}
+      <span class="chip-wrap">
+        <button
+          class="reaction-btn tooltip"
+          class:me={reaction.reacted_by_me}
+          onclick={() => handleChipClick(reaction.emoji)}
+          onpointerdown={(event) => startPress(event, reaction.emoji)}
+          onpointerup={endPress}
+          onpointercancel={endPress}
+          onpointerleave={endPress}
+          oncontextmenu={(event) => event.preventDefault()}
+          disabled={disabled || pending}
+          aria-pressed={reaction.reacted_by_me}
+          aria-label={reactionAriaLabel(reaction, currentUserID)}
+          data-tooltip={reactionAttributionText(reaction, currentUserID)}
+        >
+          <span class="reaction-emoji">{reaction.emoji}</span>
+          {#if reaction.count > 1}
+            <span class="reaction-count">{reaction.count}</span>
+          {/if}
+        </button>
+        {#if revealedEmoji === reaction.emoji}
+          <span class="reactor-popover" role="status">
+            {reactionAttributionText(reaction, currentUserID)}
+          </span>
         {/if}
-      </button>
+      </span>
     {/each}
 
     {#if groupedEntries.length > 0 && !disabled}
@@ -123,6 +191,48 @@
     gap: 4px;
     align-items: center;
     margin-top: 5px;
+  }
+
+  .chip-wrap {
+    position: relative;
+    display: inline-flex;
+  }
+
+  /* The shared .tooltip bubble is a nowrap one-liner; a reactor list needs to
+     wrap instead of running off the viewport. */
+  .reaction-btn::before {
+    white-space: normal;
+    width: max-content;
+    max-width: 220px;
+    text-align: center;
+  }
+
+  @media (hover: none), (pointer: coarse) {
+    /* Touch keeps a latched :hover after a tap. Long-press owns the reveal here. */
+    .reaction-btn::before,
+    .reaction-btn::after {
+      content: none;
+    }
+  }
+
+  .reactor-popover {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    z-index: 20;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: 220px;
+    padding: 0.42rem 0.62rem;
+    border-radius: 9px;
+    background: var(--tooltip-bg);
+    color: var(--tooltip-fg);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.3;
+    text-align: center;
+    pointer-events: none;
   }
 
   .reaction-btn {

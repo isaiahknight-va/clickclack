@@ -198,9 +198,9 @@ test("embedded channel loads, sends idempotently, and follows realtime updates",
     data: { emoji: "👀" },
   });
   expect(reactionResponse.ok()).toBe(true);
-  await expect(initialRow.getByRole("button", { name: "👀 — 1 reaction" })).toBeVisible();
-  await initialRow.getByRole("button", { name: "👀 — 1 reaction" }).click();
-  await expect(initialRow.getByRole("button", { name: "👀 — 1 reaction" })).toHaveCount(0);
+  await expect(initialRow.getByRole("button", { name: "👀, 1 reaction" })).toBeVisible();
+  await initialRow.getByRole("button", { name: "👀, 1 reaction" }).click();
+  await expect(initialRow.getByRole("button", { name: "👀, 1 reaction" })).toHaveCount(0);
 
   const uiEditedBody = `${initialBody} edited in embed`;
   await initialRow.hover();
