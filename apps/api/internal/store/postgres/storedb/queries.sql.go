@@ -4182,6 +4182,56 @@ func (q *Queries) ListPinnedMessages(ctx context.Context, arg ListPinnedMessages
 	return items, nil
 }
 
+const listReactionUsersForMessages = `-- name: ListReactionUsersForMessages :many
+SELECT
+  r.message_id,
+  r.emoji,
+  r.user_id,
+  u.display_name,
+  u.handle
+FROM reactions r
+JOIN users u ON u.id = r.user_id
+WHERE r.message_id = ANY($1::text[])
+ORDER BY r.message_id, r.emoji, r.created_at, r.user_id
+`
+
+type ListReactionUsersForMessagesRow struct {
+	MessageID   string `json:"message_id"`
+	Emoji       string `json:"emoji"`
+	UserID      string `json:"user_id"`
+	DisplayName string `json:"display_name"`
+	Handle      string `json:"handle"`
+}
+
+func (q *Queries) ListReactionUsersForMessages(ctx context.Context, messageIds []string) ([]ListReactionUsersForMessagesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listReactionUsersForMessages, pq.Array(messageIds))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListReactionUsersForMessagesRow
+	for rows.Next() {
+		var i ListReactionUsersForMessagesRow
+		if err := rows.Scan(
+			&i.MessageID,
+			&i.Emoji,
+			&i.UserID,
+			&i.DisplayName,
+			&i.Handle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listReactionsForMessages = `-- name: ListReactionsForMessages :many
 SELECT
   r.message_id,

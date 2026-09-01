@@ -275,10 +275,24 @@ type Channel struct {
 	UnreadCount     int64   `json:"unread_count"`
 }
 
+// ReactionUserLimit bounds how many reactor identities a summary carries. Count
+// stays authoritative, so a client renders the named reactors plus
+// (count - len(users)) unnamed ones.
+const ReactionUserLimit = 8
+
+type ReactionUser struct {
+	ID          string `json:"id"`
+	DisplayName string `json:"display_name"`
+	Handle      string `json:"handle,omitempty"`
+}
+
 type ReactionSummary struct {
 	Emoji       string `json:"emoji"`
 	Count       int64  `json:"count"`
 	ReactedByMe bool   `json:"reacted_by_me"`
+	// Users holds the earliest reactors, oldest first, capped at
+	// ReactionUserLimit. Bots are users and appear here like anyone else.
+	Users []ReactionUser `json:"users,omitempty"`
 }
 
 type PinnedMessage struct {

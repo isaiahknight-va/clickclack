@@ -86,7 +86,7 @@
   export let routeTargetID = "";
 
   let user: User | null = null;
-  const reactionController = new ReactionController(() => user?.id || "");
+  const reactionController = new ReactionController(() => user);
   const editController = new MessageEditController(revealEditSession);
   let workspaces: Workspace[] = [];
   let channels: Channel[] = [];

@@ -3191,6 +3191,16 @@ components:
           type: array
           items:
             type: string
+    ReactionUser:
+      type: object
+      required: [id, display_name]
+      properties:
+        id:
+          type: string
+        display_name:
+          type: string
+        handle:
+          type: string
     ReactionSummary:
       type: object
       required: [emoji, count, reacted_by_me]
@@ -3203,6 +3213,14 @@ components:
           minimum: 1
         reacted_by_me:
           type: boolean
+        users:
+          type: array
+          description: >-
+            Earliest reactors for this emoji, oldest first, capped at 8. Bots
+            appear here like any other user. count stays authoritative, so
+            (count - users.length) reactors are unnamed.
+          items:
+            $ref: '#/components/schemas/ReactionUser'
     Event:
       type: object
       required: [id, cursor, type, workspace_id, created_at, payload]

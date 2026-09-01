@@ -49,7 +49,7 @@
   let viewState = $state<ViewState>("loading");
   let errorText = $state("");
   let user = $state<User | null>(null);
-  const reactionController = new ReactionController(() => user?.id || "");
+  const reactionController = new ReactionController(() => user);
   const editController = new MessageEditController(revealEditSession);
   let route = $state<RouteTarget | null>(null);
   let channel = $state<Channel | null>(null);

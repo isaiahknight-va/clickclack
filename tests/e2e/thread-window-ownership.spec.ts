@@ -128,12 +128,8 @@ test("older retry retains its window, hydrates partial reactions and survives a 
     await expect(page.locator(".reply-list .reply")).toHaveCount(129);
     await expect.poll(async () => Math.abs((await anchor.boundingBox())!.y - y)).toBeLessThan(3);
     const first = page.locator(`.reply[data-message-id="${replies[0].id}"]`);
-    await expect(
-      first.getByRole("button", { name: "👍 — 1 reaction", exact: true }),
-    ).toBeAttached();
-    await expect(
-      first.getByRole("button", { name: "🔥 — 1 reaction", exact: true }),
-    ).toBeAttached();
+    await expect(first.getByRole("button", { name: "👍, 1 reaction" })).toBeAttached();
+    await expect(first.getByRole("button", { name: "🔥, 1 reaction" })).toBeAttached();
   } finally {
     release.resolve();
   }

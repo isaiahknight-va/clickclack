@@ -1980,11 +1980,18 @@ export interface components {
       last_reply_at?: string;
       last_reply_author_ids: string[];
     };
+    ReactionUser: {
+      id: string;
+      display_name: string;
+      handle?: string;
+    };
     ReactionSummary: {
       emoji: string;
       /** Format: int64 */
       count: number;
       reacted_by_me: boolean;
+      /** @description Earliest reactors for this emoji, oldest first, capped at 8. Bots appear here like any other user. count stays authoritative, so (count - users.length) reactors are unnamed. */
+      users?: components["schemas"]["ReactionUser"][];
     };
     Event: {
       id: string;
