@@ -1392,6 +1392,18 @@ WHERE r.message_id IN (sqlc.slice(message_ids))
 GROUP BY r.message_id, r.emoji
 ORDER BY r.message_id, reaction_count DESC, r.emoji;
 
+-- name: ListReactionUsersForMessages :many
+SELECT
+  r.message_id,
+  r.emoji,
+  r.user_id,
+  u.display_name,
+  u.handle
+FROM reactions r
+JOIN users u ON u.id = r.user_id
+WHERE r.message_id IN (sqlc.slice(message_ids))
+ORDER BY r.message_id, r.emoji, r.created_at, r.user_id;
+
 -- name: EventCursorExists :one
 SELECT EXISTS (
   SELECT 1 FROM events WHERE workspace_id = sqlc.arg(workspace_id) AND cursor = sqlc.arg(cursor)
