@@ -101,10 +101,19 @@ export type PreambleBlock = {
   final: boolean;
 };
 
+export type ReactionUser = {
+  id: string;
+  display_name: string;
+  handle?: string;
+};
+
 export type ReactionSummary = {
   emoji: string;
   count: number;
   reacted_by_me: boolean;
+  // Earliest reactors, oldest first, capped by the server. count stays
+  // authoritative, so (count - users.length) reactors are unnamed.
+  users?: ReactionUser[];
 };
 
 export type Message = {

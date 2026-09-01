@@ -4070,6 +4070,66 @@ func (q *Queries) ListPinnedMessages(ctx context.Context, arg ListPinnedMessages
 	return items, nil
 }
 
+const listReactionUsersForMessages = `-- name: ListReactionUsersForMessages :many
+SELECT
+  r.message_id,
+  r.emoji,
+  r.user_id,
+  u.display_name,
+  u.handle
+FROM reactions r
+JOIN users u ON u.id = r.user_id
+WHERE r.message_id IN (/*SLICE:message_ids*/?)
+ORDER BY r.message_id, r.emoji, r.created_at, r.user_id
+`
+
+type ListReactionUsersForMessagesRow struct {
+	MessageID   string `json:"message_id"`
+	Emoji       string `json:"emoji"`
+	UserID      string `json:"user_id"`
+	DisplayName string `json:"display_name"`
+	Handle      string `json:"handle"`
+}
+
+func (q *Queries) ListReactionUsersForMessages(ctx context.Context, messageIds []string) ([]ListReactionUsersForMessagesRow, error) {
+	query := listReactionUsersForMessages
+	var queryParams []interface{}
+	if len(messageIds) > 0 {
+		for _, v := range messageIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:message_ids*/?", strings.Repeat(",?", len(messageIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:message_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListReactionUsersForMessagesRow
+	for rows.Next() {
+		var i ListReactionUsersForMessagesRow
+		if err := rows.Scan(
+			&i.MessageID,
+			&i.Emoji,
+			&i.UserID,
+			&i.DisplayName,
+			&i.Handle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listReactionsForMessages = `-- name: ListReactionsForMessages :many
 SELECT
   r.message_id,
