@@ -1,6 +1,7 @@
 import { api, readableAPIError } from "./api";
 import { MAX_PROTECTED_MESSAGE_WINDOW, PAGE_MESSAGE_LIMIT } from "./chat/messageWindow";
-import type { Message, ReactionSummary, RealtimeEvent } from "./types";
+import { REACTION_USER_LIMIT, withReactor, withoutReactor } from "./reaction-attribution";
+import type { Message, ReactionSummary, ReactionUser, RealtimeEvent } from "./types";
 
 type ReactionIntent = "add" | "remove";
 
@@ -27,7 +28,17 @@ export class ReactionController {
   private revision = 0;
   private generation = 0;
 
-  constructor(private readonly currentUserID: () => string) {}
+  constructor(private readonly currentUser: () => ReactionUser | null | undefined) {}
+
+  private currentUserID(): string {
+    return this.currentUser()?.id || "";
+  }
+
+  private selfReactor(): ReactionUser | undefined {
+    const user = this.currentUser();
+    if (!user?.id) return undefined;
+    return { id: user.id, display_name: user.display_name, handle: user.handle };
+  }
 
   clear() {
     this.generation += 1;
@@ -52,7 +63,7 @@ export class ReactionController {
       next.set(message.id, {
         ...existing,
         confirmed,
-        displayed: applyIntent(confirmed, existing.pendingIntent),
+        displayed: applyIntent(confirmed, existing.pendingIntent, this.selfReactor()),
         complete: true,
         partialEmojis: new Map(),
         revision: ++this.revision,
@@ -104,12 +115,16 @@ export class ReactionController {
       Math.max(0, count),
       event.type === "reaction.added",
       currentUserActed,
+      String(event.payload.user_id ?? ""),
+      this.selfReactor(),
     );
     const pendingIntent = existing?.pendingIntent;
     const eventResolvesPendingIntent = currentUserActed && pendingIntent?.emoji === emoji;
     this.setEntry(messageID, {
       confirmed,
-      displayed: eventResolvesPendingIntent ? confirmed : applyIntent(confirmed, pendingIntent),
+      displayed: eventResolvesPendingIntent
+        ? confirmed
+        : applyIntent(confirmed, pendingIntent, this.selfReactor()),
       complete: existing?.complete ?? false,
       partialEmojis,
       revision: ++this.revision,
@@ -130,7 +145,7 @@ export class ReactionController {
     const pendingIntent = { emoji, intent };
     this.setEntry(message.id, {
       ...entry,
-      displayed: applyIntent(entry.confirmed, pendingIntent),
+      displayed: applyIntent(entry.confirmed, pendingIntent, this.selfReactor()),
       pendingIntent,
       error: "",
     });
@@ -160,7 +175,7 @@ export class ReactionController {
         this.setEntry(message.id, {
           ...current,
           confirmed,
-          displayed: applyIntent(confirmed, current.pendingIntent),
+          displayed: applyIntent(confirmed, current.pendingIntent, this.selfReactor()),
           complete: true,
           partialEmojis: new Map(),
           revision: ++this.revision,
@@ -181,7 +196,7 @@ export class ReactionController {
             this.setEntry(message.id, {
               ...current,
               confirmed,
-              displayed: applyIntent(confirmed, current.pendingIntent),
+              displayed: applyIntent(confirmed, current.pendingIntent, this.selfReactor()),
               complete: true,
               partialEmojis: new Map(),
               revision: ++this.revision,
@@ -250,6 +265,7 @@ function normalizeReactions(reactions: ReactionSummary[]): ReactionSummary[] {
       emoji: reaction.emoji,
       count: reaction.count,
       reacted_by_me: reaction.reacted_by_me,
+      users: [...(reaction.users ?? [])],
     });
   }
   return sortReactions([...byEmoji.values()]);
@@ -277,6 +293,7 @@ function mergePartialReactions(
 function applyIntent(
   confirmed: ReactionSummary[],
   pending?: { emoji: string; intent: ReactionIntent },
+  self?: ReactionUser,
 ): ReactionSummary[] {
   if (!pending) return confirmed;
   const next = confirmed.map((reaction) => ({ ...reaction }));
@@ -289,15 +306,22 @@ function applyIntent(
         ...next[index],
         count: next[index].count - 1,
         reacted_by_me: false,
+        users: withoutReactor(next[index].users, self?.id ?? ""),
       };
     }
   } else if (index < 0) {
-    next.push({ emoji: pending.emoji, count: 1, reacted_by_me: true });
+    next.push({
+      emoji: pending.emoji,
+      count: 1,
+      reacted_by_me: true,
+      users: withReactor([], self, REACTION_USER_LIMIT),
+    });
   } else if (!next[index].reacted_by_me) {
     next[index] = {
       ...next[index],
       count: next[index].count + 1,
       reacted_by_me: true,
+      users: withReactor(next[index].users, self, REACTION_USER_LIMIT),
     };
   }
   return sortReactions(next);
@@ -309,6 +333,8 @@ function applyReactionEvent(
   count: number,
   added: boolean,
   currentUserActed: boolean,
+  actorID: string,
+  self?: ReactionUser,
 ): ReactionSummary[] {
   const next = confirmed.map((reaction) => ({ ...reaction }));
   const index = next.findIndex((reaction) => reaction.emoji === emoji);
@@ -317,7 +343,15 @@ function applyReactionEvent(
     return sortReactions(next);
   }
   const reactedByMe = currentUserActed ? added : index >= 0 ? next[index].reacted_by_me : false;
-  const summary = { emoji, count, reacted_by_me: reactedByMe };
+  // An event names only its actor. Adds by anyone else stay unnamed until the
+  // next authoritative load, where count - users.length reports them honestly.
+  const known = index >= 0 ? next[index].users : [];
+  const users = added
+    ? currentUserActed
+      ? withReactor(known, self, REACTION_USER_LIMIT)
+      : (known ?? [])
+    : withoutReactor(known, actorID);
+  const summary = { emoji, count, reacted_by_me: reactedByMe, users };
   if (index >= 0) next[index] = summary;
   else next.push(summary);
   return sortReactions(next);
