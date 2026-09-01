@@ -696,6 +696,7 @@
         <ReactionsBar
           messageId={root.id}
           reactions={reactionController.reactionsFor(root)}
+          currentUserID={currentUserID}
           pending={reactionController.pending(root.id)}
           error={reactionController.error(root.id)}
           disabled={reactionsDisabled || !currentUserID}
@@ -860,6 +861,7 @@
             <ReactionsBar
               messageId={reply.id}
               reactions={reactionController.reactionsFor(reply)}
+              currentUserID={currentUserID}
               pending={reactionController.pending(reply.id)}
               error={reactionController.error(reply.id)}
               disabled={reactionsDisabled || !currentUserID}

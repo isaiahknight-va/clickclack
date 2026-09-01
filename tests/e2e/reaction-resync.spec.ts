@@ -72,7 +72,7 @@ for (const surface of ["channel embed", "thread embed", "full app"] as const) {
         cursor = event.cursor;
         const reaction = scope
           .locator(`[data-message-id="${target.id}"]`)
-          .getByRole("button", { name: "👍 — 1 reaction", exact: true });
+          .getByRole("button", { name: "👍, 1 reaction" });
         if (action === "add") await expect(reaction).toHaveCount(0);
         else await expect(reaction).toHaveAttribute("aria-pressed", "true");
       }
@@ -86,7 +86,7 @@ for (const surface of ["channel embed", "thread embed", "full app"] as const) {
       for (const target of targets) {
         const reaction = scope
           .locator(`[data-message-id="${target.id}"]`)
-          .getByRole("button", { name: "👍 — 1 reaction", exact: true });
+          .getByRole("button", { name: "👍, 1 reaction" });
         if (action === "add") await expect(reaction).toHaveAttribute("aria-pressed", "true");
         else await expect(reaction).toHaveCount(0);
       }
@@ -99,7 +99,7 @@ for (const surface of ["channel embed", "thread embed", "full app"] as const) {
       await expect(
         scope
           .locator(`[data-message-id="${target.id}"]`)
-          .getByRole("button", { name: "👀 — 1 reaction", exact: true }),
+          .getByRole("button", { name: "👀, 1 reaction" }),
       ).toHaveAttribute("aria-pressed", "true");
       expect(
         (
@@ -109,7 +109,7 @@ for (const surface of ["channel embed", "thread embed", "full app"] as const) {
         ).ok(),
       ).toBe(true);
       await expect(
-        scope.locator(`[data-message-id="${target.id}"]`).getByRole("button", { name: /👀 —/ }),
+        scope.locator(`[data-message-id="${target.id}"]`).getByRole("button", { name: /👀,/ }),
       ).toHaveCount(0);
     }
   });

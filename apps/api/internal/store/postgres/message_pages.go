@@ -109,12 +109,19 @@ func (s *Store) hydrateReactions(ctx context.Context, userID string, messages []
 		return nil, fmt.Errorf("load reactions: %w", err)
 	}
 
+	reactorRows, err := s.q.ListReactionUsersForMessages(ctx, ids)
+	if err != nil {
+		return nil, fmt.Errorf("load reaction users: %w", err)
+	}
+	reactors := reactorsByMessageEmoji(reactorRows)
+
 	reactionsByMsg := make(map[string][]store.ReactionSummary, len(ids))
 	for _, row := range rows {
 		reactionsByMsg[row.MessageID] = append(reactionsByMsg[row.MessageID], store.ReactionSummary{
 			Emoji:       row.Emoji,
 			Count:       row.ReactionCount,
 			ReactedByMe: row.ReactedByMe,
+			Users:       reactors[row.MessageID][row.Emoji],
 		})
 	}
 
@@ -125,6 +132,28 @@ func (s *Store) hydrateReactions(ctx context.Context, userID string, messages []
 		}
 	}
 	return messages, nil
+}
+
+// reactorsByMessageEmoji keeps only the earliest store.ReactionUserLimit reactors
+// per message and emoji so one heavily reacted message cannot unbound a page.
+func reactorsByMessageEmoji(rows []storedb.ListReactionUsersForMessagesRow) map[string]map[string][]store.ReactionUser {
+	byMessage := make(map[string]map[string][]store.ReactionUser)
+	for _, row := range rows {
+		byEmoji := byMessage[row.MessageID]
+		if byEmoji == nil {
+			byEmoji = make(map[string][]store.ReactionUser)
+			byMessage[row.MessageID] = byEmoji
+		}
+		if len(byEmoji[row.Emoji]) >= store.ReactionUserLimit {
+			continue
+		}
+		byEmoji[row.Emoji] = append(byEmoji[row.Emoji], store.ReactionUser{
+			ID:          row.UserID,
+			DisplayName: row.DisplayName,
+			Handle:      row.Handle,
+		})
+	}
+	return byMessage
 }
 
 func (s *Store) hydrateThreadStates(ctx context.Context, messages []store.Message) ([]store.Message, error) {
