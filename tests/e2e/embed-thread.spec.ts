@@ -59,13 +59,13 @@ test("embedded thread loads, posts replies, and follows realtime updates", async
     data: { emoji: "🚀" },
   });
   expect(rootReaction.ok()).toBe(true);
-  await expect(rootRow.getByRole("button", { name: "🚀 — 1 reaction" })).toBeVisible();
+  await expect(rootRow.getByRole("button", { name: "🚀, 1 reaction" })).toBeVisible();
   const editedRoot = `${message.body} edited in embed`;
   await rootRow.getByRole("button", { name: "Edit message" }).click();
   await rootRow.getByLabel("Edit message").fill(editedRoot);
   await rootRow.getByRole("button", { name: "Save" }).click();
   await expect(rootRow.locator(".markdown")).toContainText(editedRoot);
-  await expect(rootRow.getByRole("button", { name: "🚀 — 1 reaction" })).toBeVisible();
+  await expect(rootRow.getByRole("button", { name: "🚀, 1 reaction" })).toBeVisible();
 
   const composer = page.getByLabel("Reply body");
   await composer.fill(`embedded reply ${stamp}`);
@@ -89,14 +89,14 @@ test("embedded thread loads, posts replies, and follows realtime updates", async
     data: { emoji: "✅" },
   });
   expect(replyReaction.ok()).toBe(true);
-  await expect(realtimeReplyRow.getByRole("button", { name: "✅ — 1 reaction" })).toBeVisible();
+  await expect(realtimeReplyRow.getByRole("button", { name: "✅, 1 reaction" })).toBeVisible();
 
   const editedReply = `${realtimeReply} edited`;
   await realtimeReplyRow.getByRole("button", { name: "Edit message" }).click();
   await realtimeReplyRow.getByLabel("Edit message").fill(editedReply);
   await realtimeReplyRow.getByRole("button", { name: "Save" }).click();
   await expect(realtimeReplyRow.locator(".markdown")).toContainText(editedReply);
-  await expect(realtimeReplyRow.getByRole("button", { name: "✅ — 1 reaction" })).toBeVisible();
+  await expect(realtimeReplyRow.getByRole("button", { name: "✅, 1 reaction" })).toBeVisible();
 
   const deleteResponse = await page.request.delete(`/api/messages/${createdReply.id}`);
   expect(deleteResponse.ok()).toBe(true);
