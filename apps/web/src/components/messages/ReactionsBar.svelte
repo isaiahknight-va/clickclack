@@ -1,6 +1,12 @@
 <script lang="ts">
   import EmojiPicker from "./EmojiPicker.svelte";
-  import { reactionAriaLabel, reactionAttributionText } from "../../lib/reaction-attribution";
+  import {
+    isSeenReaction,
+    reactionAriaLabel,
+    reactionAttributionText,
+    seenAriaLabel,
+    seenAttributionText,
+  } from "../../lib/reaction-attribution";
   import type { ReactionSummary } from "../../lib/types";
 
   let {
@@ -21,9 +27,14 @@
     onToggle: (emoji: string) => void;
   } = $props();
 
+  // The seen pill leads the row: it reports readership, not sentiment, so it
+  // sorts ahead of the opinion chips regardless of count.
   let groupedEntries = $derived(
     [...reactions].sort(
-      (a, b) => b.count - a.count || a.emoji.localeCompare(b.emoji),
+      (a, b) =>
+        Number(isSeenReaction(b)) - Number(isSeenReaction(a)) ||
+        b.count - a.count ||
+        a.emoji.localeCompare(b.emoji),
     ),
   );
 
@@ -65,13 +76,29 @@
     onToggle(emoji);
   }
 
-  function dismissReveal() {
+  // The seen pill is a viewer, never a toggle: clicking or pressing Enter opens
+  // the who-saw list. Membership changes go through the emoji picker.
+  let seenPillRef = $state<HTMLButtonElement>();
+  let seenPopoverId = $derived(`seen-by-${messageId}`);
+
+  function toggleSeen(emoji: string) {
+    revealedEmoji = revealedEmoji === emoji ? "" : emoji;
+  }
+
+  function handleSeenKeydown(event: KeyboardEvent) {
+    if (event.key !== "Escape" || !revealedEmoji) return;
+    event.preventDefault();
     revealedEmoji = "";
   }
 
   $effect(() => {
     if (!revealedEmoji) return;
-    const close = () => (revealedEmoji = "");
+    // The pill's own click owns its open/closed state, so its pointerdown must
+    // not close the popover a moment before that click reopens it.
+    const close = (event: Event) => {
+      if (event.type === "pointerdown" && seenPillRef?.contains(event.target as Node)) return;
+      revealedEmoji = "";
+    };
     document.addEventListener("pointerdown", close, { capture: true });
     document.addEventListener("scroll", close, true);
     return () => {
@@ -123,28 +150,51 @@
   <div class="reactions-bar">
     {#each groupedEntries as reaction (reaction.emoji)}
       <span class="chip-wrap">
-        <button
-          class="reaction-btn tooltip"
-          class:me={reaction.reacted_by_me}
-          onclick={() => handleChipClick(reaction.emoji)}
-          onpointerdown={(event) => startPress(event, reaction.emoji)}
-          onpointerup={endPress}
-          onpointercancel={endPress}
-          onpointerleave={endPress}
-          oncontextmenu={(event) => event.preventDefault()}
-          disabled={disabled || pending}
-          aria-pressed={reaction.reacted_by_me}
-          aria-label={reactionAriaLabel(reaction, currentUserID)}
-          data-tooltip={reactionAttributionText(reaction, currentUserID)}
-        >
-          <span class="reaction-emoji">{reaction.emoji}</span>
-          {#if reaction.count > 1}
+        {#if isSeenReaction(reaction)}
+          <button
+            bind:this={seenPillRef}
+            class="reaction-btn seen-pill tooltip"
+            class:is-you={reaction.reacted_by_me}
+            onclick={() => toggleSeen(reaction.emoji)}
+            onkeydown={handleSeenKeydown}
+            aria-expanded={revealedEmoji === reaction.emoji}
+            aria-controls={seenPopoverId}
+            aria-label={seenAriaLabel(reaction, currentUserID)}
+            data-tooltip={seenAttributionText(reaction, currentUserID)}
+          >
+            <span class="reaction-emoji">{reaction.emoji}</span>
             <span class="reaction-count">{reaction.count}</span>
-          {/if}
-        </button>
+          </button>
+        {:else}
+          <button
+            class="reaction-btn tooltip"
+            class:me={reaction.reacted_by_me}
+            onclick={() => handleChipClick(reaction.emoji)}
+            onpointerdown={(event) => startPress(event, reaction.emoji)}
+            onpointerup={endPress}
+            onpointercancel={endPress}
+            onpointerleave={endPress}
+            oncontextmenu={(event) => event.preventDefault()}
+            disabled={disabled || pending}
+            aria-pressed={reaction.reacted_by_me}
+            aria-label={reactionAriaLabel(reaction, currentUserID)}
+            data-tooltip={reactionAttributionText(reaction, currentUserID)}
+          >
+            <span class="reaction-emoji">{reaction.emoji}</span>
+            {#if reaction.count > 1}
+              <span class="reaction-count">{reaction.count}</span>
+            {/if}
+          </button>
+        {/if}
         {#if revealedEmoji === reaction.emoji}
-          <span class="reactor-popover" role="status">
-            {reactionAttributionText(reaction, currentUserID)}
+          <span
+            class="reactor-popover"
+            role="status"
+            id={isSeenReaction(reaction) ? seenPopoverId : undefined}
+          >
+            {isSeenReaction(reaction)
+              ? seenAttributionText(reaction, currentUserID)
+              : reactionAttributionText(reaction, currentUserID)}
           </span>
         {/if}
       </span>
@@ -264,6 +314,26 @@
     background: var(--accent-soft, rgba(0, 128, 196, 0.13));
     border-color: var(--accent, #0080c4);
     color: var(--text-strong, #10151d);
+  }
+
+  /* A read receipt, not an opinion: quieter than a reaction chip, and it never
+     takes the accent fill that means "you reacted". */
+  .seen-pill {
+    border-color: color-mix(in srgb, var(--line-strong, rgba(16, 21, 29, 0.17)) 55%, transparent);
+    background: color-mix(in srgb, var(--muted-2, #8b94a3) 8%, transparent);
+  }
+
+  .seen-pill.is-you {
+    border-color: color-mix(in srgb, var(--accent, #0080c4) 34%, transparent);
+  }
+
+  .seen-pill:hover {
+    background: color-mix(in srgb, var(--muted-2, #8b94a3) 16%, transparent);
+    border-color: color-mix(in srgb, var(--line-strong, rgba(16, 21, 29, 0.17)) 80%, transparent);
+  }
+
+  .seen-pill .reaction-count {
+    color: var(--muted-2, #8b94a3);
   }
 
   .reaction-emoji {

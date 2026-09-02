@@ -3,6 +3,16 @@ import type { ReactionSummary, ReactionUser } from "./types";
 /** Mirrors store.ReactionUserLimit on the server. */
 export const REACTION_USER_LIMIT = 8;
 
+// House convention (TYP): agents acknowledge an instruction with the eyes
+// reaction, so this one emoji answers "who saw this" rather than "who liked
+// this". The server treats it as an ordinary reaction; only the client separates
+// it.
+export const SEEN_EMOJI = "👀";
+
+export function isSeenReaction(reaction: Pick<ReactionSummary, "emoji">): boolean {
+  return reaction.emoji === SEEN_EMOJI;
+}
+
 // The server names only the earliest reactors (see ReactionSummary.users), so
 // every label here is built from the named subset plus the authoritative count.
 // Anything the client cannot name stays counted rather than guessed.
@@ -45,6 +55,22 @@ export function reactionAttributionText(reaction: ReactionSummary, currentUserID
   }
   const parts = unnamed > 0 ? [...names, othersLabel(unnamed)] : names;
   return `${joinNames(parts)} reacted with ${reaction.emoji}`;
+}
+
+/** Who saw a message: "Seen by You, Ada, and 2 others". */
+export function seenAttributionText(reaction: ReactionSummary, currentUserID: string): string {
+  const names = reactorNames(reaction, currentUserID);
+  const unnamed = unnamedReactorCount(reaction, names.length);
+  if (names.length === 0) {
+    return `Seen by ${peopleLabel(Math.max(1, Math.floor(reaction.count)))}`;
+  }
+  const parts = unnamed > 0 ? [...names, othersLabel(unnamed)] : names;
+  return `Seen by ${joinNames(parts)}`;
+}
+
+/** Screen-reader label for the seen pill: who saw it, and what the button does. */
+export function seenAriaLabel(reaction: ReactionSummary, currentUserID: string): string {
+  return `${seenAttributionText(reaction, currentUserID)}. Show who saw this message`;
 }
 
 /** Screen-reader label for a chip: state, tally, and who. */
