@@ -1,10 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  isSeenReaction,
   REACTION_USER_LIMIT,
   reactionAriaLabel,
   reactionAttributionText,
   reactorNames,
+  SEEN_EMOJI,
+  seenAriaLabel,
+  seenAttributionText,
   unnamedReactorCount,
   withReactor,
   withoutReactor,
@@ -77,6 +81,43 @@ test("aria label carries state, tally, and attribution", () => {
     reactionAriaLabel(summary(1, [user("u1", "Ada")]), ""),
     "👀, 1 reaction. Ada reacted with 👀",
   );
+});
+
+test("only the eyes reaction reads as a seen receipt", () => {
+  assert.equal(SEEN_EMOJI, "👀");
+  assert.equal(isSeenReaction({ emoji: SEEN_EMOJI }), true);
+  assert.equal(isSeenReaction({ emoji: "👍" }), false);
+  assert.equal(isSeenReaction({ emoji: "" }), false);
+});
+
+test("seen attribution names viewers instead of reactors", () => {
+  assert.equal(seenAttributionText(summary(1, [user("u1", "Tater")]), ""), "Seen by Tater");
+  assert.equal(
+    seenAttributionText(summary(2, [user("u1", "Tater"), user("u2", "Isaiah Knight")]), ""),
+    "Seen by Tater and Isaiah Knight",
+  );
+  assert.equal(
+    seenAttributionText(summary(3, [user("u1", "Tater"), user("u2", "Bo")]), "u2"),
+    "Seen by Tater, You, and 1 other",
+  );
+});
+
+test("seen attribution falls back to a headcount and stays bounded", () => {
+  assert.equal(seenAttributionText(summary(1, []), ""), "Seen by 1 person");
+  assert.equal(seenAttributionText(summary(5, []), ""), "Seen by 5 people");
+  assert.equal(
+    seenAttributionText(summary(12, [user("u1", "Ada"), user("u2", "Bo")]), ""),
+    "Seen by Ada, Bo, and 10 others",
+  );
+});
+
+test("seen aria label names the viewers and what the pill does", () => {
+  assert.equal(
+    seenAriaLabel(summary(2, [user("u1", "Tater"), user("u2", "Isaiah Knight")]), ""),
+    "Seen by Tater and Isaiah Knight. Show who saw this message",
+  );
+  // The pill is not a toggle, so its label never claims a reaction tally.
+  assert.doesNotMatch(seenAriaLabel(summary(2, []), ""), /reaction/);
 });
 
 test("withReactor appends once and respects the server bound", () => {
