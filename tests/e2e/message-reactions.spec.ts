@@ -167,21 +167,31 @@ test("the eyes reaction reads as a seen pill that opens the who-saw list", async
       headers: actor ? { "X-ClickClack-User": actor.id } : {},
       data: { emoji },
     });
-  // 👍 outnumbers 👀, so the pill's lead position cannot come from its count.
+  // 👍 outnumbers the acknowledgement, so the pill's lead position cannot come
+  // from its count.
   for (const actor of [bots[0], bots[1], undefined])
     expect((await react("👍", actor)).ok()).toBe(true);
   expect((await react("👀", bots[0])).ok()).toBe(true);
   expect((await react("👀")).ok()).toBe(true);
+  // TYP bots ack over the API with the literal shortcode (the bridge's
+  // ACK_EMOJI), which the server stores verbatim as its own reaction row. It is
+  // the same acknowledgement, so it belongs in the same pill.
+  expect((await react("eyes", bots[1])).ok()).toBe(true);
 
   // Reload for the authoritative hydration that names foreign reactors.
   await page.reload();
   await waitForAppReady(page);
   const seenRow = page.locator(`[data-message-id="${messageID}"]`);
-  const seenBy = `Seen by ${bots[0].display_name} and You`;
+  const seenBy = `Seen by ${bots[0].display_name}, You, and ${bots[1].display_name}`;
   const pill = seenRow.getByRole("button", { name: "Seen by" });
   await expect(pill).toHaveAttribute("aria-label", `${seenBy}. Show who saw this message`);
   await expect(pill).toHaveAttribute("data-tooltip", seenBy);
-  await expect(pill).toContainText("2");
+  // One pill, both spellings: summed tally, merged names, and the glyph on show
+  // even though one membership arrived as the string "eyes".
+  await expect(seenRow.locator(".seen-pill")).toHaveCount(1);
+  await expect(pill).toContainText("3");
+  await expect(pill.locator(".reaction-emoji")).toHaveText("👀");
+  await expect(seenRow.getByRole("button", { name: "eyes" })).toHaveCount(0);
   await expect(seenRow.getByRole("button", { name: "👍, 3 reactions" })).toBeVisible();
   // A read receipt is not an opinion: no pressed state, and it leads the row.
   expect(await pill.getAttribute("aria-pressed")).toBeNull();
@@ -214,10 +224,12 @@ test("the eyes reaction reads as a seen pill that opens the who-saw list", async
   await expect(pill).toBeFocused();
 
   // Nothing above touched the viewer's own membership.
-  await expect(pill).toContainText("2");
+  await expect(pill).toContainText("3");
   expect(reactionWrites).toBe(0);
 
-  // The picker remains the way in and out: re-picking 👀 takes it back off.
+  // The picker remains the way in and out: re-picking 👀 takes it back off. It
+  // only ever writes the glyph, so the bot's string-form membership survives and
+  // the pill keeps reporting it.
   const removal = page.waitForRequest(
     (request) =>
       request.method() === "DELETE" && new URL(request.url()).pathname.startsWith(reactionPath),
@@ -226,9 +238,10 @@ test("the eyes reaction reads as a seen pill that opens the who-saw list", async
   await removal;
   await expect(pill).toHaveAttribute(
     "aria-label",
-    `Seen by ${bots[0].display_name}. Show who saw this message`,
+    `Seen by ${bots[0].display_name} and ${bots[1].display_name}. Show who saw this message`,
   );
-  await expect(pill).toContainText("1");
+  await expect(pill).toContainText("2");
+  await expect(seenRow.locator(".seen-pill")).toHaveCount(1);
   await expect(seenRow.getByRole("button", { name: "👍, 3 reactions" })).toBeVisible();
 });
 

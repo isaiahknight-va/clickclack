@@ -2,6 +2,7 @@
   import EmojiPicker from "./EmojiPicker.svelte";
   import {
     isSeenReaction,
+    mergeSeenReactions,
     reactionAriaLabel,
     reactionAttributionText,
     seenAriaLabel,
@@ -27,10 +28,12 @@
     onToggle: (emoji: string) => void;
   } = $props();
 
-  // The seen pill leads the row: it reports readership, not sentiment, so it
-  // sorts ahead of the opinion chips regardless of count.
+  // Every spelling of the acknowledgement collapses into one pill first, so a
+  // bot's shortcode and a human's glyph read as one readership list. The pill
+  // then leads the row: it reports readership, not sentiment, so it sorts ahead
+  // of the opinion chips regardless of count.
   let groupedEntries = $derived(
-    [...reactions].sort(
+    mergeSeenReactions(reactions).sort(
       (a, b) =>
         Number(isSeenReaction(b)) - Number(isSeenReaction(a)) ||
         b.count - a.count ||

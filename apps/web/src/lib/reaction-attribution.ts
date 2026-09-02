@@ -9,8 +9,59 @@ export const REACTION_USER_LIMIT = 8;
 // it.
 export const SEEN_EMOJI = "👀";
 
+// The server stores whatever string the writer sent, so the same acknowledgement
+// arrives in more than one spelling: the picker writes the glyph, the TYP bridge
+// posts the literal shortcode "eyes", and some clients pad the glyph with VS16.
+// Order is the display order of the merged membership, not chronology, because
+// the payload carries no reaction timestamps to interleave the variants by.
+export const SEEN_EMOJI_FORMS: readonly string[] = [SEEN_EMOJI, `${SEEN_EMOJI}\uFE0F`, "eyes"];
+
 export function isSeenReaction(reaction: Pick<ReactionSummary, "emoji">): boolean {
-  return reaction.emoji === SEEN_EMOJI;
+  return SEEN_EMOJI_FORMS.includes(reaction.emoji);
+}
+
+/**
+ * Collapses every seen-variant reaction on a message into one pill entry that
+ * reports the glyph, the summed tally, and the concatenated membership. Chips
+ * that are not a seen variant pass through untouched, still carrying whatever
+ * string the server stored.
+ */
+export function mergeSeenReactions(reactions: ReactionSummary[]): ReactionSummary[] {
+  const variants = SEEN_EMOJI_FORMS.flatMap((form) =>
+    reactions.filter((reaction) => reaction.emoji === form),
+  );
+  if (variants.length === 0) return [...reactions];
+
+  const users: ReactionUser[] = [];
+  const named = new Set<string>();
+  let count = 0;
+  let reactedByMe = false;
+  for (const variant of variants) {
+    count += Math.max(0, Math.floor(variant.count));
+    reactedByMe ||= variant.reacted_by_me;
+    for (const user of variant.users ?? []) {
+      if (!user?.id) continue;
+      if (named.has(user.id)) {
+        // One person holding two spellings still saw the message once, so the
+        // collapsed membership leaves the headcount rather than inflating it.
+        // Only named duplicates are detectable; unnamed ones stay counted twice.
+        count -= 1;
+        continue;
+      }
+      named.add(user.id);
+      users.push(user);
+    }
+  }
+
+  return [
+    {
+      emoji: SEEN_EMOJI,
+      count: Math.max(count, users.length),
+      reacted_by_me: reactedByMe,
+      users,
+    },
+    ...reactions.filter((reaction) => !isSeenReaction(reaction)),
+  ];
 }
 
 // The server names only the earliest reactors (see ReactionSummary.users), so
