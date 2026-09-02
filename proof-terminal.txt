@@ -1,0 +1,16 @@
+=== parent e9bfe8ce (v0.4.0 main) ===
+[main@e9bfe8ce] selected row z-index: 5, .timeline isolation: auto
+[main@e9bfe8ce] Bug 1 paint probes: 9/15 inside drawer; leaks: 
+  60,560 -> ARTICLE.message-group is-self
+  187,560 -> DIV.message-actions
+  310,560 -> DIV.message-actions
+  60,650 -> P.
+  187,650 -> P.
+  310,650 -> P.
+[main@e9bfe8ce] Bug 2 header: title starts x=17, toggle spans x=14..52, overlap: true
+[main@e9bfe8ce] verdict: FAIL
+=== head eadcb3dd (this PR) ===
+[pr@eadcb3dd] selected row z-index: 5, .timeline isolation: isolate
+[pr@eadcb3dd] Bug 1 paint probes: 15/15 inside drawer; leaks: none
+[pr@eadcb3dd] Bug 2 header: title starts x=65, toggle spans x=14..52, overlap: false
+[pr@eadcb3dd] verdict: PASS
