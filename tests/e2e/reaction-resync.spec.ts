@@ -93,23 +93,23 @@ for (const surface of ["channel embed", "thread embed", "full app"] as const) {
       muted = false;
       const target = targets.at(-1)!;
       const live = await page.request.post(`/api/messages/${target.id}/reactions`, {
-        data: { emoji: "👀" },
+        data: { emoji: "🎉" },
       });
       expect(live.ok()).toBe(true);
       await expect(
         scope
           .locator(`[data-message-id="${target.id}"]`)
-          .getByRole("button", { name: "👀, 1 reaction" }),
+          .getByRole("button", { name: "🎉, 1 reaction" }),
       ).toHaveAttribute("aria-pressed", "true");
       expect(
         (
           await page.request.delete(
-            `/api/messages/${target.id}/reactions/${encodeURIComponent("👀")}`,
+            `/api/messages/${target.id}/reactions/${encodeURIComponent("🎉")}`,
           )
         ).ok(),
       ).toBe(true);
       await expect(
-        scope.locator(`[data-message-id="${target.id}"]`).getByRole("button", { name: /👀,/ }),
+        scope.locator(`[data-message-id="${target.id}"]`).getByRole("button", { name: /🎉,/ }),
       ).toHaveCount(0);
     }
   });

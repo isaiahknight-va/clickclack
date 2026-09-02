@@ -147,6 +147,91 @@ test("reaction mutations are accessible, authoritative, persistent, and realtime
   expect(messageRefreshes).toBe(0);
 });
 
+test("the eyes reaction reads as a seen pill that opens the who-saw list", async ({ page }) => {
+  const { suffix, workspace } = await openReactionChannel(page);
+  const row = await sendMessage(page, `Seen pill proof ${suffix}`);
+  const messageID = await row.getAttribute("data-message-id");
+  expect(messageID).toBeTruthy();
+  const reactionPath = `/api/messages/${messageID}/reactions`;
+
+  const bots: Array<{ id: string; display_name: string }> = [];
+  for (const displayName of ["Reader bot", "Second reader"]) {
+    const created = await page.request.post(`/api/workspaces/${workspace.id}/bots`, {
+      data: { display_name: displayName, initial_token: false },
+    });
+    expect(created.ok()).toBe(true);
+    bots.push((await created.json()).bot);
+  }
+  const react = async (emoji: string, actor?: { id: string }) =>
+    page.request.post(reactionPath, {
+      headers: actor ? { "X-ClickClack-User": actor.id } : {},
+      data: { emoji },
+    });
+  // 👍 outnumbers 👀, so the pill's lead position cannot come from its count.
+  for (const actor of [bots[0], bots[1], undefined])
+    expect((await react("👍", actor)).ok()).toBe(true);
+  expect((await react("👀", bots[0])).ok()).toBe(true);
+  expect((await react("👀")).ok()).toBe(true);
+
+  // Reload for the authoritative hydration that names foreign reactors.
+  await page.reload();
+  await waitForAppReady(page);
+  const seenRow = page.locator(`[data-message-id="${messageID}"]`);
+  const seenBy = `Seen by ${bots[0].display_name} and You`;
+  const pill = seenRow.getByRole("button", { name: "Seen by" });
+  await expect(pill).toHaveAttribute("aria-label", `${seenBy}. Show who saw this message`);
+  await expect(pill).toHaveAttribute("data-tooltip", seenBy);
+  await expect(pill).toContainText("2");
+  await expect(seenRow.getByRole("button", { name: "👍, 3 reactions" })).toBeVisible();
+  // A read receipt is not an opinion: no pressed state, and it leads the row.
+  expect(await pill.getAttribute("aria-pressed")).toBeNull();
+  await expect(seenRow.locator(".reactions-bar .reaction-btn").first()).toHaveClass(/seen-pill/);
+
+  let reactionWrites = 0;
+  page.on("request", (request) => {
+    if (request.method() === "GET") return;
+    if (new URL(request.url()).pathname.startsWith(reactionPath)) reactionWrites += 1;
+  });
+
+  const popover = seenRow.locator(".reactor-popover");
+  await pill.click();
+  await expect(popover).toHaveText(seenBy);
+  await expect(pill).toHaveAttribute("aria-expanded", "true");
+  await expect(popover).toHaveAttribute("id", (await pill.getAttribute("aria-controls")) ?? "");
+  if (process.env.SEEN_PILL_PROOF_PATH) {
+    await seenRow.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: process.env.SEEN_PILL_PROOF_PATH, fullPage: true });
+  }
+  await pill.click();
+  await expect(popover).toHaveCount(0);
+  await expect(pill).toHaveAttribute("aria-expanded", "false");
+
+  await pill.focus();
+  await page.keyboard.press("Enter");
+  await expect(popover).toHaveText(seenBy);
+  await page.keyboard.press("Escape");
+  await expect(popover).toHaveCount(0);
+  await expect(pill).toBeFocused();
+
+  // Nothing above touched the viewer's own membership.
+  await expect(pill).toContainText("2");
+  expect(reactionWrites).toBe(0);
+
+  // The picker remains the way in and out: re-picking 👀 takes it back off.
+  const removal = page.waitForRequest(
+    (request) =>
+      request.method() === "DELETE" && new URL(request.url()).pathname.startsWith(reactionPath),
+  );
+  await pickReaction(seenRow, "👀");
+  await removal;
+  await expect(pill).toHaveAttribute(
+    "aria-label",
+    `Seen by ${bots[0].display_name}. Show who saw this message`,
+  );
+  await expect(pill).toContainText("1");
+  await expect(seenRow.getByRole("button", { name: "👍, 3 reactions" })).toBeVisible();
+});
+
 test("desktop message actions overlay without reflowing message text", async ({ page }) => {
   const { suffix } = await openReactionChannel(page);
   const previousRow = await sendMessage(page, `Desktop action neighbor ${suffix}`);
@@ -713,7 +798,7 @@ for (const scenario of [
     }
     const reactionPath = `/api/messages/${created[10].id}/reactions`;
     if (scenario.initialOwn) {
-      expect((await page.request.post(reactionPath, { data: { emoji: "👀" } })).ok()).toBe(true);
+      expect((await page.request.post(reactionPath, { data: { emoji: "👍" } })).ok()).toBe(true);
     }
     expect(
       (await page.request.post(`/api/channels/${channel.id}/read`, { data: { seq: 140 } })).ok(),
@@ -741,10 +826,10 @@ for (const scenario of [
       for (const action of scenario.actions) {
         const response =
           action === "remove"
-            ? await page.request.delete(`${reactionPath}/${encodeURIComponent("👀")}`)
+            ? await page.request.delete(`${reactionPath}/${encodeURIComponent("👍")}`)
             : await page.request.post(reactionPath, {
                 headers: action === "foreign add" ? { "X-ClickClack-User": bot.id } : {},
-                data: { emoji: "👀" },
+                data: { emoji: "👍" },
               });
         expect(response.ok()).toBe(true);
         const { event } = await response.json();
@@ -762,11 +847,11 @@ for (const scenario of [
       release.resolve();
       await expect(target).toBeInViewport();
       if (scenario.count === 0) {
-        await expect(target.getByRole("button", { name: /👀,/ })).toHaveCount(0);
+        await expect(target.getByRole("button", { name: /👍,/ })).toHaveCount(0);
         return;
       }
       const reaction = target.getByRole("button", {
-        name: `👀, ${scenario.count} reaction${scenario.count === 1 ? "" : "s"}`,
+        name: `👍, ${scenario.count} reaction${scenario.count === 1 ? "" : "s"}`,
       });
       await expect(reaction).toHaveAttribute("aria-pressed", String(scenario.own));
       const firstAction = page.waitForRequest((request) =>
@@ -775,11 +860,11 @@ for (const scenario of [
       await reaction.press("Enter");
       expect((await firstAction).method()).toBe(scenario.own ? "DELETE" : "POST");
       const count = scenario.count + (scenario.own ? -1 : 1);
-      if (count === 0) await expect(target.getByRole("button", { name: /👀,/ })).toHaveCount(0);
+      if (count === 0) await expect(target.getByRole("button", { name: /👍,/ })).toHaveCount(0);
       else
         await expect(
           target.getByRole("button", {
-            name: `👀, ${count} reaction${count === 1 ? "" : "s"}`,
+            name: `👍, ${count} reaction${count === 1 ? "" : "s"}`,
           }),
         ).toHaveAttribute("aria-pressed", String(!scenario.own));
     } finally {
