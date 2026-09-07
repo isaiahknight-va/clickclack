@@ -1,0 +1,18 @@
+$ git rev-parse --short fa52084a 86b56c1b
+fa52084a  (parent: upstream main at filing)
+86b56c1b  (head: this PR)
+
+$ CGO_ENABLED=0 go build -trimpath -o clickclack-parent ./apps/api/cmd/clickclack   # worktree at fa52084a, committed dist, no rebuild
+$ CGO_ENABLED=0 go build -trimpath -o clickclack-head   ./apps/api/cmd/clickclack   # worktree at 86b56c1b
+
+$ node verify-unread-bar.mjs parent ./clickclack-parent 18090 proof/
+[parent] row under the bar: msg_01m1y4kmgx570sb0em2c27tghe classes="message-row can-open-thread actions-flip menu-open" z-index=6; unread-bar z-index=5
+[parent] element on top of "Mark read": P.
+[parent] click "Mark read": FAILED: locator.click: Timeout 4000ms exceeded.
+[parent] verdict: FAIL
+
+$ node verify-unread-bar.mjs head ./clickclack-head 18091 proof/
+[head] row under the bar: msg_01m1y4kw9x2sm0cn05wn3trv5b classes="message-row can-open-thread actions-flip menu-open" z-index=6; unread-bar z-index=5
+[head] element on top of "Mark read": unread-bar
+[head] click "Mark read": bar cleared
+[head] verdict: PASS
