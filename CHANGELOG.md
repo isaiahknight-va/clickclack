@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.1 - 2026-09-07
 
 **Highlights:** Complete attachment delivery and reliable unread and reaction controls.
 
