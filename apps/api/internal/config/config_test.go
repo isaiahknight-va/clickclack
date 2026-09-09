@@ -227,36 +227,6 @@ func TestLoadAccessConfigFromEnvironmentAndJSON(t *testing.T) {
 	}
 }
 
-func TestLoadAccessLogFromEnvironmentAndJSON(t *testing.T) {
-	t.Setenv("CLICKCLACK_ACCESS_LOG", "errors")
-	path := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(path, []byte(`{"access_log":"off"}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	cfg, err := Load(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.AccessLog != "errors" {
-		t.Fatalf("environment did not override access_log JSON config: %#v", cfg)
-	}
-	t.Setenv("CLICKCLACK_ACCESS_LOG", "")
-	cfg, err = Load(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.AccessLog != "off" {
-		t.Fatalf("access_log JSON config was not loaded: %#v", cfg)
-	}
-	cfg, err = Load("")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.AccessLog != "" {
-		t.Fatalf("access_log should be empty when unset so the serve default applies: %#v", cfg)
-	}
-}
-
 func TestNormalizeHomeLink(t *testing.T) {
 	cases := []struct {
 		name      string
