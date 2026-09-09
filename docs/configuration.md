@@ -32,6 +32,7 @@ hook in `cmd/clickclack/main.go`.
 | `--uploads`           | `CLICKCLACK_UPLOADS`             | derived     | Upload storage URL. Defaults to `file://<data>/uploads`; use `r2://bucket/prefix` for Cloudflare R2. |
 | `--environment`       | `CLICKCLACK_ENVIRONMENT`         | unset       | Low-cardinality deployment label used only by opt-in metrics. |
 | `--metrics-enabled`   | `CLICKCLACK_METRICS_ENABLED`     | `false`     | Expose metadata-only Prometheus metrics at `/metrics`; keep private. |
+| `--access-log`        | `CLICKCLACK_ACCESS_LOG`          | `all`       | `serve` only. Per-request access log volume: `all`, `errors` (only responses with status 400 and above), or `off`. Panics are always logged. |
 | `--config`            | —                                | unset       | JSON config file. |
 | `--dev-bootstrap`     | `CLICKCLACK_DEV_BOOTSTRAP`       | `false`     | `serve` only. Creates a default user/workspace/channel and enables local dev auth fallbacks when explicitly set to `true`. |
 | `--password-auth`     | `CLICKCLACK_PASSWORD_AUTH_ENABLED` | `false`   | `serve` only. Enables local email/handle and password sign-in; passwords are set with `clickclack admin user set-password`. See [Auth](features/auth.md). |
