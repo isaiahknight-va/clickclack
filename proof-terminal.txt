@@ -8,7 +8,7 @@ $ ./verify-access-log.sh baseline-main ./clickclack-main 18095 60
 [baseline-main] serve args: --dev-bootstrap=true  | pollers: 2 x every 2 s for 60s
 [baseline-main] access-log lines: total=64 status=200: 63 events-route: 60 non-2xx: 1
 [baseline-main] non-2xx lines kept:
-    2026/09/09 12:20:47 method="GET" scheme="http" host="127.0.0.1:18095" proto="HTTP/1.1" remote="127.0.0.1:64745" correlation_id="corr_dc4e56a39d7ccda63b2ee6dfaae62612" route="/api/*" status=404 bytes=28 elapsed=45.666µs
+    2026/09/09 12:20:47 method="GET" scheme="http" host="127.0.0.1:18095" proto="HTTP/1.1" remote="127.0.0.1:64745" correlation_id="corr_<redacted>" route="/api/*" status=404 bytes=28 elapsed=45.666µs
 [baseline-main] projected at this cadence: 90720 status=200 lines/day
 [baseline-main] log file:  16K for 60s
 
@@ -18,14 +18,14 @@ $ ./verify-access-log.sh flag-off ./clickclack-flag 18098 60 --access-log=off
 [flag-errors] serve args: --dev-bootstrap=true --access-log=errors | pollers: 2 x every 2 s for 60s
 [flag-errors] access-log lines: total=1 status=200: 0 events-route: 0 non-2xx: 1
 [flag-errors] non-2xx lines kept:
-    2026/09/09 12:29:50 method="GET" scheme="http" host="127.0.0.1:18096" proto="HTTP/1.1" remote="127.0.0.1:54974" correlation_id="corr_be0dd2c63703c94e417ea9c76140a01b" route="/api/*" status=404 bytes=28 elapsed=36.292µs
+    2026/09/09 12:29:50 method="GET" scheme="http" host="127.0.0.1:18096" proto="HTTP/1.1" remote="127.0.0.1:54974" correlation_id="corr_<redacted>" route="/api/*" status=404 bytes=28 elapsed=36.292µs
 [flag-errors] projected at this cadence: 0 status=200 lines/day
 [flag-errors] log file: 4.0K for 60s
 
 [flag-default] serve args: --dev-bootstrap=true  | pollers: 2 x every 2 s for 60s
 [flag-default] access-log lines: total=64 status=200: 63 events-route: 60 non-2xx: 1
 [flag-default] non-2xx lines kept:
-    2026/09/09 12:30:52 method="GET" scheme="http" host="127.0.0.1:18097" proto="HTTP/1.1" remote="127.0.0.1:55775" correlation_id="corr_623fe3bd23b5e1a6d5d83299230f267c" route="/api/*" status=404 bytes=28 elapsed=58.833µs
+    2026/09/09 12:30:52 method="GET" scheme="http" host="127.0.0.1:18097" proto="HTTP/1.1" remote="127.0.0.1:55775" correlation_id="corr_<redacted>" route="/api/*" status=404 bytes=28 elapsed=58.833µs
 [flag-default] projected at this cadence: 90720 status=200 lines/day
 [flag-default] log file:  16K for 60s
 

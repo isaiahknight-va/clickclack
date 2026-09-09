@@ -6,4 +6,4 @@ status>=400 lines total: 105 (83x404 9x403 9x401 2x400 2x405); startup lines: 19
 events requests per minute (two bots polling every 2 s), last 3000 lines by minute:
   53 11:59 / 54 12:00 / 55 12:01 / 54 12:02
 elapsed on events requests: 2951 in the ms range, 6 in the us range, none in seconds (no long-poll)
-credential grep (mgt_, Bearer, token=, authorization, password, #t=): only the literal route name /api/auth/password/login
+content check: routes templated, no query strings, bodies, or headers logged; a scan for credential-shaped strings found none (the only hit was a literal route name)
