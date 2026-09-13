@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added roaming personal channel order, so a sidebar reordered on one device appears in the same order on every other device signed in to the same account, with localStorage still serving the pre-paint cache and the offline fallback.
 - Updated Virtua, Wrangler, transitive build dependencies, the pinned AWS CLI, and the PostgreSQL CI service while retaining the 48-hour release-age gate and supported runtime minimums.
 - Preserve generated JavaScript literals during web builds, preventing whitespace cleanup from corrupting syntax grammars and Svelte class handling.
 - Hide OpenClaw ID sign-in when the server has not configured it, and show the correct sign-in guidance for OpenClaw-only servers.
