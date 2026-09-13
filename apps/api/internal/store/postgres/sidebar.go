@@ -23,8 +23,11 @@ func (s *Store) GetSidebarPreferences(ctx context.Context, userID string) (*stor
 			// workspace falls back to the server's default ordering.
 			continue
 		}
-		if len(ids) == 0 {
-			continue
+		// A row holding an empty list is a cleared order, which is not the same
+		// as never having saved one: the client needs the key back so it can
+		// drop its own cached order instead of restoring it.
+		if ids == nil {
+			ids = []string{}
 		}
 		order[row.WorkspaceID] = ids
 	}
@@ -46,16 +49,10 @@ func updateSidebarPreferences(ctx context.Context, q *storedb.Queries, userID st
 		if err != nil {
 			return err
 		}
+		// A cleared order is stored as a row holding an empty list rather than
+		// deleted, so a later read can tell "cleared" from "never saved". The
+		// row goes away only when the membership it hangs off does.
 		filtered := store.FilterSidebarChannelOrder(order, channelIDs)
-		if len(filtered) == 0 {
-			if err := q.DeleteSidebarChannelOrder(ctx, storedb.DeleteSidebarChannelOrderParams{
-				UserID:      userID,
-				WorkspaceID: workspaceID,
-			}); err != nil {
-				return err
-			}
-			continue
-		}
 		encoded, err := json.Marshal(filtered)
 		if err != nil {
 			return err

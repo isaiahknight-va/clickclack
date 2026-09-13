@@ -1747,7 +1747,7 @@ export interface components {
     };
     /** @description Current user's complete sidebar preference snapshot. Omitted properties use client defaults. */
     SidebarPreferences: {
-      /** @description Personal channel order, keyed by workspace id. Each value lists the caller's channel ids for that workspace in sidebar order. Workspaces without a saved order are absent. */
+      /** @description Personal channel order, keyed by workspace id. Each value lists the caller's channel ids for that workspace in sidebar order. A workspace whose order was cleared is present with an empty array, so a client can tell a clear from a workspace that never saved an order; workspaces that never saved one are absent. */
       channel_order?: {
         [key: string]: string[];
       };
