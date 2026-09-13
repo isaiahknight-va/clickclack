@@ -475,6 +475,9 @@
 
   function openProfileSettings() {
     if (!user) return;
+    // At phone widths the profile card lives inside the navigation drawer, and
+    // a drawer left open renders underneath the modal's own rail.
+    mobileNavOpen = false;
     settingsModalSection = "profile";
     settingsModalOpen = true;
   }
@@ -4239,6 +4242,7 @@
   <SettingsModal
     {user}
     {workspaces}
+    currentWorkspaceID={selectedWorkspaceID}
     initialSection={settingsModalSection}
     {hideCommentary}
     {hideToolCalls}
