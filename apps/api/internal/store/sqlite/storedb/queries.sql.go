@@ -613,22 +613,6 @@ func (q *Queries) DeletePushSubscription(ctx context.Context, arg DeletePushSubs
 	return err
 }
 
-const deleteSidebarChannelOrder = `-- name: DeleteSidebarChannelOrder :exec
-DELETE FROM user_sidebar_channel_order
-WHERE user_id = ?1
-  AND workspace_id = ?2
-`
-
-type DeleteSidebarChannelOrderParams struct {
-	UserID      string `json:"user_id"`
-	WorkspaceID string `json:"workspace_id"`
-}
-
-func (q *Queries) DeleteSidebarChannelOrder(ctx context.Context, arg DeleteSidebarChannelOrderParams) error {
-	_, err := q.db.ExecContext(ctx, deleteSidebarChannelOrder, arg.UserID, arg.WorkspaceID)
-	return err
-}
-
 const deleteUnclaimedBotSetupCodesForTokenName = `-- name: DeleteUnclaimedBotSetupCodesForTokenName :execrows
 DELETE FROM bot_setup_codes
 WHERE workspace_id = ?1

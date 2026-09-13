@@ -2,8 +2,9 @@
   import Avatar from "../avatar/Avatar.svelte";
   import { api, apiResourceURL } from "../../lib/api";
   import {
-    channelOrderStorageKey,
+    channelOrderWorkspaceFromStorageKey,
     flushChannelOrderPatches,
+    markChannelOrderLocallyNewer,
     parseChannelOrder,
     resolveChannelOrder,
     storeChannelOrder,
@@ -131,9 +132,16 @@
     };
   });
 
+  // Another tab of this browser wrote a channel order. That cache is newer than
+  // the account snapshot this tab booted with, so the workspace is marked
+  // before anything re-resolves it, even when the write is for a workspace this
+  // tab is not showing.
   function handleStorage(event: StorageEvent) {
     if (!workspaceID || !currentUser?.id) return;
-    if (event.key !== channelOrderStorageKey(workspaceID, currentUser.id)) return;
+    const changed = channelOrderWorkspaceFromStorageKey(event.key, currentUser.id);
+    if (!changed) return;
+    markChannelOrderLocallyNewer(changed, currentUser.id);
+    if (changed !== workspaceID) return;
     channelOrder = parseChannelOrder(event.newValue);
   }
 
