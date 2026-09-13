@@ -1,0 +1,13 @@
+$ node verify-roaming-order.mjs parent-main ./clickclack-chorder-parent 18110 proof/   # built at 19e4c4e8 (upstream main)
+[parent-main] context A before drag: aa-mu0egzz4, mm-mu0egzz4, zz-mu0egzz4
+[parent-main] context A after drag:  zz-mu0egzz4, aa-mu0egzz4, mm-mu0egzz4
+[parent-main] context B (fresh):     aa-mu0egzz4, mm-mu0egzz4, zz-mu0egzz4
+[parent-main] /api/me sidebar_preferences.channel_order for this workspace: absent
+[parent-main] verdict: FAIL (second context shows the default order)
+
+$ node verify-roaming-order.mjs head ./clickclack-chorder-head 18111 proof/   # built at e5941b1b (this PR)
+[head] context A before drag: aa-mu0eh2ve, mm-mu0eh2ve, zz-mu0eh2ve
+[head] context A after drag:  zz-mu0eh2ve, aa-mu0eh2ve, mm-mu0eh2ve
+[head] context B (fresh):     zz-mu0eh2ve, aa-mu0eh2ve, mm-mu0eh2ve
+[head] /api/me sidebar_preferences.channel_order for this workspace: 3 ids
+[head] verdict: PASS (order roamed)
