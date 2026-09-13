@@ -293,11 +293,6 @@ ON CONFLICT(user_id, workspace_id) DO UPDATE SET
   channel_ids = excluded.channel_ids,
   updated_at = excluded.updated_at;
 
--- name: DeleteSidebarChannelOrder :exec
-DELETE FROM user_sidebar_channel_order
-WHERE user_id = sqlc.arg(user_id)
-  AND workspace_id = sqlc.arg(workspace_id);
-
 -- name: ListWorkspaceChannelIDs :many
 SELECT id
 FROM channels
