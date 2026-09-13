@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -96,13 +97,18 @@ func TestSidebarPreferencesRoamWithTheAccount(t *testing.T) {
 		t.Fatalf("profile patch changed appearance: %#v", renamed.User.AppearancePreferences)
 	}
 
-	// An empty list clears that workspace.
+	// An empty list clears that workspace, and the cleared workspace keeps its
+	// key. A client that cached the old order needs to see the clear; a
+	// response that simply omitted the workspace would look identical to one
+	// that never saved an order, and the cache would win on the next load.
 	cleared := patchJSON[currentUserResponse](t, server.URL+"/api/me", map[string]any{
 		"sidebar_preferences": map[string]any{"channel_order": map[string]any{workspaceID: []string{}}},
 	})
-	if cleared.User.SidebarPreferences != nil {
-		t.Fatalf("clearing the only workspace left a snapshot: %#v", cleared.User.SidebarPreferences)
-	}
+	assertClearedSidebarOrder(t, cleared.User.SidebarPreferences, workspaceID)
+
+	afterClear := getJSON[currentUserResponse](t, server.URL+"/api/me")
+	assertClearedSidebarOrder(t, afterClear.User.SidebarPreferences, workspaceID)
+	assertClearedSidebarOrderJSON(t, server.URL+"/api/me", workspaceID)
 }
 
 func TestSidebarPreferencesRejectNonMembers(t *testing.T) {
@@ -148,6 +154,43 @@ func TestSidebarPreferencesRejectNonMembers(t *testing.T) {
 	after := getJSONAsUser[currentUserResponse](t, stranger.ID, server.URL+"/api/me")
 	if after.User.SidebarPreferences != nil {
 		t.Fatalf("a rejected patch stored an order: %#v", after.User.SidebarPreferences)
+	}
+}
+
+// assertClearedSidebarOrder pins the difference a client depends on: a cleared
+// workspace keeps its key and holds an empty list, where a workspace that never
+// saved an order is absent.
+func assertClearedSidebarOrder(t *testing.T, preferences *store.SidebarPreferences, workspaceID string) {
+	t.Helper()
+	if preferences == nil {
+		t.Fatalf("clearing the only workspace dropped the snapshot for %s", workspaceID)
+	}
+	got, ok := preferences.ChannelOrder[workspaceID]
+	if !ok {
+		t.Fatalf("cleared workspace %s lost its key: %#v", workspaceID, preferences.ChannelOrder)
+	}
+	if len(got) != 0 {
+		t.Fatalf("cleared workspace %s kept an order: %#v", workspaceID, got)
+	}
+}
+
+// assertClearedSidebarOrderJSON reads the wire bytes, because a nil slice would
+// satisfy the typed assertion above and still reach the browser as null.
+func assertClearedSidebarOrderJSON(t *testing.T, url, workspaceID string) {
+	t.Helper()
+	payload := getJSON[struct {
+		User struct {
+			SidebarPreferences struct {
+				ChannelOrder map[string]json.RawMessage `json:"channel_order"`
+			} `json:"sidebar_preferences"`
+		} `json:"user"`
+	}](t, url)
+	raw, ok := payload.User.SidebarPreferences.ChannelOrder[workspaceID]
+	if !ok {
+		t.Fatalf("cleared workspace %s is missing from the response body", workspaceID)
+	}
+	if string(raw) != "[]" {
+		t.Fatalf("cleared workspace %s serialized as %s, want []", workspaceID, raw)
 	}
 }
 

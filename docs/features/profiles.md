@@ -93,12 +93,23 @@ that workspace are dropped rather than rejected, so a channel deleted since the
 sidebar rendered cannot block a save, and a repeated id keeps its first
 position. One workspace holds at most 500 ids.
 
+A cleared workspace stays in later `GET /api/me` responses with an empty array
+rather than disappearing, so a browser holding a cached order can tell a clear
+from a workspace that never saved one and drop its copy instead of restoring
+it. The row goes away only when the membership it hangs off does.
+
 Reordering still applies on the device first and localStorage stays the
 pre-paint cache, so drag, keyboard, and touch moves take effect without waiting
 on the network and survive a server that cannot be reached. The account order
-wins on load and is written back into the cache. The account write is debounced
+wins on load and is written back into the cache. Because the account copy stops
+at 500 ids, it leads the cached order rather than replacing it: local positions
+past that cap stay on the device that made them. The account write is debounced
 and best effort: a failed write leaves the local order in place and the next
-reorder retries.
+reorder retries. Writes for one workspace are serialized, and an order that
+arrives while a write is in flight replaces any other waiting order, so the
+newest order is the one that lands. An account snapshot is applied once per
+loaded profile and workspace, so moving between workspaces re-reads the cache
+instead of replaying a snapshot over an order another tab has since saved.
 
 Clicking a message avatar or author name opens a Slack-style profile pane in
 the right rail. The pane shows the user's avatar, display name, handle,

@@ -118,7 +118,10 @@ func TestSidebarChannelOrderLifecycle(t *testing.T) {
 	}
 	assertChannelOrder(t, account.SidebarPreferences, workspace.ID, second.ID, first.ID)
 
-	// An empty list clears that workspace and leaves the rest alone.
+	// An empty list clears that workspace and leaves the rest alone. The
+	// cleared workspace keeps its key, holding an empty list, so a client can
+	// tell a clear from a workspace that never saved an order and drop its own
+	// cached copy instead of restoring it.
 	account, err = st.UpdateCurrentUser(ctx, store.UpdateCurrentUserInput{
 		UserID: user.ID,
 		SidebarPreferences: &store.SidebarPreferencesPatch{
@@ -131,10 +134,15 @@ func TestSidebarChannelOrderLifecycle(t *testing.T) {
 	if account.SidebarPreferences == nil {
 		t.Fatal("clearing one workspace dropped the whole snapshot")
 	}
-	if _, ok := account.SidebarPreferences.ChannelOrder[workspace.ID]; ok {
-		t.Fatalf("cleared workspace survived: %#v", account.SidebarPreferences.ChannelOrder)
-	}
+	assertClearedChannelOrder(t, account.SidebarPreferences, workspace.ID)
 	assertChannelOrder(t, account.SidebarPreferences, other.ID, otherChannel.ID)
+
+	cleared, err := st.GetSidebarPreferences(ctx, user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertClearedChannelOrder(t, cleared, workspace.ID)
+	assertChannelOrder(t, cleared, other.ID, otherChannel.ID)
 }
 
 func TestSidebarChannelOrderRequiresMembership(t *testing.T) {
@@ -292,6 +300,26 @@ func TestSidebarChannelOrderIndependentOfAppearance(t *testing.T) {
 		t.Fatalf("unexpected appearance: %#v", account.AppearancePreferences)
 	}
 	assertChannelOrder(t, account.SidebarPreferences, workspace.ID, channel.ID)
+}
+
+// assertClearedChannelOrder pins the difference between a workspace whose order
+// was cleared and one that never saved one: the cleared workspace keeps its key
+// and holds an empty list.
+func assertClearedChannelOrder(t *testing.T, preferences *store.SidebarPreferences, workspaceID string) {
+	t.Helper()
+	if preferences == nil {
+		t.Fatalf("expected a sidebar snapshot for %s", workspaceID)
+	}
+	got, ok := preferences.ChannelOrder[workspaceID]
+	if !ok {
+		t.Fatalf("cleared workspace %s lost its key: %#v", workspaceID, preferences.ChannelOrder)
+	}
+	if got == nil {
+		t.Fatalf("cleared workspace %s reported a null order", workspaceID)
+	}
+	if len(got) != 0 {
+		t.Fatalf("cleared workspace %s kept an order: %#v", workspaceID, got)
+	}
 }
 
 func assertChannelOrder(t *testing.T, preferences *store.SidebarPreferences, workspaceID string, want ...string) {

@@ -35,8 +35,9 @@ export type AppearancePreferencesPatch = {
 };
 
 export type SidebarPreferences = {
-  // Ordered channel ids keyed by workspace id. Workspaces without a saved
-  // order are absent.
+  // Ordered channel ids keyed by workspace id. A workspace whose order was
+  // cleared is present with an empty list; a workspace that never saved one is
+  // absent.
   channel_order?: Record<string, string[]>;
 };
 
