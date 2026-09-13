@@ -30,6 +30,10 @@ await page.getByRole("dialog", { name: "Account settings" }).waitFor();
 await page.waitForTimeout(700); // let the modal fade-in and the drawer slide-out settle
 await page.screenshot({ path: join(outdir, `integ-modal-${width}.png`) });
 const rail = await page.locator(".settings-modal__rail-heading, .settings-modal__rail-label").allInnerTexts();
+const selector = page.getByRole("dialog", { name: "Account settings" }).locator("select#settings-modal-workspace");
+const hasSelector = (await selector.count()) > 0;
+const selectedText = hasSelector ? await selector.evaluate((el) => el.options[el.selectedIndex]?.text ?? "") : "(no selector on this build)";
+const optionTexts = hasSelector ? await selector.evaluate((el) => [...el.options].map((o) => o.text)) : [];
 const integrations = page.getByRole("dialog", { name: "Account settings" }).getByRole("button", { name: "Integrations" });
 const count = await integrations.count();
 const before = page.url();
@@ -46,6 +50,7 @@ console.log(`api workspace order: ${list.join(" | ")}`);
 console.log(`TYP route_id=${typ.route_id} Guests route_id=${guests.route_id}`);
 console.log(`standing in: ${standingIn.split("\n")[0]} | url before: ${before}`);
 console.log(`rail (in order): ${rail.join(" > ")}`);
+console.log(`workspace selector: ${hasSelector ? "present, selected = " + JSON.stringify(selectedText) + ", options = " + JSON.stringify(optionTexts) : selectedText}`);
 console.log(`Integrations buttons in the modal: ${count}; clicked the FIRST`);
 console.log(`landed on: ${afterUrl} | settings heading: ${settingsHeading.split("\n")[0]}`);
 console.log(`after Close: ${backUrl}`);

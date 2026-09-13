@@ -1,23 +1,27 @@
 $ node repro-integrations.mjs ./clickclack-parent 18130 proof/parent 1280   # parent 19e4c4e8 (upstream main)
-standing in: TYP | url before: http://127.0.0.1:18130/app/TS01H8VNFCQFMM8YT/C2MBH2P57BNN61HQM
+standing in: TYP | url before: http://127.0.0.1:18130/app/TFKXK37BM22H1H5NS/C2TZ1N49K1KQ7WCYJ
+workspace selector: (no selector on this build)
 Integrations buttons in the modal: 3; clicked the FIRST
-landed on: http://127.0.0.1:18130/app/TAPPA6H15NABF9MH9/settings/integrations | settings heading: Integrations
-after Close: http://127.0.0.1:18130/app/TAPPA6H15NABF9MH9/CV0TH2YA1BGK8C0XY
+landed on: http://127.0.0.1:18130/app/TWQ0VQH9G3WQNYW4Q/settings/integrations | settings heading: Integrations
+after Close: http://127.0.0.1:18130/app/TWQ0VQH9G3WQNYW4Q/C6Y853GB58718G325
 verdict: landed in unknown; back in unknown
 
-$ node repro-integrations.mjs ./clickclack-head 18131 proof/head 1280   # head 9aeded2f (this PR)
-standing in: TYP | url before: http://127.0.0.1:18131/app/T7A9QWAC2CNRA3TFS/C9HKZZHXMTH0Q7K1S
-Integrations buttons in the modal: 3; clicked the FIRST
-landed on: http://127.0.0.1:18131/app/T7A9QWAC2CNRA3TFS/settings/integrations | settings heading: Integrations
-after Close: http://127.0.0.1:18131/app/T7A9QWAC2CNRA3TFS/C9HKZZHXMTH0Q7K1S
+$ node repro-integrations.mjs ./clickclack-head 18131 proof/head 1280   # head d753da3e (this PR)
+standing in: TYP | url before: http://127.0.0.1:18131/app/T0KF7GZ0K60SM8WG4/CQ8W70DBHAE1PBN39
+workspace selector: present, selected = "TYP (current)", options = ["ClickClack","TYP (current)","Visitors"]
+Integrations buttons in the modal: 1; clicked the FIRST
+landed on: http://127.0.0.1:18131/app/T0KF7GZ0K60SM8WG4/settings/integrations | settings heading: Integrations
+after Close: http://127.0.0.1:18131/app/T0KF7GZ0K60SM8WG4/CQ8W70DBHAE1PBN39
 verdict: landed in TYP (the workspace we stood in); back in TYP
 
 $ node repro-integrations.mjs ./clickclack-head 18132 proof/head 390    # head, phone width
-landed on: http://127.0.0.1:18132/app/TCJ3P3XJYCAE0K9DY/settings/integrations | settings heading: Integrations
-after Close: http://127.0.0.1:18132/app/TCJ3P3XJYCAE0K9DY/CJARNEGDDS5V7VTD0
+workspace selector: present, selected = "TYP (current)", options = ["ClickClack","TYP (current)","Visitors"]
+landed on: http://127.0.0.1:18132/app/TF7GEFCYEQQJY2PWW/settings/integrations | settings heading: Integrations
+after Close: http://127.0.0.1:18132/app/TF7GEFCYEQQJY2PWW/C2WZ0BC48X47P22JV
 verdict: landed in TYP (the workspace we stood in); back in TYP
 
 $ node repro-integrations.mjs ./clickclack-parent 18133 proof/parent 390  # parent, phone width
-landed on: http://127.0.0.1:18133/app/TABDSQQTEW51XGSFS/settings/integrations | settings heading: Integrations
-after Close: http://127.0.0.1:18133/app/TABDSQQTEW51XGSFS/C971PSS9V0ES80WY5
+workspace selector: (no selector on this build)
+landed on: http://127.0.0.1:18133/app/TX9YWWZVPABNVENKT/settings/integrations | settings heading: Integrations
+after Close: http://127.0.0.1:18133/app/TX9YWWZVPABNVENKT/CNEDGR48Y0YGN4R94
 verdict: landed in unknown; back in unknown
