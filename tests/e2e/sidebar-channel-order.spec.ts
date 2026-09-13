@@ -4,6 +4,8 @@ import { waitForAppReady } from "./app-ready";
 
 type Workspace = { id: string; route_id: string };
 
+const channelIDs = new Map<string, string>();
+
 async function createWorkspaceWithChannels(
   page: Page,
   label: string,
@@ -20,8 +22,19 @@ async function createWorkspaceWithChannels(
       data: { name, kind: "public" },
     });
     expect(response.ok()).toBe(true);
+    const { channel } = (await response.json()) as { channel: { id: string } };
+    channelIDs.set(name, channel.id);
   }
   return { workspace, names };
+}
+
+async function accountChannelOrder(page: Page, workspaceID: string) {
+  const response = await page.request.get("/api/me");
+  if (!response.ok()) return null;
+  const { user } = (await response.json()) as {
+    user: { sidebar_preferences?: { channel_order?: Record<string, string[]> } };
+  };
+  return user.sidebar_preferences?.channel_order?.[workspaceID] ?? null;
 }
 
 function visibleChannelNames(page: Page) {
@@ -85,6 +98,46 @@ test("channel ordering supports drag, keyboard, touch actions, and collapsed sec
     .toEqual([names[2], names[0], names[1], addedName]);
 });
 
+test("a reordered sidebar roams to a second browser context", async ({ browser, page }) => {
+  const { workspace, names } = await createWorkspaceWithChannels(page, "Roaming channel order");
+  const meResponse = await page.request.get("/api/me");
+  expect(meResponse.ok()).toBe(true);
+  const { user } = (await meResponse.json()) as { user: { id: string } };
+
+  await page.goto(`/app/${workspace.route_id}`);
+  await waitForAppReady(page);
+  await expect.poll(() => visibleChannelNames(page)).toEqual(names);
+
+  await page.getByRole("button", { name: `Move #${names[0]}` }).click();
+  await page
+    .getByRole("menu", { name: `Move #${names[0]}` })
+    .getByRole("menuitem", { name: "Move down" })
+    .click();
+  await expect.poll(() => visibleChannelNames(page)).toEqual([names[1], names[0], names[2]]);
+
+  // The account copy is what the second context will read.
+  await expect
+    .poll(() => accountChannelOrder(page, workspace.id))
+    .toEqual([names[1], names[0], names[2]].map((name) => channelIDs.get(name)));
+
+  const secondContext = await browser.newContext({
+    extraHTTPHeaders: { "X-ClickClack-User": user.id },
+  });
+  try {
+    await secondContext.addCookies(await page.context().cookies());
+    const secondPage = await secondContext.newPage();
+    // A cold device has no cache at all; clearing makes that explicit.
+    await secondPage.addInitScript(() => localStorage.clear());
+    await secondPage.goto(`/app/${workspace.route_id}`);
+    await waitForAppReady(secondPage);
+    await expect
+      .poll(() => visibleChannelNames(secondPage))
+      .toEqual([names[1], names[0], names[2]]);
+  } finally {
+    await secondContext.close();
+  }
+});
+
 test("channel ordering is isolated by workspace", async ({ page }) => {
   const first = await createWorkspaceWithChannels(page, "First channel order");
   const second = await createWorkspaceWithChannels(page, "Second channel order");
@@ -133,7 +186,9 @@ test("invalid saved channel ordering falls back to server order", async ({ page 
   await expect.poll(() => visibleChannelNames(page)).toEqual(names);
 });
 
-test("unavailable channel order storage keeps session reordering functional", async ({ page }) => {
+test("unavailable channel order storage keeps reordering functional and still roams", async ({
+  page,
+}) => {
   const { workspace, names } = await createWorkspaceWithChannels(page, "Blocked channel order");
   await page.addInitScript(() => {
     const blockedKeyPrefix = "clickclack:sidebar-channel-order:v1:";
@@ -159,7 +214,13 @@ test("unavailable channel order storage keeps session reordering functional", as
     .click();
   await expect.poll(() => visibleChannelNames(page)).toEqual([names[1], names[0], names[2]]);
 
+  // The cache never took the write, so only the account can carry the order
+  // across the reload. Wait for that write rather than racing the debounce.
+  await expect
+    .poll(() => accountChannelOrder(page, workspace.id))
+    .toEqual([names[1], names[0], names[2]].map((name) => channelIDs.get(name)));
+
   await page.reload();
   await waitForAppReady(page);
-  await expect.poll(() => visibleChannelNames(page)).toEqual(names);
+  await expect.poll(() => visibleChannelNames(page)).toEqual([names[1], names[0], names[2]]);
 });
