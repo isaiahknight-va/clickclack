@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added roaming personal channel order, so a sidebar reordered on one device appears in the same order on every other device signed in to the same account, with localStorage still serving the pre-paint cache and the offline fallback.
+
 ## 0.6.0 - 2026-09-24
 
 **Highlights:** Phone alerts with per-device controls and automatic OIDC endpoint discovery.
