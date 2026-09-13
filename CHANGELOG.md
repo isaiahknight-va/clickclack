@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added roaming personal channel order, so a sidebar reordered on one device appears in the same order on every other device signed in to the same account, with localStorage still serving the pre-paint cache and the offline fallback.
 ## 0.5.1 - 2026-09-21
 
 **Highlights:** Safer exports, reliable sign-in, and chat status indicators that stay clear of messages.
