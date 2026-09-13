@@ -7,6 +7,8 @@
 // 2. Workspace settings (members, bots, integrations, etc.) live at the
 //    real route /app/{workspaceID}/settings and have their own shell.
 
+import type { Workspace } from "./types";
+
 export type AccountSettingsSectionId = "profile" | "appearance" | "notifications" | "bots";
 
 export type AccountSettingsSection = {
@@ -96,6 +98,33 @@ export const WORKSPACE_SETTINGS_SECTIONS: WorkspaceSettingsSection[] = [
 ];
 
 export const DEFAULT_WORKSPACE_SETTINGS_SECTION: WorkspaceSettingsSectionId = "overview";
+
+// The account modal shows the workspace sections for one workspace at a time,
+// picked in a rail selector. It is opened from inside a workspace the user is
+// already standing in, so that workspace is the one to start on: otherwise the
+// rail's "Integrations" navigates into whichever workspace /api/workspaces
+// listed first and leaves the user there when the settings page closes.
+// ChatApp passes the route id it is standing on, while the list carries both,
+// so match either.
+export function isSettingsWorkspaceCurrent(
+  workspace: Workspace,
+  currentWorkspaceID?: string | null,
+): boolean {
+  if (!currentWorkspaceID) return false;
+  return workspace.id === currentWorkspaceID || workspace.route_id === currentWorkspaceID;
+}
+
+// Falls back to the first workspace so the rail still names what it is showing
+// when the current workspace is unknown or is not in the list.
+export function defaultSettingsWorkspace(
+  workspaces: readonly Workspace[],
+  currentWorkspaceID?: string | null,
+): Workspace | null {
+  const current = workspaces.find((workspace) =>
+    isSettingsWorkspaceCurrent(workspace, currentWorkspaceID),
+  );
+  return current ?? workspaces[0] ?? null;
+}
 
 export function workspaceSettingsPath(workspaceID: string, slug?: string): string {
   const base = `/app/${workspaceID}/settings`;
