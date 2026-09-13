@@ -1,0 +1,53 @@
+date: 2026-09-13 (Sunday)
+parent commit: 19e4c4e8631e19bb3dd71383be79d39e557d2816
+head commit:   e5941b1b0177649a0b63f1720185f9e0658b81f2 plus this working tree
+scratch database: clickclack_ev_b (dropped at the end)
+
+== 1. the PARENT binary creates and populates the database ==
+starting parent against the scratch database
+healthz after 2s: {"status":"ok"}
+dev-bootstrap owner present = yes
+workspace created through the API = yes
+channels and messages created through the API = yes
+
+== 2. BEFORE the upgrade, as the parent binary left it ==
+schema_migrations rows = 38
+schema_migrations latest = 0035_user_passwords.sql
+messages = 6
+users = 1
+workspaces = 2
+channels = 3
+user_sidebar_channel_order present = 0
+0036 recorded = 0
+stopped
+
+== 3. the HEAD binary starts against the same database ==
+starting head against the scratch database
+healthz after 2s: {"status":"ok"}
+migration and error lines in the head server log:
+(head log line count: 4)
+
+== 4. AFTER the upgrade ==
+schema_migrations rows = 39
+schema_migrations latest = 0036_user_sidebar_channel_order.sql
+messages = 6
+users = 1
+workspaces = 2
+channels = 3
+user_sidebar_channel_order present = 1
+user_sidebar_channel_order rows = 0
+user_sidebar_channel_order columns = user_id, workspace_id, channel_ids, updated_at
+0036 recorded = 1
+0036 name = 0036_user_sidebar_channel_order.sql
+
+data intact across the upgrade:
+messages 6 -> 6
+users 1 -> 1
+workspaces 2 -> 2
+
+/api/me on the upgraded database:
+status = 200
+user keys = avatar_url, created_at, display_name, handle, id, kind, notification_settings, password_enrolled
+stopped
+
+scratch database dropped = 0

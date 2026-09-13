@@ -1,0 +1,96 @@
+===============================================================
+subject: the live production database ($HOME/.local/state/typ/clickclack/data/clickclack.db), which already carries this branch's schema
+===============================================================
+date: 2026-09-13 (Sunday)
+head commit: e5941b1b0177649a0b63f1720185f9e0658b81f2
+source: the live production database ($HOME/.local/state/typ/clickclack/data/clickclack.db), which already carries this branch's schema, read with sqlite3 .backup (the online backup API), never cp
+
+scratch copy bytes: 2949120
+
+== BEFORE: the copy exactly as the production database stands ==
+pragma user_version = 0
+schema_migrations rows = 53
+schema_migrations latest = 0043_user_sidebar_channel_order.sql
+messages = 495
+users = 16
+workspaces = 2
+channels = 15
+user_sidebar_channel_order table present = 1
+0043 recorded = 1
+
+== starting the PR head binary against that copy ==
+command: clickclack-head serve --addr 127.0.0.1:18197 --data <scratch> --dev-bootstrap=false
+healthz after 2s: {"status":"ok"}
+server log, migration and error lines:
+(server log line count: 2)
+
+== AFTER: the same copy, once the head binary migrated and served it ==
+pragma user_version = 0
+schema_migrations rows = 53
+schema_migrations latest = 0043_user_sidebar_channel_order.sql
+messages = 495
+users = 16
+workspaces = 2
+channels = 15
+user_sidebar_channel_order table present = 1
+user_sidebar_channel_order rows = 1
+user_sidebar_channel_order columns = user_id, workspace_id, channel_ids, updated_at
+0043 recorded = 1
+0043 name = 0043_user_sidebar_channel_order.sql
+
+== GET /api/me with the existing bot token ==
+status = 200
+top level keys = user
+user keys = avatar_url, created_at, display_name, handle, id, kind, password_enrolled
+sidebar_preferences present = False
+
+scratch copy deleted = yes
+
+===============================================================
+subject: the production pre-0.4.1 snapshot from 2026-09-10 ($HOME/.local/state/typ/clickclack/data/clickclack.db.pre-0.4.1-2026-09-10), a populated database that predates this branch
+===============================================================
+date: 2026-09-13 (Sunday)
+head commit: e5941b1b0177649a0b63f1720185f9e0658b81f2
+source: the production pre-0.4.1 snapshot from 2026-09-10 ($HOME/.local/state/typ/clickclack/data/clickclack.db.pre-0.4.1-2026-09-10), a populated database that predates this branch, read with sqlite3 .backup (the online backup API), never cp
+
+scratch copy bytes: 2650112
+
+== BEFORE: the copy exactly as the production database stands ==
+pragma user_version = 0
+schema_migrations rows = 52
+schema_migrations latest = 0042_user_passwords.sql
+messages = 418
+users = 8
+workspaces = 2
+channels = 7
+user_sidebar_channel_order table present = 0
+0043 recorded = 0
+
+== starting the PR head binary against that copy ==
+command: clickclack-head serve --addr 127.0.0.1:18197 --data <scratch> --dev-bootstrap=false
+healthz after 2s: {"status":"ok"}
+server log, migration and error lines:
+(server log line count: 2)
+
+== AFTER: the same copy, once the head binary migrated and served it ==
+pragma user_version = 0
+schema_migrations rows = 53
+schema_migrations latest = 0043_user_sidebar_channel_order.sql
+messages = 418
+users = 8
+workspaces = 2
+channels = 7
+user_sidebar_channel_order table present = 1
+user_sidebar_channel_order rows = 0
+user_sidebar_channel_order columns = user_id, workspace_id, channel_ids, updated_at
+0043 recorded = 1
+0043 name = 0043_user_sidebar_channel_order.sql
+
+== GET /api/me with the existing bot token ==
+status = 200
+top level keys = user
+user keys = avatar_url, created_at, display_name, handle, id, kind, password_enrolled
+sidebar_preferences present = False
+
+scratch copy deleted = yes
+

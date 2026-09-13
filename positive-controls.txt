@@ -1,0 +1,137 @@
+POSITIVE CONTROL 1 (finding 1: a cleared order must be distinguishable from never-saved)
+break: restore the pre-fix write path, which DELETEs the row when the filtered list is empty
+
+--- FAIL: TestSidebarChannelOrderLifecycle (0.03s)
+    sidebar_test.go:137: cleared workspace wsp_01m2egn01tyv341bh4efhchrd2 lost its key: map[string][]string{"wsp_01m2egn01vv34q9d1s2k4xgdt7":[]string{"chn_01m2egn01vv34q9d1s2nsxzmhp"}}
+FAIL
+FAIL	github.com/openclaw/clickclack/apps/api/internal/store/sqlite	0.264s
+FAIL
+
+--- FAIL: TestSidebarPreferencesRoamWithTheAccount (0.04s)
+    sidebar_preferences_test.go:107: clearing the only workspace dropped the snapshot for wsp_01m2egn29c86wfx13wvvq4kmnx
+FAIL
+FAIL	github.com/openclaw/clickclack/apps/api/internal/httpapi	0.388s
+FAIL
+
+restore: both green again
+ok  	github.com/openclaw/clickclack/apps/api/internal/store/sqlite	0.267s
+ok  	github.com/openclaw/clickclack/apps/api/internal/httpapi	0.380s
+
+POSITIVE CONTROL 2 (finding 2: account writes must be serialized and coalesced per scope)
+break: send every debounced body immediately, the pre-fix fire-and-forget path
+
+ok 1 - an account order replaces the local cache and is written back into it
+ok 2 - no account order leaves the cache alone and keeps serving it
+ok 3 - an account order for another workspace never touches this one
+ok 4 - a cleared account order clears the cache
+ok 5 - a reorder made in this session outlives a stale account snapshot
+ok 6 - unavailable storage still resolves and still accepts a reorder
+ok 7 - a reorder writes the cache first and patches the account once after the debounce
+ok 8 - a flush sends the latest pending order once, with keepalive
+ok 9 - a failed account patch leaves the local order in place
+ok 10 - an account order is sanitized the same way the cache is
+ok 11 - parseChannelOrder keeps its existing rules
+ok 12 - the patch body carries one workspace and stops at the roaming cap
+not ok 13 - an order that arrives during an account write waits for it and lands last
+not ok 14 - only the newest order waiting on an account write is sent
+not ok 15 - a flush during an account write joins the queue instead of racing it
+not ok 16 - a failed account write does not block the next order
+ok 17 - an account snapshot applies once per profile and a newer cache wins after that
+ok 18 - a cache write from another tab marks that workspace locally newer
+ok 19 - local positions past the roaming cap survive an account order
+ok 20 - an account order leads the local order and a cleared one wipes it
+# tests 20
+# pass 16
+# fail 4
+
+restore:
+# tests 20
+# pass 20
+# fail 0
+
+POSITIVE CONTROL 3 (finding 3: an account snapshot applies at most once per profile object and workspace)
+break: drop the applied-once guard, the pre-fix replay-every-resolve path
+
+not ok 17 - an account snapshot applies once per profile and a newer cache wins after that
+# tests 20
+# pass 19
+# fail 1
+
+POSITIVE CONTROL 4 (finding 4: local positions past the roaming cap must survive)
+break: let the account list replace the local list, the pre-fix merge
+
+not ok 19 - local positions past the roaming cap survive an account order
+not ok 20 - an account order leads the local order and a cleared one wipes it
+# tests 20
+# pass 18
+# fail 2
+
+restore:
+# tests 20
+# pass 20
+# fail 0
+POSITIVE CONTROL 1b (finding 1, PostgreSQL store, real database)
+break: restore the pre-fix write path in the Postgres store
+
+--- FAIL: TestSidebarChannelOrderLifecycle (0.03s)
+    sidebar_test.go:137: cleared workspace wsp_01m2ehcbksm396c4q2asc1q023 lost its key: map[string][]string{"wsp_01m2ehcbm36pjw0p96nx10pqf7":[]string{"chn_01m2ehcbm4a0k99bvfzck4myq0"}}
+FAIL
+FAIL	github.com/openclaw/clickclack/apps/api/internal/store/postgres	0.269s
+FAIL
+
+restore:
+ok  	github.com/openclaw/clickclack/apps/api/internal/store/postgres	0.255s
+
+
+===============================================================
+e2e POSITIVE CONTROLS (same method, at the browser level)
+===============================================================
+Caveat recorded honestly: the script that produced the run below reverted
+Sidebar.svelte with git checkout while restoring, so the storage-event marking
+was absent from the second and third runs. The Sidebar change was restored
+afterwards and the final full suite (389 passed) ran with it in place. What the
+runs do show: breaking the merge makes the over-cap e2e fail, and breaking the
+store write path makes the clear-then-reload e2e fail.
+
+### e2e POSITIVE CONTROL A: findings 3 and 4, client side
+  ✓  1 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:46:5 › channel ordering supports drag, keyboard, touch actions, and collapsed sections (702ms)
+  ✓  2 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:101:5 › a reordered sidebar roams to a second browser context (1.4s)
+  ✓  3 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:141:5 › channel ordering is isolated by workspace (542ms)
+  ✓  4 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:174:5 › invalid saved channel ordering falls back to server order (235ms)
+  ✓  5 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:189:5 › unavailable channel order storage keeps reordering functional and still roams (1.2s)
+  ✓  6 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:267:5 › clearing the account order clears the cached one on the next load (1.3s)
+  ✓  7 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:298:5 › a second tab keeps the newer order when it returns to the workspace (2.6s)
+  ✘  8 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:355:5 › a local order longer than the roaming cap keeps its tail across a reload (2.3s)
+    Error: expect(received).toBe(expected) // Object.is equality
+  1 failed
+  7 passed (16.9s)
+sidebar restored
+
+### e2e POSITIVE CONTROL B: finding 1, server side
+  ✓  1 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:46:5 › channel ordering supports drag, keyboard, touch actions, and collapsed sections (727ms)
+  ✓  2 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:101:5 › a reordered sidebar roams to a second browser context (1.4s)
+  ✓  3 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:141:5 › channel ordering is isolated by workspace (536ms)
+  ✓  4 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:174:5 › invalid saved channel ordering falls back to server order (221ms)
+  ✓  5 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:189:5 › unavailable channel order storage keeps reordering functional and still roams (1.3s)
+  ✘  6 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:267:5 › clearing the account order clears the cached one on the next load (6.1s)
+  ✓  7 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:298:5 › a second tab keeps the newer order when it returns to the workspace (2.7s)
+  ✓  8 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:355:5 › a local order longer than the roaming cap keeps its tail across a reload (2.0s)
+    Error: expect(received).toEqual(expected) // deep equality
+  1 failed
+  7 passed (21.7s)
+
+### restored: full spec green again
+  ✓  1 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:46:5 › channel ordering supports drag, keyboard, touch actions, and collapsed sections (700ms)
+  ✓  2 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:101:5 › a reordered sidebar roams to a second browser context (1.4s)
+  ✓  3 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:141:5 › channel ordering is isolated by workspace (477ms)
+  ✓  4 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:174:5 › invalid saved channel ordering falls back to server order (219ms)
+  ✓  5 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:189:5 › unavailable channel order storage keeps reordering functional and still roams (1.3s)
+  ✓  6 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:267:5 › clearing the account order clears the cached one on the next load (1.3s)
+  ✓  7 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:298:5 › a second tab keeps the newer order when it returns to the workspace (2.6s)
+  ✓  8 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:355:5 › a local order longer than the roaming cap keeps its tail across a reload (1.9s)
+  8 passed (16.3s)
+
+working tree matches the intended change:
+ packages/sdk-ts/src/generated/openapi.d.ts         |   2 +-
+ tests/e2e/sidebar-channel-order.spec.ts            | 199 ++++++++++++++++++-
+ 24 files changed, 696 insertions(+), 122 deletions(-)

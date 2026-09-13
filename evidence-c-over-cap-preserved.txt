@@ -1,0 +1,28 @@
+Evidence C: a browser preference longer than the roaming cap survives a roam and a reload.
+date: 2026-09-13 (Sunday)
+head commit: e5941b1b0177649a0b63f1720185f9e0658b81f2 plus this working tree
+
+The e2e test builds a workspace of 520 channels, seeds this browser with a
+520-id local order, reorders once so the order roams (capped at 500 on the
+wire), reloads, and checks that the cached order still holds all 520 ids with
+the tail beyond the cap untouched.
+
+command: npx playwright test tests/e2e/sidebar-channel-order.spec.ts
+
+
+Running 8 tests using 1 worker
+
+  ✓  1 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:46:5 › channel ordering supports drag, keyboard, touch actions, and collapsed sections (1.1s)
+  ✓  2 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:101:5 › a reordered sidebar roams to a second browser context (1.5s)
+  ✓  3 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:141:5 › channel ordering is isolated by workspace (613ms)
+  ✓  4 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:174:5 › invalid saved channel ordering falls back to server order (221ms)
+  ✓  5 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:189:5 › unavailable channel order storage keeps reordering functional and still roams (1.3s)
+  ✓  6 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:267:5 › clearing the account order clears the cached one on the next load (1.3s)
+  ✓  7 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:298:5 › a second tab keeps the newer order when it returns to the workspace (2.6s)
+local order before the roam: 520 ids
+account order after the roam: 500 ids
+cached order after the reload: 520 ids
+tail beyond the cap preserved: 20 ids
+  ✓  8 [chromium] › tests/e2e/sidebar-channel-order.spec.ts:355:5 › a local order longer than the roaming cap keeps its tail across a reload (1.9s)
+
+  8 passed (17.0s)
