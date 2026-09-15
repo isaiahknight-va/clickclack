@@ -50,6 +50,13 @@ except the author.
 The current user's profile control sits at the bottom of the channel sidebar.
 Click or right-click it to open account settings and edit display name, handle,
 avatar URL, conversation display preferences, and notification settings.
+The account settings rail shows one Workspace group. When the account belongs
+to more than one workspace, a selector under the heading chooses which one the
+group's sections apply to; it opens on the workspace the user is standing in,
+whose name carries a "(current)" marker in the list, so a workspace section
+opens that workspace rather than whichever one the API listed first. With a
+single workspace the heading names it and there is no selector. Opening account
+settings on a phone closes the navigation drawer.
 
 Profile and notification saves update only their respective sections. Saving
 one section preserves changes to another section made in another tab or device.
