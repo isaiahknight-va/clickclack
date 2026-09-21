@@ -941,6 +941,7 @@
     returnFocus={copyLinkReturnFocus}
   />
 {/if}
+<div class="composer-dock">
 <AgentResponding active={agentResponding} agentNames={respondingAgentNames} />
 {#if replyError}<p class="composer-notice composer-notice--error" role="alert">{replyError}</p>{/if}
 <ChatComposer
@@ -959,3 +960,4 @@
   onInputRef={onReplyInputRef}
   onClearReply={onClearReply}
 />
+</div>
