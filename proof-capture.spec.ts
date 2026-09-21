@@ -1,0 +1,40 @@
+import { expect, test } from "@playwright/test";
+import { randomUUID } from "node:crypto";
+import { waitForAppReady } from "./app-ready";
+const OUT = process.env.REPRO_OUT!, TAG = process.env.REPRO_TAG!;
+const FILL = "the quick brown fox jumps over the lazy dog and keeps going so this line wraps on a narrow screen. THE LAST LINE OF THIS MESSAGE MUST STAY READABLE.";
+test.use({ deviceScaleFactor: 2 });
+for (const vp of [{ name: "desktop", width: 1280, height: 800 }, { name: "phone", width: 390, height: 844 }]) {
+  test(`proof ${vp.name}`, async ({ page }) => {
+    await page.setViewportSize(vp);
+    const x = randomUUID().slice(0, 8);
+    const ws = (await (await page.request.post("/api/workspaces", { data: { name: `Proof ${x}` } })).json()) as any;
+    const ch = (await (await page.request.post(`/api/workspaces/${ws.workspace.id}/channels`, { data: { name: `proof-${x}`, kind: "public" } })).json()) as any;
+    const bot = (await (await page.request.post(`/api/workspaces/${ws.workspace.id}/bots`, { data: { display_name: "Blackbird", handle: `blackbird-${x}`, token_name: "e2e", scopes: ["bot:write"] } })).json()) as any;
+    const pub = (type: string, payload: any) => page.request.post("/api/realtime/ephemeral", { headers: { Authorization: `Bearer ${bot.bot_token.token}` }, data: { workspace_id: ws.workspace.id, channel_id: ch.channel.id, type, payload } });
+    for (let i = 0; i < 15; i++) await page.request.post(`/api/channels/${ch.channel.id}/messages`, { data: { body: `Message ${i}: ${FILL}` } });
+    const root = (await (await page.request.post(`/api/channels/${ch.channel.id}/messages`, { data: { body: `Message 15: ${FILL}` } })).json()) as any;
+    for (let i = 0; i < 12; i++) await page.request.post(`/api/messages/${root.message.id}/thread/replies`, { data: { body: `Reply ${i}: ${FILL}` } });
+    await page.goto(`/app/${ws.workspace.route_id}/${ch.channel.route_id}`);
+    await waitForAppReady(page);
+    await expect(page.locator(".messages-scroll .markdown").filter({ hasText: "Message 15:" })).toBeVisible();
+    await page.waitForTimeout(900);
+    await pub("typing.started", {});
+    await expect(page.locator("main .typing-indicator.visible:not(.agent-responding)")).toBeVisible();
+    await page.waitForTimeout(600);
+    const mainClip = await page.evaluate(() => { const r = document.querySelector(".messages-scroll")!.getBoundingClientRect(); return { x: r.left, y: r.bottom - 130, width: Math.min(r.width, 640), height: 190 }; });
+    await page.screenshot({ path: `${OUT}/${TAG}-channel-${vp.name}.png`, clip: mainClip });
+    await pub("typing.stopped", {});
+    const row = page.locator(`.messages-scroll [data-message-id="${root.message.id}"]`).first();
+    await row.getByRole("button", { name: /repl/i }).first().click();
+    const pane = page.getByRole("complementary", { name: "Thread pane" });
+    await expect(pane.getByText("Reply 11:")).toBeVisible();
+    await page.waitForTimeout(900);
+    await pub("agent.progress", { turn_id: `t-${x}`, seq: 1, op: "append", line: { id: "l", kind: "commentary", text: "Working", status: "running" } });
+    await expect(pane.locator(".agent-responding")).toBeVisible();
+    await page.waitForTimeout(600);
+    const m = await page.evaluate(() => { const s = document.querySelector(".thread .thread-scroll")!; const r = s.getBoundingClientRect(); const md = s.querySelectorAll(".markdown"); const last = md[md.length - 1].getBoundingClientRect(); const ind = document.querySelector(".thread .agent-responding")!.getBoundingClientRect(); return { clip: { x: r.left, y: r.bottom - 130, width: r.width, height: 190 }, gap: ind.top - last.bottom, off: s.scrollHeight - s.scrollTop - s.clientHeight }; });
+    console.log("PROOF", TAG, vp.name, "thread gap", m.gap, "fromBottom", m.off);
+    await page.screenshot({ path: `${OUT}/${TAG}-thread-${vp.name}.png`, clip: m.clip });
+  });
+}

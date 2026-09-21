@@ -1,0 +1,13 @@
+indicator-band.spec.ts on parent b869988d:
+    Expected: 613
+    Received: 597
+    Expected: 401
+    Received: 385
+    Expected: 657
+    Received: 641
+    Expected: 701
+    Received: 685
+  4 failed
+
+indicator-band.spec.ts + agent-responding.spec.ts on the fix:
+  5 passed (9.4s)
