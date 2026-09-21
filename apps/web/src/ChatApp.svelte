@@ -4028,9 +4028,8 @@
 
     <AgentProgress turns={agentProgressTurns} />
 
-    <TypingIndicator entries={typingEntries} currentUserID={user?.id} />
-
     <div class="composer-dock">
+    <TypingIndicator entries={typingEntries} currentUserID={user?.id} />
     <AgentResponding
       active={agentResponding && $threadView.root === null}
       agentNames={activeRespondingAgentNames}

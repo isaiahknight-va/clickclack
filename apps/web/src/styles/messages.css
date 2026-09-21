@@ -293,10 +293,10 @@
   transform: translateY(0);
 }
 
-/* The live "agent is responding" indicator floats over the composer inside a
-   permanently reserved band, so showing/hiding it never reflows the
-   transcript or shifts the composer. The space is always there; only opacity
-   toggles. */
+/* The live "is typing" and "agent is responding" indicators float over the
+   composer inside a permanently reserved band, so showing/hiding them never
+   reflows the transcript, clips its last line, or shifts the composer. The
+   space is always there; only opacity toggles. */
 .composer-dock {
   position: relative;
   padding-top: 20px;
@@ -365,6 +365,7 @@
   font: inherit;
 }
 
+.composer-dock .typing-indicator,
 .composer-dock .agent-responding {
   position: absolute;
   top: 0;
@@ -382,11 +383,29 @@
   pointer-events: none;
 }
 
+.composer-dock .typing-indicator.visible,
 .composer-dock .agent-responding.visible {
   height: 20px;
   margin: 0;
   opacity: 1;
   transform: none;
+}
+
+.composer-dock .typing-indicator__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A person typing while an agent responds: share the band, one on each side. */
+.composer-dock:has(> .agent-responding) > .typing-indicator:not(.agent-responding) {
+  left: 50%;
+  justify-content: flex-end;
+}
+
+.composer-dock:has(> .typing-indicator.visible:not(.agent-responding)) > .agent-responding {
+  right: 50%;
 }
 
 .typing-indicator__dots {
