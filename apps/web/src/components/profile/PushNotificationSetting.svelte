@@ -50,7 +50,10 @@
       available = state.enabled;
       if (!state.enabled) return;
       const subscription = supported ? await currentPushSubscription() : null;
-      enabled = Boolean(subscription) && readPushEnabled(userID);
+      // One browser subscription serves every account on this device, and the
+      // server keeps it for whichever account registered it last. The switch
+      // is on only while the server also lists a device for this account.
+      enabled = Boolean(subscription) && readPushEnabled(userID) && state.subscriptions.length > 0;
       // A device whose subscription is gone is off here, whatever this
       // browser remembered.
       if (!subscription && readPushEnabled(userID)) writePushEnabled(userID, false);
