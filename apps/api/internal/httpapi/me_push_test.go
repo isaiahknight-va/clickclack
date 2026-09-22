@@ -80,7 +80,7 @@ func TestPushEndpointsRegisterAndRemoveADevice(t *testing.T) {
 	}
 
 	endpoint := "https://push.example.com/send/device-one"
-	stored := putPushSubscription(t, fixture.server.URL, endpoint, "iPhone")
+	stored := putPushSubscription(t, fixture.server.URL, fixture.owner.ID, endpoint, "iPhone")
 	if stored.Subscription.UserAgent != "iPhone" || stored.Subscription.ID == "" {
 		t.Fatalf("unexpected stored summary %#v", stored.Subscription)
 	}
@@ -158,11 +158,11 @@ func TestPushStateAnswersForThisDevice(t *testing.T) {
 	if state, _ := read("?device=" + thisKey); state.ThisDevice {
 		t.Fatal("no device is registered yet")
 	}
-	putPushSubscription(t, fixture.server.URL, otherEndpoint, "phone")
+	putPushSubscription(t, fixture.server.URL, fixture.owner.ID, otherEndpoint, "phone")
 	if state, _ := read("?device=" + thisKey); state.ThisDevice || len(state.Subscriptions) != 1 {
 		t.Fatalf("a device elsewhere is not this one: %#v", state)
 	}
-	putPushSubscription(t, fixture.server.URL, thisEndpoint, "laptop")
+	putPushSubscription(t, fixture.server.URL, fixture.owner.ID, thisEndpoint, "laptop")
 	state, raw := read("?device=" + thisKey)
 	if !state.ThisDevice {
 		t.Fatalf("the registered endpoint must read as this device: %s", raw)
@@ -186,7 +186,8 @@ func TestPushStateAnswersForThisDevice(t *testing.T) {
 func TestPushEndpointsRejectUnusableSubscriptions(t *testing.T) {
 	t.Parallel()
 	fixture := newPushTestServer(t, true)
-	valid := `"keys":{"p256dh":"` + exampleClientKey + `","auth":"` + exampleClientAuth + `"}`
+	valid := `"user_id":"` + fixture.owner.ID + `","keys":{"p256dh":"` + exampleClientKey + `","auth":"` + exampleClientAuth + `"}`
+	who := `"user_id":"` + fixture.owner.ID + `",`
 	offCurve := offCurveClientKey(t)
 	// Built rather than written out so no credential-shaped literal sits in the source.
 	endpointWithUserinfo := (&url.URL{Scheme: "https", User: url.UserPassword("user", "pass"), Host: "push.example.com", Path: "/send/x"}).String()
@@ -198,10 +199,11 @@ func TestPushEndpointsRejectUnusableSubscriptions(t *testing.T) {
 		"plain http":         `{"endpoint":"http://push.example.com/send/x",` + valid + `}`,
 		"no endpoint":        `{"endpoint":"",` + valid + `}`,
 		"credentials":        `{"endpoint":"` + endpointWithUserinfo + `",` + valid + `}`,
-		"off curve key":      `{"endpoint":"https://push.example.com/send/x","keys":{"p256dh":"` + offCurve + `","auth":"` + exampleClientAuth + `"}}`,
-		"short key":          `{"endpoint":"https://push.example.com/send/x","keys":{"p256dh":"AAAA","auth":"` + exampleClientAuth + `"}}`,
-		"short auth":         `{"endpoint":"https://push.example.com/send/x","keys":{"p256dh":"` + exampleClientKey + `","auth":"AAAA"}}`,
-		"no keys":            `{"endpoint":"https://push.example.com/send/x"}`,
+		"off curve key":      `{` + who + `"endpoint":"https://push.example.com/send/x","keys":{"p256dh":"` + offCurve + `","auth":"` + exampleClientAuth + `"}}`,
+		"short key":          `{` + who + `"endpoint":"https://push.example.com/send/x","keys":{"p256dh":"AAAA","auth":"` + exampleClientAuth + `"}}`,
+		"short auth":         `{` + who + `"endpoint":"https://push.example.com/send/x","keys":{"p256dh":"` + exampleClientKey + `","auth":"AAAA"}}`,
+		"no keys":            `{` + who + `"endpoint":"https://push.example.com/send/x"}`,
+		"no account":         `{"endpoint":"https://push.example.com/send/x","keys":{"p256dh":"` + exampleClientKey + `","auth":"` + exampleClientAuth + `"}}`,
 		"not json":           `{`,
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -254,7 +256,7 @@ func TestPushEndpointsRejectBotTokens(t *testing.T) {
 	expectStatusWithBearer(t, botToken.Token, http.MethodPut, fixture.server.URL+"/api/me/push/subscriptions", strings.NewReader(body), http.StatusForbidden)
 }
 
-func putPushSubscription(t *testing.T, baseURL, endpoint, label string) struct {
+func putPushSubscription(t *testing.T, baseURL, userID, endpoint, label string) struct {
 	Subscription store.PushSubscription `json:"subscription"`
 } {
 	t.Helper()
@@ -262,6 +264,7 @@ func putPushSubscription(t *testing.T, baseURL, endpoint, label string) struct {
 		"endpoint":   endpoint,
 		"keys":       map[string]string{"p256dh": exampleClientKey, "auth": exampleClientAuth},
 		"user_agent": label,
+		"user_id":    userID,
 	}
 	payload, err := json.Marshal(body)
 	if err != nil {
@@ -337,7 +340,7 @@ func TestPushRegistrationFollowsTheCookieSession(t *testing.T) {
 	}
 	handler := newProductionPushHandler(t, st, AccessConfig{})
 	endpoint := "https://push.example.com/send/cookie"
-	recorder := servePushPut(handler, endpoint, func(request *http.Request) {
+	recorder := servePushPut(handler, owner.ID, endpoint, func(request *http.Request) {
 		request.AddCookie(&http.Cookie{Name: "cc_session", Value: session.Token})
 	})
 	if recorder.Code != http.StatusOK {
@@ -353,9 +356,58 @@ func TestPushRegistrationFollowsTheCookieSession(t *testing.T) {
 		t.Fatalf("signing out must stop the device: %v", err)
 	}
 
-	anonymous := servePushPut(handler, endpoint+"-anonymous", func(*http.Request) {})
+	anonymous := servePushPut(handler, owner.ID, endpoint+"-anonymous", func(*http.Request) {})
 	if anonymous.Code != http.StatusUnauthorized {
 		t.Fatalf("a production server must refuse an anonymous registration: %d", anonymous.Code)
+	}
+}
+
+// TestPushRegistrationRefusesAnAccountChangedUnderneath is one browser, one
+// cookie jar: a tab still showing account A asks to register while the cookie
+// now belongs to B, who never turned push on. Nothing is written for either
+// account, and the same request naming B goes through.
+func TestPushRegistrationRefusesAnAccountChangedUnderneath(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := newAccessTestStore(t)
+	accountA, err := st.EnsureBootstrap(ctx, "Owner", "push-account-a@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	accountB, err := st.CreateUser(ctx, store.CreateUserInput{DisplayName: "Other", Email: "push-account-b@example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessionB, err := st.CreateSession(ctx, accountB.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := newProductionPushHandler(t, st, AccessConfig{})
+	asB := func(request *http.Request) {
+		request.AddCookie(&http.Cookie{Name: "cc_session", Value: sessionB.Token})
+	}
+	endpoint := "https://push.example.com/send/shared-browser"
+
+	stale := servePushPut(handler, accountA.ID, endpoint, asB)
+	if stale.Code != http.StatusConflict {
+		t.Fatalf("status = %d, body = %s", stale.Code, stale.Body.String())
+	}
+	if !strings.Contains(stale.Body.String(), errPushRegistrationAccountChanged.Error()) {
+		t.Fatalf("the refusal must say why: %s", stale.Body.String())
+	}
+	for _, account := range []store.User{accountA, accountB} {
+		subscriptions, err := st.ListPushSubscriptions(ctx, account.ID)
+		if err != nil || len(subscriptions) != 0 {
+			t.Fatalf("a refused registration must write nothing for %s: %#v %v", account.DisplayName, subscriptions, err)
+		}
+	}
+
+	current := servePushPut(handler, accountB.ID, endpoint, asB)
+	if current.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", current.Code, current.Body.String())
+	}
+	if _, err := st.GetPushSubscriptionDelivery(ctx, accountB.ID, endpoint); err != nil {
+		t.Fatalf("the signed-in account naming itself must register: %v", err)
 	}
 }
 
@@ -377,8 +429,20 @@ func TestPushRegistrationThroughAccessBindsTheMintedSession(t *testing.T) {
 		"exp": time.Now().Add(time.Hour).Unix(), "iat": time.Now().Add(-time.Minute).Unix(),
 		"email": "push-access@example.com",
 	})
+	// The app reads the signed-in account before it registers, and names it
+	// in the registration.
+	meRequest := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+	meRequest.Header.Set(accessAssertionHeader, assertion)
+	meRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(meRecorder, meRequest)
+	var me struct {
+		User store.User `json:"user"`
+	}
+	if err := json.Unmarshal(meRecorder.Body.Bytes(), &me); err != nil || me.User.ID == "" {
+		t.Fatalf("GET /api/me through Access: %d %s", meRecorder.Code, meRecorder.Body.String())
+	}
 	endpoint := "https://push.example.com/send/access"
-	recorder := servePushPut(handler, endpoint, func(request *http.Request) {
+	recorder := servePushPut(handler, me.User.ID, endpoint, func(request *http.Request) {
 		request.Header.Set(accessAssertionHeader, assertion)
 	})
 	if recorder.Code != http.StatusOK {
@@ -410,7 +474,7 @@ func TestPushRegistrationByTheDevelopmentIdentity(t *testing.T) {
 	t.Parallel()
 	fixture := newPushTestServer(t, true)
 	endpoint := "https://push.example.com/send/development"
-	putPushSubscription(t, fixture.server.URL, endpoint, "laptop")
+	putPushSubscription(t, fixture.server.URL, fixture.owner.ID, endpoint, "laptop")
 	if _, err := fixture.store.GetPushSubscriptionDelivery(context.Background(), fixture.owner.ID, endpoint); err != nil {
 		t.Fatalf("a development registration must be deliverable: %v", err)
 	}
@@ -430,8 +494,8 @@ func newProductionPushHandler(t *testing.T, st *sqlitestore.Store, access Access
 	}).Handler()
 }
 
-func servePushPut(handler http.Handler, endpoint string, authenticate func(*http.Request)) *httptest.ResponseRecorder {
-	body := `{"endpoint":"` + endpoint + `","keys":{"p256dh":"` + exampleClientKey + `","auth":"` + exampleClientAuth + `"},"user_agent":"phone"}`
+func servePushPut(handler http.Handler, userID, endpoint string, authenticate func(*http.Request)) *httptest.ResponseRecorder {
+	body := `{"user_id":"` + userID + `","endpoint":"` + endpoint + `","keys":{"p256dh":"` + exampleClientKey + `","auth":"` + exampleClientAuth + `"},"user_agent":"phone"}`
 	request := httptest.NewRequest(http.MethodPut, "/api/me/push/subscriptions", strings.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set(csrfHeaderName, "1")

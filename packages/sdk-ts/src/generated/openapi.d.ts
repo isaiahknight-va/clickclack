@@ -1777,6 +1777,8 @@ export interface components {
       failure_count: number;
     };
     PushSubscriptionRequest: {
+      /** @description The account the client is registering this device for, the one whose opt-in it checked. It must be the signed-in account, or the request is refused with 409. */
+      user_id: string;
       /** @description The push service URL from pushManager.subscribe. Must be https and must not point inside the deployment's own network. */
       endpoint: string;
       keys: {
@@ -3036,7 +3038,7 @@ export interface operations {
           };
         };
       };
-      /** @description The endpoint or the client keys are unusable */
+      /** @description The endpoint or the client keys are unusable, or user_id is missing */
       400: {
         headers: {
           [name: string]: unknown;
@@ -3052,6 +3054,13 @@ export interface operations {
       };
       /** @description Web push is not configured on this server */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description user_id is not the signed-in account, as when another tab signed this browser in to a different account. Nothing is written. */
+      409: {
         headers: {
           [name: string]: unknown;
         };
