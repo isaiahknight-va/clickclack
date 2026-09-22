@@ -81,9 +81,19 @@ Each notification is a JSON payload under 3 KB, encrypted for one subscription:
 The title matches the one an open tab shows, including "ClickClack" in place of
 an author with no name, and the tag matches too, so a
 device that both has the app open and receives a push shows one notification
-rather than two. The body is truncated to 240 characters. Tapping the
-notification focuses an open app window and routes it, or opens one; the app
-waits for the conversation to load and then shows its newest message.
+rather than two. The body is truncated to 240 characters.
+
+Tapping the notification lands at the conversation's newest message whether
+or not the app is open:
+
+- With an app window open, the service worker focuses it and posts it the
+  URL. The window routes to the conversation, waits for its messages to load,
+  and jumps to the newest one.
+- With no app window open, the service worker opens one at the URL with
+  `?from=push` added. On start the app removes the mark, routes to the
+  conversation, waits for its messages to load, and jumps to the newest one.
+  The mark travels in the URL because a message posted to a window that is
+  still starting can arrive before the app is listening.
 
 Delivery happens off the request path in a small worker pool, so posting a
 message never waits on a push service. A push can wait in that queue behind a
@@ -115,8 +125,8 @@ device's delivery secret.
 One row per device in `user_push_subscriptions`: the endpoint, the two client
 keys, a short device label, timestamps, the failure count and backoff, and the
 session that registered it. `GET /api/me/push` returns only the label, the
-timestamps, and the failure count. The endpoint and the keys never leave the
-server.
+timestamps, and the failure count for each device, plus whether the asking
+browser is one of them. The endpoint and the keys never leave the server.
 
 A database-level backup preserves device registrations: `clickclack backup`
 for SQLite, or the operator's own PostgreSQL dump. A JSON export does not. It
@@ -139,6 +149,11 @@ GET    /api/me/push
 PUT    /api/me/push/subscriptions
 DELETE /api/me/push/subscriptions
 ```
+
+`GET` takes an optional `device` query: the unpadded base64url SHA-256 of the
+endpoint the browser holds. The answer's `this_device` is true when that
+digest matches one of the user's devices, and false when it matches none or
+no device is named. The settings switch reads on only when it is true.
 
 `PUT` takes the browser's subscription (`endpoint` and the `p256dh` and `auth`
 keys) plus a short `user_agent` label, and replaces any existing registration
@@ -166,11 +181,13 @@ depending on the browser.
   different hostname ends both, and every device has to opt in again.
 - The desktop app shows its own notifications and hides this switch.
 - A browser holds one push subscription for every account signed in on it, and
-  the server keeps that device for the account that registered it last. On a
-  device several accounts use, the switch reads off for an account the server
-  lists no device for, and opening the app as an account that turned push on
-  there moves the device back to it. The device list names no endpoints, so an
-  account with a device elsewhere still reads on here.
+  the server keeps that device for the account that registered it last; for
+  that account it is a new registration. On a device several accounts use,
+  the switch reads on only for the account the server delivers to on this
+  device, even when another account has devices elsewhere, and opening the
+  app as an account that turned push on there moves the device back to it.
+  Turning the switch off on a shared device unsubscribes the browser, so every
+  account on that device stops receiving until one turns it on again.
 - When the browser replaces a subscription on its own, the service worker does
   not register the replacement, because it cannot tell which account on the
   device turned push on. It asks an open app window to re-register, and only
