@@ -152,9 +152,11 @@ export async function forgetSubscription(endpoint: string): Promise<void> {
 
 // healPushSubscription re-registers this device on app start, and when the
 // service worker reports the browser replaced its subscription, but only for a
-// user who turned push on here. Reinstalls and key rotations both change the
-// endpoint, so without this a device goes quiet with nothing on screen to
-// explain it. It is the only path that registers a device without the switch.
+// user who turned push on here. A key rotation changes the endpoint, so
+// without this a device goes quiet with nothing on screen to explain it. A
+// reinstall wipes the note that push was on, so it is a fresh opt-in from the
+// switch, not a heal. This is the only path that registers a device without
+// the switch.
 export async function healPushSubscription(userID: string): Promise<void> {
   if (!userID || !pushSupported() || !readPushEnabled(userID)) return;
   try {

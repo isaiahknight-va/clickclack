@@ -218,6 +218,9 @@
   let activityClockSweeper: number | undefined;
   let activeRouteKey = "";
   let routeApplySerial = 0;
+  // The route the app is applying now; it settles once that route's messages
+  // have loaded or a later route has replaced it.
+  let routeApplication: Promise<void> = Promise.resolve();
   let messageLoadGeneration = 0;
   let workspacesLoadSerial = 0;
   let channelsLoadSerial = 0;
@@ -400,11 +403,7 @@
       }
       if (data?.type !== "clickclack:notification-click") return;
       if (typeof data.url !== "string" || !data.url.startsWith("/app")) return;
-      // The tap means "show me that message". Land in the conversation and
-      // then at its newest message, even when the app was already there.
-      void goto(data.url, { keepFocus: true, noScroll: true }).then(() =>
-        scrollMessagesToBottom(),
-      );
+      void openNotificationTarget(data.url);
     };
     navigator.serviceWorker?.addEventListener("message", handleServiceWorkerMessage);
     return () => {
@@ -415,6 +414,18 @@
       stopDesktopQuickCompose?.();
     };
   });
+
+  // The tap means "show me that message": land in its conversation, then at
+  // its newest message, even when the app was already there. Jumping before
+  // the route's window loads would scroll the conversation being left.
+  async function openNotificationTarget(url: string) {
+    await goto(url, { keepFocus: true, noScroll: true });
+    await tick();
+    const serial = routeApplySerial;
+    await routeApplication;
+    if (serial !== routeApplySerial) return;
+    await jumpToLiveChat();
+  }
 
   function focusActiveComposer() {
     void tick().then(() => {
@@ -474,8 +485,9 @@
       const me = await requestCurrentUser();
       user = me.user;
       syncBrowserNotificationState();
-      // A reinstall or a key rotation gives this device a new endpoint, so
-      // re-register the one it holds now. The PUT replaces in place.
+      // A key rotation gives this device a new endpoint, so re-register the
+      // one it holds now. The PUT replaces in place. A reinstall starts with
+      // empty storage and is a fresh opt-in from the settings row.
       if (!desktop) void healPushSubscription(user.id);
       await loadWorkspaces();
       // Let workspace projections settle before admitting routes in a later flush.
@@ -624,7 +636,7 @@
   }
 
   function followRoute(workspaceID: string, targetID: string) {
-    if (routeKey(workspaceID, targetID) !== activeRouteKey) void applyRoute(workspaceID, targetID);
+    if (routeKey(workspaceID, targetID) !== activeRouteKey) routeApplication = applyRoute(workspaceID, targetID);
   }
 
   function commitSelectedRoute() {

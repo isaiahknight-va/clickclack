@@ -356,6 +356,119 @@ test("a renewal on a device where this account never turned push on registers no
   expect(await stubCalls(page)).toEqual([]);
 });
 
+// turnPushOn flips the settings switch and waits for the device to be stored,
+// then closes the dialog.
+async function turnPushOn(page: Page) {
+  const modal = await openNotificationSettings(page);
+  const stored = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/me/push/subscriptions") &&
+      response.request().method() === "PUT" &&
+      response.status() === 200,
+  );
+  await modal.getByLabel("Push notifications on this device").check();
+  await stored;
+  await expect(modal.getByText("On for this device")).toBeVisible();
+  await modal.getByRole("button", { name: "Close", exact: true }).click();
+}
+
+// expectPushSwitch opens the settings row fresh, the way a person checks
+// whether this device will ring, and asserts what the switch shows once the
+// row has read the server.
+async function expectPushSwitch(page: Page, checked: boolean) {
+  const stateRead = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/me/push" && response.request().method() === "GET",
+  );
+  const modal = await openNotificationSettings(page);
+  const control = modal.getByLabel("Push notifications on this device");
+  await stateRead;
+  if (checked) {
+    await expect(control).toBeChecked();
+  } else {
+    // Off is the row's starting state, so give a wrong reading room to land
+    // after the server answered before asserting it never did.
+    await page.waitForTimeout(500);
+    await expect(control).not.toBeChecked();
+  }
+  await modal.getByRole("button", { name: "Close", exact: true }).click();
+}
+
+test("a device two accounts turned push on shows it on only for the account the server delivers to", async ({
+  page,
+  context,
+}) => {
+  // One browser, one push subscription, two accounts in two tabs.
+  const endpoint = `${relayOrigin}/push/${randomUUID()}`;
+  await stubPushManager(page, endpoint);
+  const first = await createGeneralChannel(page, "Push shared first", true);
+  await page.goto(first.route);
+  await waitForAppReady(page);
+  await turnPushOn(page);
+
+  const second = await context.newPage();
+  await stubPushManager(second, endpoint);
+  const other = await createGeneralChannel(second, "Push shared second", true);
+  await second.goto(other.route);
+  await waitForAppReady(second);
+  await turnPushOn(second);
+  // The endpoint is unique, so the second account now holds the device.
+  expect((await pushState(page)).subscriptions).toHaveLength(0);
+  expect((await pushState(second)).subscriptions).toHaveLength(1);
+
+  await expectPushSwitch(page, false);
+  await expectPushSwitch(second, true);
+
+  // Opening the app as the first account re-registers the device it turned
+  // on here, so the device moves back and the second account's switch reads
+  // off.
+  const healed = page.waitForResponse(
+    (response) => isPushRegistration(response.request()) && response.status() === 200,
+  );
+  await page.reload();
+  await waitForAppReady(page);
+  await healed;
+  await expectPushSwitch(second, false);
+  await expectPushSwitch(page, true);
+});
+
+test("a notification tap lands at the conversation's newest message", async ({ page }) => {
+  const { workspace, channel, route } = await createGeneralChannel(page, "Push tap", true);
+  const elsewhere = await page.request.post(`/api/workspaces/${workspace.id}/channels`, {
+    data: { name: "elsewhere", kind: "public" },
+  });
+  expect(elsewhere.ok()).toBe(true);
+  const { channel: away } = (await elsewhere.json()) as { channel: { route_id: string } };
+  await page.goto(`/app/${workspace.route_id}/${away.route_id}`);
+  await waitForAppReady(page);
+
+  const poster = await page.request.post(`/api/workspaces/${workspace.id}/bots`, {
+    data: { display_name: `Tapper ${randomUUID().slice(0, 8)}` },
+  });
+  expect(poster.ok()).toBe(true);
+  const { bot_token: botToken } = (await poster.json()) as { bot_token: { token: string } };
+  let newest = "";
+  for (let index = 1; index <= 60; index += 1) {
+    const posted = await page.request.post(`/api/channels/${channel.id}/messages`, {
+      headers: { Authorization: `Bearer ${botToken.token}` },
+      data: { body: `backlog ${index}` },
+    });
+    expect(posted.ok()).toBe(true);
+    newest = ((await posted.json()) as { message: { id: string } }).message.id;
+  }
+
+  // The worker's notificationclick handler posts this message to the app
+  // window; dispatching it on the container reaches the same listener.
+  await page.evaluate((url) => {
+    navigator.serviceWorker.dispatchEvent(
+      new MessageEvent("message", { data: { type: "clickclack:notification-click", url } }),
+    );
+  }, route);
+
+  await expect(page).toHaveURL(new RegExp(`${route}$`));
+  await expect(page.locator(`[data-message-id="${newest}"]`)).toBeInViewport();
+});
+
 // fireSubscriptionChange raises the event a browser raises when it replaces a
 // subscription. A synthetic event cannot extend its lifetime, so the worker's
 // waitUntil throws after the handler has already started its work; that is
