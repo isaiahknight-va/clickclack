@@ -92,7 +92,12 @@ func webPushTitle(message store.Message, place store.Channel) string {
 	if title := channelDisplayTitle(place); title != "" {
 		return author + " in #" + title
 	}
-	return author + " in Direct message"
+	if message.DirectConversationID != "" {
+		return author + " in Direct message"
+	}
+	// A channel that could not be read names nobody rather than claiming to
+	// be a conversation it is not.
+	return author
 }
 
 func webPushBody(message store.Message) string {
