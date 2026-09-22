@@ -72,6 +72,13 @@ test("appleDevice recognizes an iPad reporting a desktop user agent", () => {
   });
 });
 
+test("deviceLabel names an iPad that presents as a Mac", () => {
+  const mac =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15";
+  assert.equal(deviceLabel(mac, 5), "iPad Safari");
+  assert.equal(deviceLabel(mac, 0), "Mac Safari");
+});
+
 test("deviceLabel names the platform and browser without copying the user agent", () => {
   assert.equal(
     deviceLabel(
