@@ -394,7 +394,11 @@
       const data = event.data as { type?: string; url?: string } | null;
       if (data?.type !== "clickclack:notification-click") return;
       if (typeof data.url !== "string" || !data.url.startsWith("/app")) return;
-      void goto(data.url, { keepFocus: true, noScroll: true });
+      // The tap means "show me that message". Land in the conversation and
+      // then at its newest message, even when the app was already there.
+      void goto(data.url, { keepFocus: true, noScroll: true }).then(() =>
+        scrollMessagesToBottom(),
+      );
     };
     navigator.serviceWorker?.addEventListener("message", handleServiceWorkerMessage);
     return () => {
