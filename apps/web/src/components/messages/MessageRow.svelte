@@ -225,18 +225,23 @@
   // A reaction the user just added grows this row. When the list is not
   // following the bottom (a trackpad or a finger usually leaves it a few
   // pixels short), the new chip lands below the fold under the composer's
-  // status band. Bring it into view once it has rendered.
-  async function react(emoji: string) {
-    await reactionController.toggle(message, emoji);
-    await tick();
-    revealRowBottom();
+  // status band. Reveal the chip on its optimistic render, before the request
+  // resolves, so a scroll the user makes meanwhile is never undone.
+  function react(emoji: string) {
+    void reactionController.toggle(message, emoji);
+    void tick().then(revealReactionsBar);
   }
 
-  function revealRowBottom() {
+  // Only the reactions bar is measured: attachments render below it, so the
+  // row's own bottom can be a screen further down.
+  function revealReactionsBar() {
     const scroller = rowEl?.closest(".messages-scroll");
-    if (!rowEl || !scroller) return;
-    const overflow = rowEl.getBoundingClientRect().bottom - scroller.getBoundingClientRect().bottom;
-    if (overflow > 0) scroller.scrollTop += Math.ceil(overflow);
+    const bar = rowEl?.querySelector(".reactions-bar") ?? rowEl;
+    if (!bar || !scroller) return;
+    const target = bar.getBoundingClientRect();
+    const view = scroller.getBoundingClientRect();
+    if (target.bottom > view.bottom) scroller.scrollTop += Math.ceil(target.bottom - view.bottom);
+    else if (target.top < view.top) scroller.scrollTop -= Math.ceil(view.top - target.top);
   }
 
   function quickReact(emoji: string) {
