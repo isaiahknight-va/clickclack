@@ -395,8 +395,9 @@
     const handleServiceWorkerMessage = (event: MessageEvent) => {
       const data = event.data as { type?: string; url?: string } | null;
       if (data?.type === "clickclack:push-renew") {
-        // The browser replaced this device's subscription. Only the signed-in
-        // user's own opt-in may register the replacement.
+        // The browser replaced this device's subscription. Only this tab's
+        // account's own opt-in may register the replacement, and only while
+        // the server says that account is still the one signed in here.
         if (user && !desktop) void healPushSubscription(user.id);
         return;
       }
