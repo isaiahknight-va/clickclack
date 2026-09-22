@@ -261,6 +261,7 @@ type PushNotificationRecipient struct {
 	UserID          string
 	DisplayName     string
 	PushoverUserKey string
+	Subscriptions   []PushSubscriptionTarget
 }
 
 type Workspace struct {
@@ -1281,6 +1282,11 @@ type Store interface {
 	GetAppearancePreferences(ctx context.Context, userID string) (*AppearancePreferences, error)
 	GetSidebarPreferences(ctx context.Context, userID string) (*SidebarPreferences, error)
 	ListPushNotificationRecipients(ctx context.Context, messageID string, mentionedUserIDs []string) ([]PushNotificationRecipient, error)
+	UpsertPushSubscription(ctx context.Context, input PushSubscriptionInput) (PushSubscription, error)
+	ListPushSubscriptions(ctx context.Context, userID string) ([]PushSubscription, error)
+	DeletePushSubscription(ctx context.Context, userID, endpoint string) error
+	MarkPushSubscriptionSuccess(ctx context.Context, userID, endpoint string) error
+	MarkPushSubscriptionFailure(ctx context.Context, userID, endpoint string, retryAfter time.Duration) (int64, error)
 	UpsertChannelNotificationSettings(ctx context.Context, input ChannelNotificationInput) error
 	GetChannelNotificationPreference(ctx context.Context, channelID, userID string) (string, error)
 	AddWorkspaceMember(ctx context.Context, workspaceID, userID, role string) error

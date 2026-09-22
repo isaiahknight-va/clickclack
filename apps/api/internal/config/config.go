@@ -39,6 +39,9 @@ type Config struct {
 	AccessTeamDomain       string   `json:"access_team_domain"`
 	AccessAUD              string   `json:"access_aud"`
 	PushoverAPIToken       string   `json:"pushover_api_token"`
+	WebPushVAPIDPublicKey  string   `json:"webpush_vapid_public_key"`
+	WebPushVAPIDPrivateKey string   `json:"webpush_vapid_private_key"`
+	WebPushSubject         string   `json:"webpush_subject"`
 	R2AccountID            string   `json:"r2_account_id"`
 	R2AccessKeyID          string   `json:"r2_access_key_id"`
 	R2SecretAccessKey      string   `json:"r2_secret_access_key"`
@@ -153,6 +156,15 @@ func Load(path string) (Config, error) {
 	if env := os.Getenv("CLICKCLACK_PUSHOVER_API_TOKEN"); env != "" {
 		cfg.PushoverAPIToken = env
 	}
+	if env := os.Getenv("CLICKCLACK_WEBPUSH_VAPID_PUBLIC_KEY"); env != "" {
+		cfg.WebPushVAPIDPublicKey = env
+	}
+	if env := os.Getenv("CLICKCLACK_WEBPUSH_VAPID_PRIVATE_KEY"); env != "" {
+		cfg.WebPushVAPIDPrivateKey = env
+	}
+	if env := os.Getenv("CLICKCLACK_WEBPUSH_SUBJECT"); env != "" {
+		cfg.WebPushSubject = env
+	}
 	if env := os.Getenv("CLICKCLACK_R2_ACCOUNT_ID"); env != "" {
 		cfg.R2AccountID = env
 	}
@@ -243,6 +255,37 @@ func (c *Config) ValidateServe() error {
 	c.OpenClawIDClientID = openclawClientID
 	c.OpenClawIDClientSecret = openclawClientSecret
 	c.OpenClawIDIssuer = strings.TrimSpace(c.OpenClawIDIssuer)
+	return normalizeWebPush(c, publicURL)
+}
+
+// WebPushEnabled reports whether both halves of the VAPID key pair are
+// configured. Every push endpoint and every delivery is off until they are.
+func (c *Config) WebPushEnabled() bool {
+	return strings.TrimSpace(c.WebPushVAPIDPublicKey) != "" && strings.TrimSpace(c.WebPushVAPIDPrivateKey) != ""
+}
+
+// normalizeWebPush trims the VAPID pair and resolves the RFC 8292 contact the
+// push services see. The contact defaults to the deployment origin, which is
+// the operator identity they already have.
+func normalizeWebPush(c *Config, publicURL string) error {
+	c.WebPushVAPIDPublicKey = strings.TrimSpace(c.WebPushVAPIDPublicKey)
+	c.WebPushVAPIDPrivateKey = strings.TrimSpace(c.WebPushVAPIDPrivateKey)
+	subject := strings.TrimSpace(c.WebPushSubject)
+	if (c.WebPushVAPIDPublicKey != "") != (c.WebPushVAPIDPrivateKey != "") {
+		return errors.New("CLICKCLACK_WEBPUSH_VAPID_PUBLIC_KEY and CLICKCLACK_WEBPUSH_VAPID_PRIVATE_KEY must be configured together")
+	}
+	if subject == "" {
+		subject = publicURL
+	}
+	if c.WebPushEnabled() {
+		if subject == "" {
+			return errors.New("web push requires CLICKCLACK_WEBPUSH_SUBJECT or CLICKCLACK_PUBLIC_URL")
+		}
+		if !strings.HasPrefix(subject, "https://") && !strings.HasPrefix(subject, "mailto:") {
+			return errors.New("CLICKCLACK_WEBPUSH_SUBJECT must be an https URL or a mailto address")
+		}
+	}
+	c.WebPushSubject = subject
 	return nil
 }
 

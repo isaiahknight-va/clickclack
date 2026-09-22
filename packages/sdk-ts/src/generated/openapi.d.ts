@@ -267,6 +267,41 @@ export interface paths {
     patch: operations["updateMe"];
     trace?: never;
   };
+  "/api/me/push": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** @description Web push state for the current user. Reports disabled with no keys when the server has no VAPID key pair. */
+    get: operations["getMyPush"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/me/push/subscriptions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** @description Register or replace the browser push subscription for one device. Re-registering the same endpoint replaces its keys. */
+    put: operations["putMyPushSubscription"];
+    post?: never;
+    /** @description Remove one device. An endpoint that is not registered still answers 204, so the client can call this freely. */
+    delete: operations["deleteMyPushSubscription"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/event-types": {
     parameters: {
       query?: never;
@@ -1723,6 +1758,36 @@ export interface components {
       /** @description Current user's Pushover user key. Must be set when Pushover notifications are enabled. */
       pushover_user_key: string;
     };
+    PushState: {
+      /** @description Whether the server has a VAPID key pair and can deliver web push. */
+      enabled: boolean;
+      /** @description Application server key for pushManager.subscribe, base64url. Empty when web push is disabled. */
+      vapid_public_key: string;
+      subscriptions: components["schemas"]["PushSubscription"][];
+    };
+    /** @description One registered device. The endpoint and the client keys are delivery secrets and are never returned. */
+    PushSubscription: {
+      id: string;
+      /** @description Short device label chosen by the client. */
+      user_agent: string;
+      created_at: string;
+      updated_at: string;
+      last_success_at?: string;
+      /** Format: int64 */
+      failure_count: number;
+    };
+    PushSubscriptionRequest: {
+      /** @description The push service URL from pushManager.subscribe. Must be https and must not point inside the deployment's own network. */
+      endpoint: string;
+      keys: {
+        /** @description Uncompressed P-256 public key from the subscription, base64url. */
+        p256dh: string;
+        /** @description 16 byte subscription auth secret, base64url. */
+        auth: string;
+      };
+      /** @description Short device label, truncated to 200 characters. */
+      user_agent?: string;
+    };
     /** @description Current user's complete appearance preference snapshot. Empty properties use client defaults. */
     AppearancePreferences: {
       /** @enum {string} */
@@ -2942,6 +3007,119 @@ export interface operations {
             user: components["schemas"]["User"];
           };
         };
+      };
+    };
+  };
+  getMyPush: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Web push state */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PushState"];
+        };
+      };
+    };
+  };
+  putMyPushSubscription: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PushSubscriptionRequest"];
+      };
+    };
+    responses: {
+      /** @description Stored device summary */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            subscription: components["schemas"]["PushSubscription"];
+          };
+        };
+      };
+      /** @description The endpoint or the client keys are unusable */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Bot tokens cannot register push subscriptions */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Web push is not configured on this server */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  deleteMyPushSubscription: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @description The push service URL returned by pushManager.subscribe. */
+          endpoint: string;
+        };
+      };
+    };
+    responses: {
+      /** @description The device is no longer registered */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The endpoint is missing */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Bot tokens cannot register push subscriptions */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Web push is not configured on this server */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };
