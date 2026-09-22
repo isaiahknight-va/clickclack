@@ -24,3 +24,5 @@ e1-*: authorization rejection on the built server path (see the summary table). 
 iphone-after-rotation-banner.png: test seven on the lock screen after the rotation and the fresh load; e3-rotation-log.txt is the server log sequence with the user id and key fingerprints replaced by placeholders.
 
 Head 31e2df0b (revision 2 final, 2026-09-22): full browser suite 403 passed (2.4m); go test for httpapi, all stores, and webpush ok; web unit 89 passed; typecheck, lint, and format clean; coverage 86.6% against the 85% gate (Russet's run with a real PostgreSQL 17, 131 postgres store tests, 0 skipped).
+
+Revision 3 (2026-09-22, head after the stale-tab fix): e1r3-* is the built-server authorization run with real session cookies, including the shared-browser case where a registration naming an account that is no longer signed in is refused with 409 and nothing is written.

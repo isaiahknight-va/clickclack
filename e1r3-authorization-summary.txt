@@ -1,0 +1,20 @@
+Web push send-time authorization, production build path
+binary: go build -tags clickclack_e2e_unsafe_callbacks, serve without --dev-bootstrap
+head: 61a4ba67
+workers held on the fake push service before each case's message was posted: 4
+
+case                   pushes to the recipient's device   server log line for the recipient
+control                1                                  web push delivered for user usr_01m35qs35ytcc03y5y40hhgdk6 via 127.0.0.1:54419
+session-revoked        0                                  web push delivery skipped for user usr_01m35qs3a256hncmecwdyt26b6: the session that registered the device has ended
+subscription-deleted   0                                  web push delivery skipped for user usr_01m35qs3ecyvqhb61rgww33amr: the device is no longer registered
+membership-removed     0                                  web push delivery skipped for user usr_01m35qs3jrsands49m1fwt2csp: the user can no longer read the message
+
+Shared browser: one cookie jar, signed in as A, then as B
+A registers its device by cookie, naming A:              200
+the jar's session after B signs in belongs to:          B
+registration naming A under B's cookie answered:        409 this browser is now signed in to a different account; nothing was saved
+devices listed for B / for A:                           0 / 1
+pushes to the endpoint the stale registration named:    0 (a message to B was posted)
+pushes to A's device:                                   1 (a message to A was posted)
+
+RESULT: PASS
