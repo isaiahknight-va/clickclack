@@ -27,10 +27,14 @@ clickclack admin webpush keygen
 It prints the two environment variables once. Put them in the server's
 configuration, along with a contact address, and restart:
 
-- `CLICKCLACK_WEBPUSH_VAPID_PUBLIC_KEY`
-- `CLICKCLACK_WEBPUSH_VAPID_PRIVATE_KEY`
-- `CLICKCLACK_WEBPUSH_SUBJECT`, a `mailto:` address or an `https` URL the push
-  services can use to reach the operator. It defaults to `CLICKCLACK_PUBLIC_URL`.
+- `CLICKCLACK_WEBPUSH_VAPID_PUBLIC_KEY` (config file key `webpush_vapid_public_key`)
+- `CLICKCLACK_WEBPUSH_VAPID_PRIVATE_KEY` (`webpush_vapid_private_key`)
+- `CLICKCLACK_WEBPUSH_SUBJECT` (`webpush_subject`), a `mailto:` address or an
+  `https` URL the push services can use to reach the operator. It defaults to
+  `CLICKCLACK_PUBLIC_URL`.
+
+The two keys are the pair `admin webpush keygen` prints; the configuration
+reference leaves them out on purpose.
 
 Keep the private key like any other server secret. Rotating it invalidates
 every registered device; each one re-registers the next time its owner opens

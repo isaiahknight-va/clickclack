@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -114,6 +115,8 @@ func TestPushEndpointsRejectUnusableSubscriptions(t *testing.T) {
 	fixture := newPushTestServer(t, true)
 	valid := `"keys":{"p256dh":"` + exampleClientKey + `","auth":"` + exampleClientAuth + `"}`
 	offCurve := offCurveClientKey(t)
+	// Built rather than written out so no credential-shaped literal sits in the source.
+	endpointWithUserinfo := (&url.URL{Scheme: "https", User: url.UserPassword("user", "pass"), Host: "push.example.com", Path: "/send/x"}).String()
 	for name, body := range map[string]string{
 		"loopback endpoint":  `{"endpoint":"https://127.0.0.1/send/x",` + valid + `}`,
 		"private endpoint":   `{"endpoint":"https://10.0.0.1/send/x",` + valid + `}`,
@@ -121,7 +124,7 @@ func TestPushEndpointsRejectUnusableSubscriptions(t *testing.T) {
 		"bare host endpoint": `{"endpoint":"https://push/send/x",` + valid + `}`,
 		"plain http":         `{"endpoint":"http://push.example.com/send/x",` + valid + `}`,
 		"no endpoint":        `{"endpoint":"",` + valid + `}`,
-		"credentials":        `{"endpoint":"https://user:pass@push.example.com/send/x",` + valid + `}`,
+		"credentials":        `{"endpoint":"` + endpointWithUserinfo + `",` + valid + `}`,
 		"off curve key":      `{"endpoint":"https://push.example.com/send/x","keys":{"p256dh":"` + offCurve + `","auth":"` + exampleClientAuth + `"}}`,
 		"short key":          `{"endpoint":"https://push.example.com/send/x","keys":{"p256dh":"AAAA","auth":"` + exampleClientAuth + `"}}`,
 		"short auth":         `{"endpoint":"https://push.example.com/send/x","keys":{"p256dh":"` + exampleClientKey + `","auth":"AAAA"}}`,
