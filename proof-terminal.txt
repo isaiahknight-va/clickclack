@@ -14,3 +14,8 @@ reaction-reveal.spec.ts on parent v0.5.1 (483a27a9):
 
 reaction-reveal.spec.ts + message-actions-any-hover.spec.ts + message-reactions.spec.ts on the fix:
   1 passed (6.5s)
+
+message-actions-touch.spec.ts (iPhone profile) + reaction-reveal.spec.ts (four cases) + message-actions-any-hover.spec.ts + message-reactions.spec.ts on the fix:
+  22 passed (21.8s)
+
+iphone-sheet-before.png: a real iPhone, long press on a message before the fix. The sheet opened AND iOS carried the press into a text selection on the sheet's first row (Reply highlighted, Copy / Look Up callout over the emoji row).
