@@ -462,12 +462,14 @@ test("a notification tap lands at the conversation's newest message", async ({ p
   }
 
   // The worker's notificationclick handler posts this message to the app
-  // window; dispatching it on the container reaches the same listener.
+  // window; dispatching it on the container reaches the same listener. The
+  // URL is the one the server puts in the push: storage ids, which the app
+  // canonicalizes to the channel's route.
   await page.evaluate((url) => {
     navigator.serviceWorker.dispatchEvent(
       new MessageEvent("message", { data: { type: "clickclack:notification-click", url } }),
     );
-  }, route);
+  }, `/app/${workspace.id}/${channel.id}`);
 
   await expect(page).toHaveURL(new RegExp(`${route}$`));
   await expect(page.locator(`[data-message-id="${newest}"]`)).toBeInViewport();
