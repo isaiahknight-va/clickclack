@@ -349,6 +349,13 @@ paths:
     get:
       operationId: getMyPush
       description: Web push state for the current user. Reports disabled with no keys when the server has no VAPID key pair.
+      parameters:
+        - name: device
+          in: query
+          required: false
+          description: The unpadded base64url SHA-256 of the push subscription endpoint the calling browser holds. When it matches one of the user's devices, this_device is true. The endpoint itself is never sent.
+          schema:
+            type: string
       responses:
         "200":
           description: Web push state
@@ -2833,7 +2840,7 @@ components:
           pattern: "^$|^[A-Za-z0-9]{30}$"
     PushState:
       type: object
-      required: [enabled, vapid_public_key, subscriptions]
+      required: [enabled, vapid_public_key, subscriptions, this_device]
       properties:
         enabled:
           type: boolean
@@ -2845,6 +2852,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PushSubscription"
+        this_device:
+          type: boolean
+          description: Whether the device named by the device query parameter is registered to the current user. False when no device is named.
     PushSubscription:
       type: object
       description: One registered device. The endpoint and the client keys are delivery secrets and are never returned.

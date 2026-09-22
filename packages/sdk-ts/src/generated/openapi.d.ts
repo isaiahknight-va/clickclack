@@ -1764,6 +1764,8 @@ export interface components {
       /** @description Application server key for pushManager.subscribe, base64url. Empty when web push is disabled. */
       vapid_public_key: string;
       subscriptions: components["schemas"]["PushSubscription"][];
+      /** @description Whether the device named by the device query parameter is registered to the current user. False when no device is named. */
+      this_device: boolean;
     };
     /** @description One registered device. The endpoint and the client keys are delivery secrets and are never returned. */
     PushSubscription: {
@@ -3012,7 +3014,10 @@ export interface operations {
   };
   getMyPush: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description The unpadded base64url SHA-256 of the push subscription endpoint the calling browser holds. When it matches one of the user's devices, this_device is true. The endpoint itself is never sent. */
+        device?: string;
+      };
       header?: never;
       path?: never;
       cookie?: never;

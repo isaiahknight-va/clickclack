@@ -105,3 +105,16 @@ export function subscriptionIsStale(
   if (existing) return !sameApplicationServerKey(existing, configured);
   return rememberedKey !== "" && rememberedKey.trim() !== configuredKey.trim();
 }
+
+// pushDeviceKey names this browser's subscription to the server without
+// sending the endpoint: the unpadded base64url SHA-256 of it, which the server
+// computes the same way for each stored device. Without SubtleCrypto it names
+// nothing, and the server answers that this is not one of the user's devices.
+export async function pushDeviceKey(endpoint: string): Promise<string> {
+  const subtle = globalThis.crypto?.subtle;
+  if (!endpoint || !subtle) return "";
+  const digest = new Uint8Array(await subtle.digest("SHA-256", new TextEncoder().encode(endpoint)));
+  let binary = "";
+  for (const value of digest) binary += String.fromCharCode(value);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}

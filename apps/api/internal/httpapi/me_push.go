@@ -33,6 +33,7 @@ func (s *Server) getMyPush(w http.ResponseWriter, r *http.Request) {
 			"enabled":          false,
 			"vapid_public_key": "",
 			"subscriptions":    []store.PushSubscription{},
+			"this_device":      false,
 		})
 		return
 	}
@@ -45,7 +46,24 @@ func (s *Server) getMyPush(w http.ResponseWriter, r *http.Request) {
 		"enabled":          true,
 		"vapid_public_key": s.webPushPublicKey,
 		"subscriptions":    subscriptions,
+		"this_device":      pushDeviceListed(subscriptions, r.URL.Query().Get("device")),
 	})
+}
+
+// pushDeviceListed reports whether the browser asking, named by the digest of
+// the subscription it holds, is one of these devices. One subscription serves
+// every account on a browser, so this, not the account's device count, is
+// what decides whether this device rings for this account.
+func pushDeviceListed(subscriptions []store.PushSubscription, deviceKey string) bool {
+	if deviceKey == "" {
+		return false
+	}
+	for _, subscription := range subscriptions {
+		if subscription.EndpointKey == deviceKey {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) putMyPushSubscription(w http.ResponseWriter, r *http.Request) {

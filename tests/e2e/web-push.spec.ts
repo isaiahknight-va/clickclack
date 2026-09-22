@@ -436,6 +436,54 @@ test("a device two accounts turned push on shows it on only for the account the 
   await expectPushSwitch(page, true);
 });
 
+test("an account with a device elsewhere reads off on a shared device another account holds", async ({
+  page,
+  browser,
+  baseURL,
+}) => {
+  // Device one: account A turns push on with its own endpoint.
+  const phoneEndpoint = `${relayOrigin}/push/${randomUUID()}`;
+  await stubPushManager(page, phoneEndpoint);
+  const own = await createGeneralChannel(page, "Push elsewhere", true);
+  await page.goto(own.route);
+  await waitForAppReady(page);
+  await turnPushOn(page);
+  const accountA = await page.evaluate(() =>
+    fetch("/api/me").then(
+      async (response) => ((await response.json()) as { user: { id: string } }).user.id,
+    ),
+  );
+
+  // Device two, a shared laptop with one browser subscription: A turns push
+  // on there too, then B does, and the server gives the laptop to B.
+  const laptop = await browser.newContext({ baseURL });
+  try {
+    const laptopEndpoint = `${relayOrigin}/push/${randomUUID()}`;
+    const laptopA = await laptop.newPage();
+    await laptopA.setExtraHTTPHeaders({ "X-ClickClack-User": accountA });
+    await stubPushManager(laptopA, laptopEndpoint);
+    await laptopA.goto(own.route);
+    await waitForAppReady(laptopA);
+    await turnPushOn(laptopA);
+
+    const laptopB = await laptop.newPage();
+    await stubPushManager(laptopB, laptopEndpoint);
+    const other = await createGeneralChannel(laptopB, "Push laptop owner", true);
+    await laptopB.goto(other.route);
+    await waitForAppReady(laptopB);
+    await turnPushOn(laptopB);
+
+    // A still has its phone, so it has a device; just not this one.
+    expect((await pushState(laptopA)).subscriptions).toHaveLength(1);
+    await expectPushSwitch(laptopA, false);
+    await expectPushSwitch(laptopB, true);
+    // The phone is still A's, and reads on there.
+    await expectPushSwitch(page, true);
+  } finally {
+    await laptop.close();
+  }
+});
+
 test("a notification tap lands at the conversation's newest message", async ({ page }) => {
   const { workspace, channel, route } = await createGeneralChannel(page, "Push tap", true);
   const elsewhere = await page.request.post(`/api/workspaces/${workspace.id}/channels`, {
