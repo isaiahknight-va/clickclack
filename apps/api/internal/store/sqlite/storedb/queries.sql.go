@@ -598,6 +598,21 @@ func (q *Queries) DeletePendingUploadCleanup(ctx context.Context, id string) err
 	return err
 }
 
+const deletePushSubscription = `-- name: DeletePushSubscription :exec
+DELETE FROM user_push_subscriptions
+WHERE user_id = ?1 AND endpoint = ?2
+`
+
+type DeletePushSubscriptionParams struct {
+	UserID   string `json:"user_id"`
+	Endpoint string `json:"endpoint"`
+}
+
+func (q *Queries) DeletePushSubscription(ctx context.Context, arg DeletePushSubscriptionParams) error {
+	_, err := q.db.ExecContext(ctx, deletePushSubscription, arg.UserID, arg.Endpoint)
+	return err
+}
+
 const deleteUnclaimedBotSetupCodesForTokenName = `-- name: DeleteUnclaimedBotSetupCodesForTokenName :execrows
 DELETE FROM bot_setup_codes
 WHERE workspace_id = ?1
@@ -1670,6 +1685,46 @@ func (q *Queries) GetOAuthTransactionForConsume(ctx context.Context, stateHash s
 		&i.DesktopProtocol,
 		&i.CreatedAtUnix,
 		&i.ExpiresAtUnix,
+	)
+	return i, err
+}
+
+const getPushSubscription = `-- name: GetPushSubscription :one
+SELECT id, user_id, endpoint, user_agent, created_at, updated_at, last_success_at, next_attempt_at, failure_count
+FROM user_push_subscriptions
+WHERE user_id = ?1 AND endpoint = ?2
+`
+
+type GetPushSubscriptionParams struct {
+	UserID   string `json:"user_id"`
+	Endpoint string `json:"endpoint"`
+}
+
+type GetPushSubscriptionRow struct {
+	ID            string         `json:"id"`
+	UserID        string         `json:"user_id"`
+	Endpoint      string         `json:"endpoint"`
+	UserAgent     string         `json:"user_agent"`
+	CreatedAt     string         `json:"created_at"`
+	UpdatedAt     string         `json:"updated_at"`
+	LastSuccessAt sql.NullString `json:"last_success_at"`
+	NextAttemptAt sql.NullString `json:"next_attempt_at"`
+	FailureCount  int64          `json:"failure_count"`
+}
+
+func (q *Queries) GetPushSubscription(ctx context.Context, arg GetPushSubscriptionParams) (GetPushSubscriptionRow, error) {
+	row := q.db.QueryRowContext(ctx, getPushSubscription, arg.UserID, arg.Endpoint)
+	var i GetPushSubscriptionRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Endpoint,
+		&i.UserAgent,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.LastSuccessAt,
+		&i.NextAttemptAt,
+		&i.FailureCount,
 	)
 	return i, err
 }
@@ -3531,16 +3586,20 @@ func (q *Queries) ListDirectConversations(ctx context.Context, arg ListDirectCon
 }
 
 const listDirectPushNotificationRecipients = `-- name: ListDirectPushNotificationRecipients :many
-SELECT u.id AS user_id, u.display_name, uns.pushover_user_key
+SELECT u.id AS user_id, u.display_name,
+       CASE WHEN COALESCE(uns.pushover_enabled, 0) = 1 THEN COALESCE(uns.pushover_user_key, '') ELSE '' END AS pushover_user_key,
+       EXISTS (SELECT 1 FROM user_push_subscriptions ups WHERE ups.user_id = u.id) AS has_push_subscription
 FROM direct_conversation_members dcm
 JOIN direct_conversations dc ON dc.id = dcm.conversation_id
 JOIN workspace_members wm ON wm.workspace_id = dc.workspace_id AND wm.user_id = dcm.user_id
 JOIN users u ON u.id = dcm.user_id
-JOIN user_notification_settings uns ON uns.user_id = u.id
+LEFT JOIN user_notification_settings uns ON uns.user_id = u.id
 WHERE dcm.conversation_id = ?1
   AND u.id <> ?2
-  AND uns.pushover_enabled = 1
-  AND uns.pushover_user_key <> ''
+  AND (
+    (COALESCE(uns.pushover_enabled, 0) = 1 AND COALESCE(uns.pushover_user_key, '') <> '')
+    OR EXISTS (SELECT 1 FROM user_push_subscriptions ups WHERE ups.user_id = u.id)
+  )
 ORDER BY u.id
 `
 
@@ -3550,9 +3609,10 @@ type ListDirectPushNotificationRecipientsParams struct {
 }
 
 type ListDirectPushNotificationRecipientsRow struct {
-	UserID          string `json:"user_id"`
-	DisplayName     string `json:"display_name"`
-	PushoverUserKey string `json:"pushover_user_key"`
+	UserID              string `json:"user_id"`
+	DisplayName         string `json:"display_name"`
+	PushoverUserKey     string `json:"pushover_user_key"`
+	HasPushSubscription bool   `json:"has_push_subscription"`
 }
 
 func (q *Queries) ListDirectPushNotificationRecipients(ctx context.Context, arg ListDirectPushNotificationRecipientsParams) ([]ListDirectPushNotificationRecipientsRow, error) {
@@ -3564,7 +3624,12 @@ func (q *Queries) ListDirectPushNotificationRecipients(ctx context.Context, arg 
 	var items []ListDirectPushNotificationRecipientsRow
 	for rows.Next() {
 		var i ListDirectPushNotificationRecipientsRow
-		if err := rows.Scan(&i.UserID, &i.DisplayName, &i.PushoverUserKey); err != nil {
+		if err := rows.Scan(
+			&i.UserID,
+			&i.DisplayName,
+			&i.PushoverUserKey,
+			&i.HasPushSubscription,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -4056,6 +4121,114 @@ func (q *Queries) ListPinnedMessages(ctx context.Context, arg ListPinnedMessages
 			&i.MessageID,
 			&i.PinnedBy,
 			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPushSubscriptions = `-- name: ListPushSubscriptions :many
+SELECT id, user_id, endpoint, user_agent, created_at, updated_at, last_success_at, next_attempt_at, failure_count
+FROM user_push_subscriptions
+WHERE user_id = ?1
+ORDER BY created_at, id
+`
+
+type ListPushSubscriptionsRow struct {
+	ID            string         `json:"id"`
+	UserID        string         `json:"user_id"`
+	Endpoint      string         `json:"endpoint"`
+	UserAgent     string         `json:"user_agent"`
+	CreatedAt     string         `json:"created_at"`
+	UpdatedAt     string         `json:"updated_at"`
+	LastSuccessAt sql.NullString `json:"last_success_at"`
+	NextAttemptAt sql.NullString `json:"next_attempt_at"`
+	FailureCount  int64          `json:"failure_count"`
+}
+
+func (q *Queries) ListPushSubscriptions(ctx context.Context, userID string) ([]ListPushSubscriptionsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listPushSubscriptions, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPushSubscriptionsRow
+	for rows.Next() {
+		var i ListPushSubscriptionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Endpoint,
+			&i.UserAgent,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.LastSuccessAt,
+			&i.NextAttemptAt,
+			&i.FailureCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPushSubscriptionsForUsers = `-- name: ListPushSubscriptionsForUsers :many
+SELECT ups.user_id, ups.endpoint, ups.p256dh, ups.auth, ups.next_attempt_at,
+       s.expires_at AS session_expires_at
+FROM user_push_subscriptions ups
+LEFT JOIN sessions s
+  ON s.token_hash = ups.session_token_hash AND ups.session_token_hash <> ''
+WHERE ups.user_id IN (
+    SELECT CAST(value AS TEXT)
+    FROM json_each(?1)
+  )
+  AND (
+    ups.session_token_hash = ''
+    OR (s.id IS NOT NULL AND s.revoked_at IS NULL)
+  )
+ORDER BY ups.user_id, ups.created_at, ups.id
+`
+
+type ListPushSubscriptionsForUsersRow struct {
+	UserID           string         `json:"user_id"`
+	Endpoint         string         `json:"endpoint"`
+	P256dh           string         `json:"p256dh"`
+	Auth             string         `json:"auth"`
+	NextAttemptAt    sql.NullString `json:"next_attempt_at"`
+	SessionExpiresAt sql.NullString `json:"session_expires_at"`
+}
+
+func (q *Queries) ListPushSubscriptionsForUsers(ctx context.Context, userIdsJson interface{}) ([]ListPushSubscriptionsForUsersRow, error) {
+	rows, err := q.db.QueryContext(ctx, listPushSubscriptionsForUsers, userIdsJson)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPushSubscriptionsForUsersRow
+	for rows.Next() {
+		var i ListPushSubscriptionsForUsersRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Endpoint,
+			&i.P256dh,
+			&i.Auth,
+			&i.NextAttemptAt,
+			&i.SessionExpiresAt,
 		); err != nil {
 			return nil, err
 		}
@@ -4828,17 +5001,21 @@ func (q *Queries) ListWorkspaceMembersForModeration(ctx context.Context, workspa
 }
 
 const listWorkspacePushNotificationRecipients = `-- name: ListWorkspacePushNotificationRecipients :many
-SELECT u.id AS user_id, u.display_name, uns.pushover_user_key,
-       COALESCE(cns.preference, 'all') AS notification_preference
+SELECT u.id AS user_id, u.display_name,
+       CASE WHEN COALESCE(uns.pushover_enabled, 0) = 1 THEN COALESCE(uns.pushover_user_key, '') ELSE '' END AS pushover_user_key,
+       COALESCE(cns.preference, 'all') AS notification_preference,
+       EXISTS (SELECT 1 FROM user_push_subscriptions ups WHERE ups.user_id = u.id) AS has_push_subscription
 FROM workspace_members wm
 JOIN users u ON u.id = wm.user_id
-JOIN user_notification_settings uns ON uns.user_id = u.id
+LEFT JOIN user_notification_settings uns ON uns.user_id = u.id
 LEFT JOIN channel_notification_settings cns
   ON cns.channel_id = ?1 AND cns.user_id = u.id
 WHERE wm.workspace_id = ?2
   AND u.id <> ?3
-  AND uns.pushover_enabled = 1
-  AND uns.pushover_user_key <> ''
+  AND (
+    (COALESCE(uns.pushover_enabled, 0) = 1 AND COALESCE(uns.pushover_user_key, '') <> '')
+    OR EXISTS (SELECT 1 FROM user_push_subscriptions ups WHERE ups.user_id = u.id)
+  )
 ORDER BY u.id
 `
 
@@ -4853,6 +5030,7 @@ type ListWorkspacePushNotificationRecipientsRow struct {
 	DisplayName            string `json:"display_name"`
 	PushoverUserKey        string `json:"pushover_user_key"`
 	NotificationPreference string `json:"notification_preference"`
+	HasPushSubscription    bool   `json:"has_push_subscription"`
 }
 
 func (q *Queries) ListWorkspacePushNotificationRecipients(ctx context.Context, arg ListWorkspacePushNotificationRecipientsParams) ([]ListWorkspacePushNotificationRecipientsRow, error) {
@@ -4869,6 +5047,7 @@ func (q *Queries) ListWorkspacePushNotificationRecipients(ctx context.Context, a
 			&i.DisplayName,
 			&i.PushoverUserKey,
 			&i.NotificationPreference,
+			&i.HasPushSubscription,
 		); err != nil {
 			return nil, err
 		}
@@ -5057,6 +5236,53 @@ func (q *Queries) MarkMagicLinkUsed(ctx context.Context, arg MarkMagicLinkUsedPa
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const markPushSubscriptionFailure = `-- name: MarkPushSubscriptionFailure :one
+UPDATE user_push_subscriptions
+SET failure_count = failure_count + 1,
+    updated_at = ?1
+WHERE user_id = ?2 AND endpoint = ?3
+RETURNING failure_count
+`
+
+type MarkPushSubscriptionFailureParams struct {
+	UpdatedAt string `json:"updated_at"`
+	UserID    string `json:"user_id"`
+	Endpoint  string `json:"endpoint"`
+}
+
+func (q *Queries) MarkPushSubscriptionFailure(ctx context.Context, arg MarkPushSubscriptionFailureParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, markPushSubscriptionFailure, arg.UpdatedAt, arg.UserID, arg.Endpoint)
+	var failure_count int64
+	err := row.Scan(&failure_count)
+	return failure_count, err
+}
+
+const markPushSubscriptionSuccess = `-- name: MarkPushSubscriptionSuccess :exec
+UPDATE user_push_subscriptions
+SET last_success_at = ?1,
+    updated_at = ?2,
+    next_attempt_at = NULL,
+    failure_count = 0
+WHERE user_id = ?3 AND endpoint = ?4
+`
+
+type MarkPushSubscriptionSuccessParams struct {
+	LastSuccessAt sql.NullString `json:"last_success_at"`
+	UpdatedAt     string         `json:"updated_at"`
+	UserID        string         `json:"user_id"`
+	Endpoint      string         `json:"endpoint"`
+}
+
+func (q *Queries) MarkPushSubscriptionSuccess(ctx context.Context, arg MarkPushSubscriptionSuccessParams) error {
+	_, err := q.db.ExecContext(ctx, markPushSubscriptionSuccess,
+		arg.LastSuccessAt,
+		arg.UpdatedAt,
+		arg.UserID,
+		arg.Endpoint,
+	)
+	return err
 }
 
 const membershipRolesForUpdate = `-- name: MembershipRolesForUpdate :many
@@ -5577,6 +5803,23 @@ func (q *Queries) SetProviderAvatarUnlessExplicit(ctx context.Context, arg SetPr
 	return err
 }
 
+const setPushSubscriptionNextAttempt = `-- name: SetPushSubscriptionNextAttempt :exec
+UPDATE user_push_subscriptions
+SET next_attempt_at = ?1
+WHERE user_id = ?2 AND endpoint = ?3
+`
+
+type SetPushSubscriptionNextAttemptParams struct {
+	NextAttemptAt sql.NullString `json:"next_attempt_at"`
+	UserID        string         `json:"user_id"`
+	Endpoint      string         `json:"endpoint"`
+}
+
+func (q *Queries) SetPushSubscriptionNextAttempt(ctx context.Context, arg SetPushSubscriptionNextAttemptParams) error {
+	_, err := q.db.ExecContext(ctx, setPushSubscriptionNextAttempt, arg.NextAttemptAt, arg.UserID, arg.Endpoint)
+	return err
+}
+
 const setUserAvatarIfEmpty = `-- name: SetUserAvatarIfEmpty :exec
 UPDATE users
 SET avatar_url = ?1
@@ -5649,6 +5892,27 @@ type TouchBotTokenParams struct {
 
 func (q *Queries) TouchBotToken(ctx context.Context, arg TouchBotTokenParams) error {
 	_, err := q.db.ExecContext(ctx, touchBotToken, arg.LastUsedAt, arg.ID)
+	return err
+}
+
+const trimPushSubscriptions = `-- name: TrimPushSubscriptions :exec
+DELETE FROM user_push_subscriptions
+WHERE user_push_subscriptions.user_id = ?1
+  AND user_push_subscriptions.id NOT IN (
+    SELECT newest.id FROM user_push_subscriptions newest
+    WHERE newest.user_id = ?1
+    ORDER BY newest.created_at DESC, newest.id DESC
+    LIMIT ?2
+  )
+`
+
+type TrimPushSubscriptionsParams struct {
+	UserID    string `json:"user_id"`
+	KeepCount int64  `json:"keep_count"`
+}
+
+func (q *Queries) TrimPushSubscriptions(ctx context.Context, arg TrimPushSubscriptionsParams) error {
+	_, err := q.db.ExecContext(ctx, trimPushSubscriptions, arg.UserID, arg.KeepCount)
 	return err
 }
 
@@ -6263,6 +6527,53 @@ type UpsertNotificationSettingsParams struct {
 
 func (q *Queries) UpsertNotificationSettings(ctx context.Context, arg UpsertNotificationSettingsParams) error {
 	_, err := q.db.ExecContext(ctx, upsertNotificationSettings, arg.UserID, arg.PushoverEnabled, arg.PushoverUserKey)
+	return err
+}
+
+const upsertPushSubscription = `-- name: UpsertPushSubscription :exec
+INSERT INTO user_push_subscriptions (
+  id, user_id, endpoint, p256dh, auth, user_agent, session_token_hash,
+  created_at, updated_at, failure_count
+)
+VALUES (
+  ?1, ?2, ?3, ?4, ?5,
+  ?6, ?7, ?8, ?9, 0
+)
+ON CONFLICT (endpoint) DO UPDATE SET
+  user_id = excluded.user_id,
+  p256dh = excluded.p256dh,
+  auth = excluded.auth,
+  user_agent = excluded.user_agent,
+  session_token_hash = excluded.session_token_hash,
+  updated_at = excluded.updated_at,
+  next_attempt_at = NULL,
+  failure_count = 0
+`
+
+type UpsertPushSubscriptionParams struct {
+	ID               string `json:"id"`
+	UserID           string `json:"user_id"`
+	Endpoint         string `json:"endpoint"`
+	P256dh           string `json:"p256dh"`
+	Auth             string `json:"auth"`
+	UserAgent        string `json:"user_agent"`
+	SessionTokenHash string `json:"session_token_hash"`
+	CreatedAt        string `json:"created_at"`
+	UpdatedAt        string `json:"updated_at"`
+}
+
+func (q *Queries) UpsertPushSubscription(ctx context.Context, arg UpsertPushSubscriptionParams) error {
+	_, err := q.db.ExecContext(ctx, upsertPushSubscription,
+		arg.ID,
+		arg.UserID,
+		arg.Endpoint,
+		arg.P256dh,
+		arg.Auth,
+		arg.UserAgent,
+		arg.SessionTokenHash,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
 	return err
 }
 

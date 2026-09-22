@@ -303,30 +303,38 @@ WHERE wm.workspace_id = sqlc.arg(workspace_id)
 ORDER BY u.id;
 
 -- name: ListWorkspacePushNotificationRecipients :many
-SELECT u.id AS user_id, u.display_name, uns.pushover_user_key,
-       COALESCE(cns.preference, 'all') AS notification_preference
+SELECT u.id AS user_id, u.display_name,
+       CASE WHEN COALESCE(uns.pushover_enabled, 0) = 1 THEN COALESCE(uns.pushover_user_key, '') ELSE '' END AS pushover_user_key,
+       COALESCE(cns.preference, 'all') AS notification_preference,
+       EXISTS (SELECT 1 FROM user_push_subscriptions ups WHERE ups.user_id = u.id) AS has_push_subscription
 FROM workspace_members wm
 JOIN users u ON u.id = wm.user_id
-JOIN user_notification_settings uns ON uns.user_id = u.id
+LEFT JOIN user_notification_settings uns ON uns.user_id = u.id
 LEFT JOIN channel_notification_settings cns
   ON cns.channel_id = sqlc.arg(channel_id) AND cns.user_id = u.id
 WHERE wm.workspace_id = sqlc.arg(workspace_id)
   AND u.id <> sqlc.arg(author_id)
-  AND uns.pushover_enabled = 1
-  AND uns.pushover_user_key <> ''
+  AND (
+    (COALESCE(uns.pushover_enabled, 0) = 1 AND COALESCE(uns.pushover_user_key, '') <> '')
+    OR EXISTS (SELECT 1 FROM user_push_subscriptions ups WHERE ups.user_id = u.id)
+  )
 ORDER BY u.id;
 
 -- name: ListDirectPushNotificationRecipients :many
-SELECT u.id AS user_id, u.display_name, uns.pushover_user_key
+SELECT u.id AS user_id, u.display_name,
+       CASE WHEN COALESCE(uns.pushover_enabled, 0) = 1 THEN COALESCE(uns.pushover_user_key, '') ELSE '' END AS pushover_user_key,
+       EXISTS (SELECT 1 FROM user_push_subscriptions ups WHERE ups.user_id = u.id) AS has_push_subscription
 FROM direct_conversation_members dcm
 JOIN direct_conversations dc ON dc.id = dcm.conversation_id
 JOIN workspace_members wm ON wm.workspace_id = dc.workspace_id AND wm.user_id = dcm.user_id
 JOIN users u ON u.id = dcm.user_id
-JOIN user_notification_settings uns ON uns.user_id = u.id
+LEFT JOIN user_notification_settings uns ON uns.user_id = u.id
 WHERE dcm.conversation_id = sqlc.arg(conversation_id)
   AND u.id <> sqlc.arg(author_id)
-  AND uns.pushover_enabled = 1
-  AND uns.pushover_user_key <> ''
+  AND (
+    (COALESCE(uns.pushover_enabled, 0) = 1 AND COALESCE(uns.pushover_user_key, '') <> '')
+    OR EXISTS (SELECT 1 FROM user_push_subscriptions ups WHERE ups.user_id = u.id)
+  )
 ORDER BY u.id;
 
 -- name: InsertInvite :exec
@@ -1916,3 +1924,81 @@ WHERE user_id = sqlc.arg(user_id)
   AND token_hash = sqlc.arg(token_hash)
   AND revoked_at IS NULL
 FOR UPDATE;
+
+
+-- name: UpsertPushSubscription :exec
+INSERT INTO user_push_subscriptions (
+  id, user_id, endpoint, p256dh, auth, user_agent, session_token_hash,
+  created_at, updated_at, failure_count
+)
+VALUES (
+  sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(endpoint), sqlc.arg(p256dh), sqlc.arg(auth),
+  sqlc.arg(user_agent), sqlc.arg(session_token_hash), sqlc.arg(created_at), sqlc.arg(updated_at), 0
+)
+ON CONFLICT (endpoint) DO UPDATE SET
+  user_id = excluded.user_id,
+  p256dh = excluded.p256dh,
+  auth = excluded.auth,
+  user_agent = excluded.user_agent,
+  session_token_hash = excluded.session_token_hash,
+  updated_at = excluded.updated_at,
+  next_attempt_at = NULL,
+  failure_count = 0;
+
+-- name: TrimPushSubscriptions :exec
+DELETE FROM user_push_subscriptions
+WHERE user_push_subscriptions.user_id = sqlc.arg(user_id)
+  AND user_push_subscriptions.id NOT IN (
+    SELECT newest.id FROM user_push_subscriptions newest
+    WHERE newest.user_id = sqlc.arg(user_id)
+    ORDER BY newest.created_at DESC, newest.id DESC
+    LIMIT sqlc.arg(keep_count)
+  );
+
+-- name: ListPushSubscriptions :many
+SELECT id, user_id, endpoint, user_agent, created_at, updated_at, last_success_at, next_attempt_at, failure_count
+FROM user_push_subscriptions
+WHERE user_id = sqlc.arg(user_id)
+ORDER BY created_at, id;
+
+-- name: GetPushSubscription :one
+SELECT id, user_id, endpoint, user_agent, created_at, updated_at, last_success_at, next_attempt_at, failure_count
+FROM user_push_subscriptions
+WHERE user_id = sqlc.arg(user_id) AND endpoint = sqlc.arg(endpoint);
+
+-- name: DeletePushSubscription :exec
+DELETE FROM user_push_subscriptions
+WHERE user_id = sqlc.arg(user_id) AND endpoint = sqlc.arg(endpoint);
+
+-- name: MarkPushSubscriptionSuccess :exec
+UPDATE user_push_subscriptions
+SET last_success_at = sqlc.arg(last_success_at),
+    updated_at = sqlc.arg(updated_at),
+    next_attempt_at = NULL,
+    failure_count = 0
+WHERE user_id = sqlc.arg(user_id) AND endpoint = sqlc.arg(endpoint);
+
+-- name: MarkPushSubscriptionFailure :one
+UPDATE user_push_subscriptions
+SET failure_count = failure_count + 1,
+    updated_at = sqlc.arg(updated_at)
+WHERE user_id = sqlc.arg(user_id) AND endpoint = sqlc.arg(endpoint)
+RETURNING failure_count;
+
+-- name: SetPushSubscriptionNextAttempt :exec
+UPDATE user_push_subscriptions
+SET next_attempt_at = sqlc.arg(next_attempt_at)
+WHERE user_id = sqlc.arg(user_id) AND endpoint = sqlc.arg(endpoint);
+
+-- name: ListPushSubscriptionsForUsers :many
+SELECT ups.user_id, ups.endpoint, ups.p256dh, ups.auth, ups.next_attempt_at,
+       s.expires_at AS session_expires_at
+FROM user_push_subscriptions ups
+LEFT JOIN sessions s
+  ON s.token_hash = ups.session_token_hash AND ups.session_token_hash <> ''
+WHERE ups.user_id = ANY(sqlc.arg(user_ids)::text[])
+  AND (
+    ups.session_token_hash = ''
+    OR (s.id IS NOT NULL AND s.revoked_at IS NULL)
+  )
+ORDER BY ups.user_id, ups.created_at, ups.id;

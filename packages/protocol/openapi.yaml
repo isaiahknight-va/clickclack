@@ -345,6 +345,67 @@ paths:
                 properties:
                   user:
                     $ref: "#/components/schemas/User"
+  /api/me/push:
+    get:
+      operationId: getMyPush
+      description: Web push state for the current user. Reports disabled with no keys when the server has no VAPID key pair.
+      responses:
+        "200":
+          description: Web push state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushState"
+  /api/me/push/subscriptions:
+    put:
+      operationId: putMyPushSubscription
+      description: Register or replace the browser push subscription for one device. Re-registering the same endpoint replaces its keys.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushSubscriptionRequest"
+      responses:
+        "200":
+          description: Stored device summary
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [subscription]
+                properties:
+                  subscription:
+                    $ref: "#/components/schemas/PushSubscription"
+        "400":
+          description: The endpoint or the client keys are unusable
+        "403":
+          description: Bot tokens cannot register push subscriptions
+        "404":
+          description: Web push is not configured on this server
+    delete:
+      operationId: deleteMyPushSubscription
+      description: Remove one device. An endpoint that is not registered still answers 204, so the client can call this freely.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint]
+              properties:
+                endpoint:
+                  type: string
+                  description: The push service URL returned by pushManager.subscribe.
+      responses:
+        "204":
+          description: The device is no longer registered
+        "400":
+          description: The endpoint is missing
+        "403":
+          description: Bot tokens cannot register push subscriptions
+        "404":
+          description: Web push is not configured on this server
   /api/event-types:
     get:
       operationId: listEventTypes
@@ -2766,6 +2827,59 @@ components:
           type: string
           description: Current user's Pushover user key. Must be set when Pushover notifications are enabled.
           pattern: "^$|^[A-Za-z0-9]{30}$"
+    PushState:
+      type: object
+      required: [enabled, vapid_public_key, subscriptions]
+      properties:
+        enabled:
+          type: boolean
+          description: Whether the server has a VAPID key pair and can deliver web push.
+        vapid_public_key:
+          type: string
+          description: Application server key for pushManager.subscribe, base64url. Empty when web push is disabled.
+        subscriptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PushSubscription"
+    PushSubscription:
+      type: object
+      description: One registered device. The endpoint and the client keys are delivery secrets and are never returned.
+      required: [id, user_agent, created_at, updated_at, failure_count]
+      properties:
+        id:
+          type: string
+        user_agent:
+          type: string
+          description: Short device label chosen by the client.
+        created_at:
+          type: string
+        updated_at:
+          type: string
+        last_success_at:
+          type: string
+        failure_count:
+          type: integer
+          format: int64
+    PushSubscriptionRequest:
+      type: object
+      required: [endpoint, keys]
+      properties:
+        endpoint:
+          type: string
+          description: The push service URL from pushManager.subscribe. Must be https and must not point inside the deployment's own network.
+        keys:
+          type: object
+          required: [p256dh, auth]
+          properties:
+            p256dh:
+              type: string
+              description: Uncompressed P-256 public key from the subscription, base64url.
+            auth:
+              type: string
+              description: 16 byte subscription auth secret, base64url.
+        user_agent:
+          type: string
+          description: Short device label, truncated to 200 characters.
     AppearancePreferences:
       type: object
       description: Current user's complete appearance preference snapshot. Empty properties use client defaults.

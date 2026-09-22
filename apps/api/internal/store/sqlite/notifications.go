@@ -142,6 +142,7 @@ func (s *Store) listWorkspacePushNotificationRecipients(ctx context.Context, mes
 		mentioned[userID] = struct{}{}
 	}
 	out := make([]store.PushNotificationRecipient, 0, len(rows))
+	subscribed := make([]string, 0, len(rows))
 	for _, row := range rows {
 		if row.NotificationPreference == store.ChannelNotifyMuted {
 			continue
@@ -152,8 +153,11 @@ func (s *Store) listWorkspacePushNotificationRecipients(ctx context.Context, mes
 			}
 		}
 		out = append(out, storePushRecipient(row.UserID, row.DisplayName, row.PushoverUserKey))
+		if row.HasPushSubscription {
+			subscribed = append(subscribed, row.UserID)
+		}
 	}
-	return out, nil
+	return s.attachPushSubscriptions(ctx, out, subscribed)
 }
 
 func (s *Store) listDirectPushNotificationRecipients(ctx context.Context, message store.Message) ([]store.PushNotificationRecipient, error) {
@@ -165,8 +169,26 @@ func (s *Store) listDirectPushNotificationRecipients(ctx context.Context, messag
 		return nil, err
 	}
 	out := make([]store.PushNotificationRecipient, 0, len(rows))
+	subscribed := make([]string, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, storePushRecipient(row.UserID, row.DisplayName, row.PushoverUserKey))
+		if row.HasPushSubscription {
+			subscribed = append(subscribed, row.UserID)
+		}
 	}
-	return out, nil
+	return s.attachPushSubscriptions(ctx, out, subscribed)
+}
+
+// attachPushSubscriptions fills in the devices for the recipients the
+// recipient query flagged, in one batched query rather than a join that would
+// multiply recipient rows per device.
+func (s *Store) attachPushSubscriptions(ctx context.Context, recipients []store.PushNotificationRecipient, subscribed []string) ([]store.PushNotificationRecipient, error) {
+	targets, err := s.listPushSubscriptionTargets(ctx, subscribed)
+	if err != nil {
+		return nil, err
+	}
+	for index := range recipients {
+		recipients[index].Subscriptions = targets[recipients[index].UserID]
+	}
+	return recipients, nil
 }

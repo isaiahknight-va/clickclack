@@ -4,15 +4,23 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/url"
 	"strings"
 
 	"github.com/openclaw/clickclack/apps/api/internal/store"
 )
 
+// PushNotification is one alert for one recipient. Pushover reads the
+// recipient key, the title, and the message; the web push notifier reads the
+// rest and ignores the key.
 type PushNotification struct {
-	RecipientKey string
-	Title        string
-	Message      string
+	RecipientKey  string
+	Title         string
+	Message       string
+	UserID        string
+	Tag           string
+	URL           string
+	Subscriptions []store.PushSubscriptionTarget
 }
 
 type PushNotifier interface {
@@ -20,7 +28,7 @@ type PushNotifier interface {
 }
 
 func (s *Server) notifyMessageCreated(ctx context.Context, message store.Message, mentionedUserIDs []string) {
-	if s.pushNotifier == nil {
+	if s.pushNotifier == nil && s.webPushNotifier == nil {
 		return
 	}
 	recipients, err := s.store.ListPushNotificationRecipients(ctx, message.ID, mentionedUserIDs)
@@ -28,19 +36,105 @@ func (s *Server) notifyMessageCreated(ctx context.Context, message store.Message
 		log.Printf("push notification recipient lookup failed: %v", err)
 		return
 	}
+	place := s.notificationPlace(ctx, message)
 	for _, recipient := range recipients {
 		if !s.canNotifyMessageRecipient(ctx, message, recipient.UserID) {
 			continue
 		}
-		notification := PushNotification{
-			RecipientKey: recipient.PushoverUserKey,
-			Title:        notificationTitle(message),
-			Message:      notificationBody(message),
+		if s.pushNotifier != nil && recipient.PushoverUserKey != "" {
+			notification := PushNotification{
+				RecipientKey: recipient.PushoverUserKey,
+				Title:        notificationTitle(message),
+				Message:      notificationBody(message),
+			}
+			if err := s.pushNotifier.Notify(ctx, notification); err != nil {
+				log.Printf("push notification failed for user %s: %v", recipient.UserID, err)
+			}
 		}
-		if err := s.pushNotifier.Notify(ctx, notification); err != nil {
-			log.Printf("push notification failed for user %s: %v", recipient.UserID, err)
+		if s.webPushNotifier == nil || len(recipient.Subscriptions) == 0 {
+			continue
+		}
+		notification := PushNotification{
+			UserID:        recipient.UserID,
+			Title:         webPushTitle(message, place),
+			Message:       webPushBody(message),
+			Tag:           webPushTag(message),
+			URL:           webPushURL(message, place),
+			Subscriptions: recipient.Subscriptions,
+		}
+		if err := s.webPushNotifier.Notify(ctx, notification); err != nil {
+			log.Printf("web push notification failed for user %s: %v", recipient.UserID, err)
 		}
 	}
+}
+
+// notificationPlace resolves the channel a message was posted in once per
+// message. The author is a member wherever they can post, so their view is the
+// cheapest one to ask with.
+func (s *Server) notificationPlace(ctx context.Context, message store.Message) store.Channel {
+	if s.webPushNotifier == nil || message.ChannelID == "" {
+		return store.Channel{}
+	}
+	channel, err := s.store.GetChannel(ctx, message.ChannelID, message.AuthorID)
+	if err != nil {
+		return store.Channel{}
+	}
+	return channel
+}
+
+// webPushTitle matches the title the in-page notification uses, so a device
+// that sees both paths reads one sentence, not two shapes of it.
+func webPushTitle(message store.Message, place store.Channel) string {
+	author := message.AuthorID
+	if message.Author != nil && strings.TrimSpace(message.Author.DisplayName) != "" {
+		author = message.Author.DisplayName
+	}
+	if title := channelDisplayTitle(place); title != "" {
+		return author + " in #" + title
+	}
+	return author + " in Direct message"
+}
+
+func webPushBody(message store.Message) string {
+	body := strings.TrimSpace(message.Body)
+	if body == "" {
+		return "New message"
+	}
+	return body
+}
+
+// webPushTag matches the tag the in-page notification uses so a device showing
+// both collapses them into one.
+func webPushTag(message store.Message) string {
+	return "clickclack:" + message.ID
+}
+
+// webPushURL routes a tap to the thread, conversation, or channel the message
+// belongs to. Storage identifiers are valid route parameters; the app
+// canonicalizes them on arrival.
+func webPushURL(message store.Message, place store.Channel) string {
+	target := ""
+	switch {
+	case message.ParentMessageID != nil && message.ThreadRootID != "":
+		target = message.ThreadRootID
+	case message.DirectConversationID != "":
+		target = message.DirectConversationID
+	case place.RouteID != "":
+		target = place.RouteID
+	default:
+		target = message.ChannelID
+	}
+	if message.WorkspaceID == "" || target == "" {
+		return "/app"
+	}
+	return "/app/" + url.PathEscape(message.WorkspaceID) + "/" + url.PathEscape(target)
+}
+
+func channelDisplayTitle(channel store.Channel) string {
+	if channel.DisplayTitle != nil && strings.TrimSpace(*channel.DisplayTitle) != "" {
+		return strings.TrimSpace(*channel.DisplayTitle)
+	}
+	return strings.TrimSpace(channel.Name)
 }
 
 func messageEventMentionedUserIDs(events []store.Event) []string {
