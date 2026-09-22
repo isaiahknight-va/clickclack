@@ -1,0 +1,8 @@
+message-actions-any-hover.spec.ts on parent v0.5.1 (483a27a9):
+    Error: expect(locator).toBeVisible() failed
+    Locator: locator('[data-message-id="msg_01m35a2t2re497fdemdmfd59ct"]').first().getByRole('button', { name: 'Add reaction' })
+    Expected: visible
+  1 failed
+
+message-actions-any-hover.spec.ts + message-reactions.spec.ts on the fix:
+  17 passed (23.3s)
