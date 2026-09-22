@@ -15,3 +15,8 @@ Finished in 21ms on 172 files using 10 threads.
 On the parent v0.5.1: GET /api/me/push answers 404 (route not found), /service-worker.js and /manifest.webmanifest answer 404, and the settings row does not exist, so both web-push.spec.ts cases fail at the switch.
 
 Real device: iPhone, ClickClack installed to the Home Screen, switch on, DM from the Tater bot seat, lock-screen banner captured by the operator; Apple's relay accepted every push (last_success_at stamped).
+
+2026-09-22, second real-device pass on the review follow-up build:
+iphone-first-activation-banner.png: fresh install (app deleted and re-added to the Home Screen), switch on at the first tap, server log 'web push device registered ... via web.push.apple.com' at 17:30:53 ET, push delivered 17:31:24 ET, lock screen shown.
+iphone-tap-landed.png: the tap opened the installed app on the conversation at the newest message.
+e1-*: authorization rejection on the built server path (see the summary table). e2-*: populated v0.5.1 upgrade on a real SQLite snapshot, a Pushover-enabled copy, and a seeded PostgreSQL.

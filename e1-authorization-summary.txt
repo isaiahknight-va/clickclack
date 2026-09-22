@@ -1,0 +1,12 @@
+Web push send-time authorization, production build path
+binary: go build -tags clickclack_e2e_unsafe_callbacks, serve without --dev-bootstrap
+head: 7da0b97a
+workers held on the fake push service before each case's message was posted: 4
+
+case                   pushes to the recipient's device   server log line for the recipient
+control                1                                  web push delivered for user usr_01m35g0q5n2ffjsqgree9y2xhj via 127.0.0.1:49183
+session-revoked        0                                  web push delivery skipped for user usr_01m35g0q9t801e8267bdfqnzta: the session that registered the device has ended
+subscription-deleted   0                                  web push delivery skipped for user usr_01m35g0qe30jzgv69336d9pq9b: the device is no longer registered
+membership-removed     0                                  web push delivery skipped for user usr_01m35g0qjkzresyjdqjjt8wsb3: the user can no longer read the message
+
+RESULT: PASS

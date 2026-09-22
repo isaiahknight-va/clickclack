@@ -1,0 +1,51 @@
+Web push upgrade evidence: v0.5.1 (483a27a9) to head (7da0b97a)
+
+SQLite: copy of pre-webpush-2026-09-22.db
+  users: 16, messages: 642, channels: 15
+  migrations applied by head: 0043_user_push_subscriptions.sql 
+  user_notification_settings: 1 rows, contents sha256 e4815ce7e862939e, schema c39795c66d31aabe
+  ok    user_notification_settings row count unchanged
+  ok    user_notification_settings contents unchanged
+  ok    user_notification_settings schema unchanged
+  channel_notification_settings: 2 rows, contents sha256 00ae805a93dd1e0b, schema 7f6d63e8bf0f6baa
+  ok    channel_notification_settings row count unchanged
+  ok    channel_notification_settings contents unchanged
+  ok    channel_notification_settings schema unchanged
+  ok    user_push_subscriptions exists and is empty
+  v0.5.1 recipient selection before upgrade: {"digest":"0787287701ea9920a4252551cd41191c6c593c2d0d237afdf6d4067b86c08d14","lookup_errors":0,"messages":642,"pushover_deliveries":0,"pushover_recipients":0,"selections":1284}
+  head recipient selection after upgrade:   {"digest":"0787287701ea9920a4252551cd41191c6c593c2d0d237afdf6d4067b86c08d14","lookup_errors":0,"messages":642,"pushover_deliveries":0,"pushover_recipients":0,"selections":1284}
+  ok    Pushover recipients identical before and after, web push off
+
+SQLite: a second copy with Pushover turned on for every user by v0.5.1 before the upgrade
+  (the snapshot's own users never set Pushover up, so the first pass selects nobody)
+  migrations applied by head: 0043_user_push_subscriptions.sql 
+  user_notification_settings: 16 rows, contents sha256 8292b4c127339502, schema c39795c66d31aabe
+  ok    user_notification_settings row count unchanged
+  ok    user_notification_settings contents unchanged
+  ok    user_notification_settings schema unchanged
+  channel_notification_settings: 133 rows, contents sha256 aad7a0db8f6a660d, schema 7f6d63e8bf0f6baa
+  ok    channel_notification_settings row count unchanged
+  ok    channel_notification_settings contents unchanged
+  ok    channel_notification_settings schema unchanged
+  ok    user_push_subscriptions exists and is empty
+  v0.5.1 recipient selection before upgrade: {"digest":"b410fcb6d94bbf3a8447cc075ed38ef2049583dc563ac1d645952ec0d6153829","lookup_errors":0,"messages":642,"pushover_deliveries":7856,"pushover_recipients":15,"selections":1284}
+  head recipient selection after upgrade:   {"digest":"b410fcb6d94bbf3a8447cc075ed38ef2049583dc563ac1d645952ec0d6153829","lookup_errors":0,"messages":642,"pushover_deliveries":7856,"pushover_recipients":15,"selections":1284}
+  ok    Pushover recipients identical before and after, web push off
+
+PostgreSQL: fresh database migrated and seeded by v0.5.1
+  users: 7, messages: 34, channels: 2
+  migrations applied by head: 0036_user_push_subscriptions.sql 
+  user_notification_settings: 5 rows, contents sha256 0989b3dd8b24090d, schema 4e64c04f3db65777
+  ok    user_notification_settings row count unchanged
+  ok    user_notification_settings contents unchanged
+  ok    user_notification_settings schema unchanged
+  channel_notification_settings: 4 rows, contents sha256 f3d344e1ae3b6e09, schema 518fb7fa990e15d3
+  ok    channel_notification_settings row count unchanged
+  ok    channel_notification_settings contents unchanged
+  ok    channel_notification_settings schema unchanged
+  ok    user_push_subscriptions exists and is empty
+  v0.5.1 recipient selection before upgrade: {"digest":"32d87bba87c9fddcec54ff12ba35d5f4af21fecee390f4661028e71a90be87fa","lookup_errors":0,"messages":34,"pushover_deliveries":152,"pushover_recipients":4,"selections":68}
+  head recipient selection after upgrade:   {"digest":"32d87bba87c9fddcec54ff12ba35d5f4af21fecee390f4661028e71a90be87fa","lookup_errors":0,"messages":34,"pushover_deliveries":152,"pushover_recipients":4,"selections":68}
+  ok    Pushover recipients identical before and after, web push off
+
+RESULT: PASS
