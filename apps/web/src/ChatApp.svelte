@@ -11,6 +11,7 @@
   import { APIError, api, apiResourceURL, frontendBaseURL, readableAPIError } from "./lib/api";
   import { requestCurrentUser } from "./lib/appearance";
   import { readBrowserNotificationsEnabled, writeBrowserNotificationsEnabled } from "./lib/browserNotifications";
+  import { startPointerModeTracking } from "./lib/pointer-mode.svelte";
   import { desktop } from "./lib/desktop";
   import { probeMediaDimensions } from "./lib/media";
   import { markdownImageViewerURL } from "./lib/actions/markdown";
@@ -367,6 +368,7 @@
   });
 
   onMount(() => {
+    const stopPointerModeTracking = startPointerModeTracking();
     loadActivityPrefs();
     void loadHomeLink((path) => api<unknown>(path)).then((link) => {
       homeLink = link;
@@ -388,6 +390,7 @@
     const stopDesktopQuickCompose = desktop?.onQuickCompose(() => focusActiveComposer());
     mobileNavMedia.addEventListener("change", handleMobileNavBreakpoint);
     return () => {
+      stopPointerModeTracking();
       mobileNavMedia.removeEventListener("change", handleMobileNavBreakpoint);
       stopDesktopNavigate?.();
       stopDesktopQuickCompose?.();

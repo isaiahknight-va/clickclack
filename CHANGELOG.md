@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Fixed the macOS menu bar icon disappearing on dark menu bars by preserving the template flag after resizing. Thanks @isaiahknight-va.
-- Fixed message and thread actions being unreachable from a trackpad or mouse on a touch-first device such as an iPad, by collapsing to the long-press sheet only when no attached pointer can hover, and scroll a reaction the user just added into view when it lands below the fold.
+- Fixed message and thread actions being unreachable from a trackpad or mouse on a touch-first device such as an iPad, by keeping the toolbar and menu for a mouse or trackpad in hand while a finger keeps the long-press sheet, and scroll a reaction the user just added into view when it lands below the fold.
 ## 0.5.1 - 2026-09-21
 
 **Highlights:** Safer exports, reliable sign-in, and chat status indicators that stay clear of messages.

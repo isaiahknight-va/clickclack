@@ -8,6 +8,7 @@
   import type { MessageEdit, MessageEditController } from "../../lib/messageEditing.svelte";
   import { uploadURL } from "../../lib/uploads";
   import ReactionsBar from "./ReactionsBar.svelte";
+  import { pointerMode } from "../../lib/pointer-mode.svelte";
   import EmojiPicker, { QUICK_REACTS } from "./EmojiPicker.svelte";
   import MessageActionSheet from "./MessageActionSheet.svelte";
   import CopyLinkFallback from "./CopyLinkFallback.svelte";
@@ -392,8 +393,11 @@
   const MESSAGE_INTERACTIVE_TARGETS =
     "a, button, input, textarea, select, .attachment-grid, .media-tile, .markdown img, .gif-player, .markdown-table-scroll, .message-actions, .message-failed";
   const coarseQuery =
-    typeof window !== "undefined" ? window.matchMedia("not all and (any-hover: hover)") : null;
-  let coarsePointer = $state(coarseQuery?.matches ?? false);
+    typeof window !== "undefined" ? window.matchMedia("(hover: none), (pointer: coarse)") : null;
+  let coarseDevice = $state(coarseQuery?.matches ?? false);
+  // A mouse or trackpad in hand gets the desktop toolbar and menu even on a
+  // coarse device; a finger keeps the long-press sheet.
+  let coarsePointer = $derived(coarseDevice && !pointerMode.mouse);
   let showActionSheet = $state(false);
   let longPressTimer: number | undefined;
   let longPressCleanup: (() => void) | undefined;
@@ -405,7 +409,7 @@
   $effect(() => {
     if (!coarseQuery) return;
     const onChange = () => {
-      coarsePointer = coarseQuery.matches;
+      coarseDevice = coarseQuery.matches;
     };
     coarseQuery.addEventListener("change", onChange);
     return () => coarseQuery.removeEventListener("change", onChange);
