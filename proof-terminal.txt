@@ -6,3 +6,11 @@ message-actions-any-hover.spec.ts on parent v0.5.1 (483a27a9):
 
 message-actions-any-hover.spec.ts + message-reactions.spec.ts on the fix:
   17 passed (23.3s)
+
+reaction-reveal.spec.ts on parent v0.5.1 (483a27a9):
+    Expected: <= 717
+    Received:    760
+  1 failed
+
+reaction-reveal.spec.ts + message-actions-any-hover.spec.ts + message-reactions.spec.ts on the fix:
+  1 passed (6.5s)
