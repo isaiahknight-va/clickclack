@@ -25,7 +25,15 @@ posts a message so the recipient's push waits in the queue, then:
 
 and releases the workers. The recipient's device must receive one push in the
 control case and none in the others, each with a `web push delivery skipped`
-line naming the reason. `summary.txt` holds the table; `server-webpush.log`
+line naming the reason.
+
+A last case is one browser shared by two accounts, signed in by cookie the
+way a browser is. Signed in as A, the device registers for A; the same jar then
+signs in as B, and a registration that still names A, as a tab left open on A
+asks after a renewal, must answer `409`. B must list no device, a message to B
+must reach no endpoint, and a message to A must still reach A's device.
+
+`summary.txt` holds the tables; `server-webpush.log`
 and `server.log` hold what the server printed. The run fails if a session
 token, a sign-in token, or an endpoint appears in the server's output.
 Requires `go`, `node`, and `sqlite3`.

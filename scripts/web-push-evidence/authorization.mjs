@@ -9,6 +9,12 @@
 // the recipient's authority, and releases the workers. The recipient's device
 // must receive nothing, except in the control case, where it receives one push.
 //
+// A last case is one browser shared by two accounts. Signed in by cookie as A,
+// the device registers for A; the same cookie jar then signs in as B, and a
+// registration that still names A, the way a tab left open on A asks after a
+// renewal, must be refused with nothing written. B's messages must reach no
+// device, and A's must still reach A's.
+//
 //   node scripts/web-push-evidence/authorization.mjs --out <dir>
 //
 // Writes summary.txt, server-webpush.log (the web push lines), and server.log
@@ -193,25 +199,58 @@ async function member(workspace, name) {
   return { id, session: await signIn(email) };
 }
 
-async function registerDevice(session, endpoint) {
+// The RFC 8291 example subscription keys, a real point on P-256.
+const subscriptionKeys = {
+  p256dh:
+    "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4",
+  auth: "BTBZMqHH6r4Tts7J_aSIgg",
+};
+
+async function registerDevice(user, endpoint) {
   endpointPaths.push(new URL(endpoint).pathname);
-  await api(session, "PUT", "/api/me/push/subscriptions", {
+  await api(user.session, "PUT", "/api/me/push/subscriptions", {
+    user_id: user.id,
     endpoint,
-    keys: {
-      // The RFC 8291 example subscription keys, a real point on P-256.
-      p256dh:
-        "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4",
-      auth: "BTBZMqHH6r4Tts7J_aSIgg",
-    },
+    keys: subscriptionKeys,
     user_agent: "evidence device",
   });
+}
+
+// signInToJar signs in the way a browser does and returns the session cookie
+// the server set, name and value, for a jar that the next sign-in replaces.
+async function signInToJar(email) {
+  const token = cli("admin", "magic-link", "create", "--data", dataDir, "--email", email);
+  const response = await fetch(`${origin}/api/auth/magic/consume`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-ClickClack-CSRF": "1" },
+    body: JSON.stringify({ token }),
+  });
+  if (!response.ok) fail(`sign-in answered ${response.status}`);
+  const session = (await response.json()).token;
+  secrets.push(token, session);
+  const cookie = response.headers
+    .getSetCookie()
+    .map((header) => header.split(";")[0])
+    .find((pair) => pair.endsWith(`=${session}`));
+  if (!cookie) fail("sign-in set no session cookie");
+  return cookie;
+}
+
+async function withCookie(cookie, method, path, body) {
+  const response = await fetch(`${origin}${path}`, {
+    method,
+    headers: { Cookie: cookie, "Content-Type": "application/json", "X-ClickClack-CSRF": "1" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await response.text();
+  return { status: response.status, body: text ? JSON.parse(text) : {} };
 }
 
 // The blocker's four devices are what hold the workers on the fake service.
 const blockerPlace = await workspaceWithChannel("Blocker");
 const blocker = await member(blockerPlace.workspace, "blocker");
 for (let index = 0; index < WORKERS; index += 1) {
-  await registerDevice(blocker.session, `${relayOrigin}/hold/${index}/${randomUUID()}`);
+  await registerDevice(blocker, `${relayOrigin}/hold/${index}/${randomUUID()}`);
 }
 
 const results = [];
@@ -219,7 +258,7 @@ for (const name of CASES) {
   const place = await workspaceWithChannel(`Case ${name}`);
   const recipient = await member(place.workspace, "recipient");
   const endpoint = `${relayOrigin}/push/${name}/${randomUUID()}`;
-  await registerDevice(recipient.session, endpoint);
+  await registerDevice(recipient, endpoint);
 
   shutGate();
   await api(ownerSession, "POST", `/api/channels/${blockerPlace.channel}/messages`, {
@@ -268,6 +307,75 @@ for (const name of CASES) {
   });
 }
 
+// One browser, one cookie jar, two accounts. The workers are free now.
+openGate();
+const sharedA = await workspaceWithChannel("Shared browser A");
+const sharedB = await workspaceWithChannel("Shared browser B");
+const accountA = { email: `shared-a-${randomUUID().slice(0, 8)}@evidence.test` };
+const accountB = { email: `shared-b-${randomUUID().slice(0, 8)}@evidence.test` };
+for (const [account, place, name] of [
+  [accountA, sharedA, "shared-a"],
+  [accountB, sharedB, "shared-b"],
+]) {
+  account.id = cli(
+    "admin",
+    "user",
+    "create",
+    "--data",
+    dataDir,
+    "--workspace",
+    place.workspace,
+    "--name",
+    name,
+    "--email",
+    account.email,
+  );
+}
+const deviceA = `${relayOrigin}/push/shared-a/${randomUUID()}`;
+const renewed = `${relayOrigin}/push/shared-renewed/${randomUUID()}`;
+endpointPaths.push(new URL(deviceA).pathname, new URL(renewed).pathname);
+let jar = await signInToJar(accountA.email);
+const registeredA = await withCookie(jar, "PUT", "/api/me/push/subscriptions", {
+  user_id: accountA.id,
+  endpoint: deviceA,
+  keys: subscriptionKeys,
+  user_agent: "shared browser",
+});
+if (registeredA.status !== 200) fail(`A's own registration answered ${registeredA.status}`);
+const jarA = jar;
+jar = await signInToJar(accountB.email);
+const me = await withCookie(jar, "GET", "/api/me");
+const stale = await withCookie(jar, "PUT", "/api/me/push/subscriptions", {
+  user_id: accountA.id,
+  endpoint: renewed,
+  keys: subscriptionKeys,
+  user_agent: "shared browser",
+});
+const devicesB = (await withCookie(jar, "GET", "/api/me/push")).body.subscriptions.length;
+const devicesA = (await withCookie(jarA, "GET", "/api/me/push")).body.subscriptions.length;
+await api(ownerSession, "POST", `/api/channels/${sharedB.channel}/messages`, {
+  body: "for the account that never turned push on",
+});
+await api(ownerSession, "POST", `/api/channels/${sharedA.channel}/messages`, {
+  body: "for the account that did",
+});
+await waitFor(
+  () => logLines.some((line) => line.includes(`web push delivered for user ${accountA.id}`)),
+  "the delivery to A",
+);
+// B has no device, so nothing is queued for B; this settle only gives a push
+// that was going to leave the time one takes.
+await sleep(1_000);
+const shared = {
+  cookieOwner: me.body.user?.id === accountB.id ? "B" : `not B (${me.body.user?.id})`,
+  staleStatus: stale.status,
+  staleError: stale.body.error ?? "",
+  devicesA,
+  devicesB,
+  pushesToRenewed: delivered.get("shared-renewed") ?? 0,
+  pushesToA: delivered.get("shared-a") ?? 0,
+};
+
 clearTimeout(deadline);
 server.kill("SIGTERM");
 await new Promise((resolve) => server.once("exit", resolve));
@@ -293,6 +401,15 @@ for (const result of results) {
     problems.push(`control: logged "${result.line}"`);
 }
 
+if (shared.cookieOwner !== "B") problems.push(`shared: the jar was ${shared.cookieOwner}`);
+if (shared.staleStatus !== 409)
+  problems.push(`shared: a registration naming A under B's cookie answered ${shared.staleStatus}`);
+if (shared.devicesB !== 0) problems.push(`shared: B has ${shared.devicesB} devices, want 0`);
+if (shared.devicesA !== 1) problems.push(`shared: A has ${shared.devicesA} devices, want 1`);
+if (shared.pushesToRenewed !== 0)
+  problems.push(`shared: ${shared.pushesToRenewed} pushes to the renewed endpoint, want 0`);
+if (shared.pushesToA !== 1) problems.push(`shared: ${shared.pushesToA} pushes to A, want 1`);
+
 const summary = [
   "Web push send-time authorization, production build path",
   `binary: go build -tags clickclack_e2e_unsafe_callbacks, serve without --dev-bootstrap`,
@@ -303,6 +420,14 @@ const summary = [
   ...results.map(
     (result) => `${result.name.padEnd(22)} ${String(result.delivered).padEnd(34)} ${result.line}`,
   ),
+  "",
+  "Shared browser: one cookie jar, signed in as A, then as B",
+  `A registers its device by cookie, naming A:              200`,
+  `the jar's session after B signs in belongs to:          ${shared.cookieOwner}`,
+  `registration naming A under B's cookie answered:        ${shared.staleStatus} ${shared.staleError}`,
+  `devices listed for B / for A:                           ${shared.devicesB} / ${shared.devicesA}`,
+  `pushes to the endpoint the stale registration named:    ${shared.pushesToRenewed} (a message to B was posted)`,
+  `pushes to A's device:                                   ${shared.pushesToA} (a message to A was posted)`,
   "",
   problems.length === 0 ? "RESULT: PASS" : `RESULT: FAIL\n${problems.join("\n")}`,
   "",
