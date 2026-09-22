@@ -14,6 +14,7 @@
   import { startPointerModeTracking } from "./lib/pointer-mode.svelte";
   import { desktop } from "./lib/desktop";
   import { healPushSubscription } from "./lib/webPush";
+  import { takePushLanding } from "./lib/push-landing";
   import { probeMediaDimensions } from "./lib/media";
   import { markdownImageViewerURL } from "./lib/actions/markdown";
   import {
@@ -381,7 +382,7 @@
       activityClock = Date.now();
     }, 30_000);
     syncBrowserNotificationState();
-    void boot();
+    void boot(takePushLanding(window.location.href));
     const mobileNavMedia = window.matchMedia(MOBILE_NAV_MEDIA_QUERY);
     const handleMobileNavBreakpoint = () => {
       mobileNavOpen = false;
@@ -416,10 +417,16 @@
   });
 
   // The tap means "show me that message": land in its conversation, then at
-  // its newest message, even when the app was already there. Jumping before
-  // the route's window loads would scroll the conversation being left.
+  // its newest message, even when the app was already there.
   async function openNotificationTarget(url: string) {
     await goto(url, { keepFocus: true, noScroll: true });
+    await landAtNewestMessage();
+  }
+
+  // Jumping before the route's window loads would scroll the conversation
+  // being left, so the jump waits for the route, and a navigation in the
+  // meantime cancels it.
+  async function landAtNewestMessage() {
     await tick();
     const serial = routeApplySerial;
     await routeApplication;
@@ -480,7 +487,7 @@
     syncArtifactModalInert(false, null);
   });
 
-  async function boot() {
+  async function boot(pushLanding: string | null = null) {
     try {
       const me = await requestCurrentUser();
       user = me.user;
@@ -490,8 +497,13 @@
       // empty storage and is a fresh opt-in from the settings row.
       if (!desktop) void healPushSubscription(user.id);
       await loadWorkspaces();
+      // A tap that had to open this window marked its URL. The mark comes off
+      // before any route is admitted, and the window then lands the way a tap
+      // on an open one does.
+      if (pushLanding !== null) await goto(pushLanding, { replaceState: true, keepFocus: true, noScroll: true });
       // Let workspace projections settle before admitting routes in a later flush.
       appReady = true;
+      if (pushLanding !== null) void landAtNewestMessage();
     } catch (error) {
       handleAppLoadError(error);
     }
