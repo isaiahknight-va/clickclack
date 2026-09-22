@@ -15,6 +15,7 @@
     registerPushWorker,
     storeSubscription,
     writePushEnabled,
+    writeSubscribedKey,
   } from "../../lib/webPush";
   import type { User } from "../../lib/types";
 
@@ -93,7 +94,7 @@
       return;
     }
     const registration = await registerPushWorker();
-    const subscription = await ensurePushSubscription(registration, state.vapid_public_key);
+    const subscription = await ensurePushSubscription(registration, state.vapid_public_key, user.id);
     await storeSubscription(subscription);
     writePushEnabled(user.id, true);
     enabled = true;
@@ -103,6 +104,7 @@
   async function turnOff() {
     const subscription = await currentPushSubscription();
     writePushEnabled(user.id, false);
+    writeSubscribedKey(user.id, "");
     enabled = false;
     if (!subscription) return;
     const endpoint = subscription.endpoint;

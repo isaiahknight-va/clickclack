@@ -6,6 +6,7 @@ import {
   deviceLabel,
   pushSupported,
   sameApplicationServerKey,
+  subscriptionIsStale,
 } from "./push-capability.ts";
 
 const globals = globalThis as {
@@ -116,4 +117,18 @@ test("sameApplicationServerKey replaces a subscription made under a rotated key"
   // A browser that hides the key cannot be compared and keeps its subscription.
   assert.equal(sameApplicationServerKey(null, current), true);
   assert.equal(sameApplicationServerKey(undefined, current), true);
+});
+
+test("subscriptionIsStale uses the browser's key when it has one, else the remembered key", () => {
+  const current =
+    "BNbxGYNMhEIi9zrneh7mqV4oUanjLUK3m-mYZBc62frMKrEoiPJ-pVPSPSFy0WcyTuzTjGjuj_VO5bqYwstlGtE";
+  const other =
+    "BCTr9HsDUFcPuwSZkBv5t_nnrv-XyDnOr5UXvKZ8Enjex7GADo0ZeCgz7gT5n3UQ5oLjFmT2j03pmBpSSttwq_Y";
+  const bytes = applicationServerKey(current);
+  assert.equal(subscriptionIsStale(bytes, "", current), false);
+  assert.equal(subscriptionIsStale(bytes, other, current), false);
+  assert.equal(subscriptionIsStale(applicationServerKey(other), "", current), true);
+  assert.equal(subscriptionIsStale(null, current, current), false);
+  assert.equal(subscriptionIsStale(null, other, current), true);
+  assert.equal(subscriptionIsStale(null, "", current), false);
 });

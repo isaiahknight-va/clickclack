@@ -7,7 +7,7 @@ import {
   applicationServerKey,
   deviceLabel,
   pushSupported,
-  sameApplicationServerKey,
+  subscriptionIsStale,
 } from "./push-capability";
 
 export type PushDevice = {
@@ -26,6 +26,10 @@ export type PushState = {
 };
 
 const STORAGE_PREFIX = "clickclack:web-push-enabled:v1:";
+// The server key this device last subscribed under, per user. Safari does not
+// expose a subscription's applicationServerKey, so this is how a rotation is
+// noticed there.
+const KEY_PREFIX = "clickclack:web-push-key:v1:";
 const WORKER_URL = "/service-worker.js";
 
 function storageKey(userID: string): string {
@@ -51,6 +55,25 @@ export function writePushEnabled(userID: string, enabled: boolean): void {
   }
 }
 
+export function readSubscribedKey(userID: string): string {
+  if (!userID) return "";
+  try {
+    return window.localStorage.getItem(`${KEY_PREFIX}${userID}`) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function writeSubscribedKey(userID: string, key: string): void {
+  if (!userID) return;
+  try {
+    if (key) window.localStorage.setItem(`${KEY_PREFIX}${userID}`, key);
+    else window.localStorage.removeItem(`${KEY_PREFIX}${userID}`);
+  } catch {
+    // Without storage the browser's own key report is the only rotation signal.
+  }
+}
+
 export function fetchPushState(): Promise<PushState> {
   return api<PushState>("/api/me/push");
 }
@@ -73,10 +96,19 @@ export async function registerPushWorker(): Promise<ServiceWorkerRegistration> {
 export async function ensurePushSubscription(
   registration: ServiceWorkerRegistration,
   vapidPublicKey: string,
+  userID = "",
 ): Promise<PushSubscription> {
   const key = applicationServerKey(vapidPublicKey);
   const existing = await registration.pushManager.getSubscription();
-  if (existing && sameApplicationServerKey(existing.options.applicationServerKey, key)) {
+  if (
+    existing &&
+    !subscriptionIsStale(
+      existing.options.applicationServerKey,
+      readSubscribedKey(userID),
+      vapidPublicKey,
+    )
+  ) {
+    writeSubscribedKey(userID, vapidPublicKey);
     return existing;
   }
   if (existing) {
@@ -84,7 +116,12 @@ export async function ensurePushSubscription(
     await existing.unsubscribe();
     await forgetSubscription(staleEndpoint).catch(() => undefined);
   }
-  return registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+  const fresh = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: key,
+  });
+  writeSubscribedKey(userID, vapidPublicKey);
+  return fresh;
 }
 
 export async function currentPushSubscription(): Promise<PushSubscription | null> {
@@ -124,7 +161,7 @@ export async function healPushSubscription(userID: string): Promise<void> {
     const state = await fetchPushState();
     if (!state.enabled) return;
     const registration = await registerPushWorker();
-    const subscription = await ensurePushSubscription(registration, state.vapid_public_key);
+    const subscription = await ensurePushSubscription(registration, state.vapid_public_key, userID);
     await storeSubscription(subscription);
   } catch {
     // The settings row is the recovery path; a failed heal must never break

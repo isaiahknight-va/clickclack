@@ -90,3 +90,18 @@ export function applicationServerKey(value: string): Uint8Array<ArrayBuffer> {
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
   return bytes;
 }
+
+// subscriptionIsStale decides whether an existing subscription was made under
+// a key the server no longer signs with. The browser's own report wins when
+// it gives one; otherwise the key this device remembers subscribing under
+// decides, because Safari does not expose applicationServerKey. With neither,
+// the subscription is kept.
+export function subscriptionIsStale(
+  existing: ArrayBuffer | ArrayBufferView | null | undefined,
+  rememberedKey: string,
+  configuredKey: string,
+): boolean {
+  const configured = applicationServerKey(configuredKey);
+  if (existing) return !sameApplicationServerKey(existing, configured);
+  return rememberedKey !== "" && rememberedKey.trim() !== configuredKey.trim();
+}
