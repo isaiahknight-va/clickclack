@@ -221,9 +221,26 @@
     reactionsDisabled || !currentUserID || isPending || isFailed || reactionPending,
   );
 
+  // A reaction the user just added grows this row. When the list is not
+  // following the bottom (a trackpad or a finger usually leaves it a few
+  // pixels short), the new chip lands below the fold under the composer's
+  // status band. Bring it into view once it has rendered.
+  async function react(emoji: string) {
+    await reactionController.toggle(message, emoji);
+    await tick();
+    revealRowBottom();
+  }
+
+  function revealRowBottom() {
+    const scroller = rowEl?.closest(".messages-scroll");
+    if (!rowEl || !scroller) return;
+    const overflow = rowEl.getBoundingClientRect().bottom - scroller.getBoundingClientRect().bottom;
+    if (overflow > 0) scroller.scrollTop += Math.ceil(overflow);
+  }
+
   function quickReact(emoji: string) {
     if (cannotReact) return;
-    void reactionController.toggle(message, emoji);
+    void react(emoji);
   }
 
   function toggleReactPicker() {
@@ -234,7 +251,7 @@
 
   function chooseToolbarReaction(emoji: string) {
     if (cannotReact) return;
-    void reactionController.toggle(message, emoji);
+    void react(emoji);
     showReactPicker = false;
   }
 
@@ -489,7 +506,7 @@
   function sheetReact(emoji: string) {
     closeActionSheet();
     if (cannotReact) return;
-    void reactionController.toggle(message, emoji);
+    void react(emoji);
   }
 
   function sheetOpenThread() {
@@ -670,7 +687,7 @@
         pending={reactionController.pending(message.id)}
         error={reactionController.error(message.id)}
         disabled={reactionsDisabled || !currentUserID}
-        onToggle={(emoji) => void reactionController.toggle(message, emoji)}
+        onToggle={(emoji) => void react(emoji)}
       />
     {/if}
     {#if message.attachments?.length}
