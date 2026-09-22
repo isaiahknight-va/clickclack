@@ -1,4 +1,11 @@
-import { expect, test, type Page, type Request, type Worker } from "@playwright/test";
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type Page,
+  type Request,
+  type Worker,
+} from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { createGeneralChannel } from "./channel-fixture";
 import { waitForAppReady } from "./app-ready";
@@ -30,16 +37,16 @@ type Delivery = {
 // subscription, or drop the current one the way a browser rotating it would.
 type StubOptions = { stale?: { endpoint: string; key: string } };
 
+// The RFC 8291 example subscription keys: a real point on P-256 and a 16 byte
+// auth secret, so the server can encrypt for them.
+const exampleSubscriptionKeys = {
+  p256dh: "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4",
+  auth: "BTBZMqHH6r4Tts7J_aSIgg",
+};
+
 async function stubPushManager(page: Page, endpoint: string, options: StubOptions = {}) {
   await page.addInitScript(
-    ({ endpoint, stale }) => {
-      const subscriptionKeys = {
-        // The RFC 8291 example subscription keys: a real point on P-256 and a
-        // 16 byte auth secret, so the server can encrypt for them.
-        p256dh:
-          "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4",
-        auth: "BTBZMqHH6r4Tts7J_aSIgg",
-      };
+    ({ endpoint, stale, subscriptionKeys }) => {
       const calls: string[] = [];
       let subscribed = 0;
       type StubSubscription = {
@@ -118,7 +125,7 @@ async function stubPushManager(page: Page, endpoint: string, options: StubOption
       }
       (window as unknown as { Notification: unknown }).Notification = GrantedNotification;
     },
-    { endpoint, stale: options.stale },
+    { endpoint, stale: options.stale, subscriptionKeys: exampleSubscriptionKeys },
   );
 }
 
@@ -603,12 +610,13 @@ test("a notification tap with no app window open lands at the newest message", a
 test.describe("a device registered under a signed-in session", () => {
   const csrf = { "X-ClickClack-CSRF": "1" };
 
-  test("stops receiving pushes when that session signs out", async ({ page }) => {
-    const endpoint = `${relayOrigin}/push/${randomUUID()}`;
-    await stubPushManager(page, endpoint);
+  // signInByMagicLink signs the page's browser context in as a new account.
+  // The cookie it sets is shared by every tab in the context, the way one
+  // browser shares it.
+  async function signInByMagicLink(page: Page, label: string): Promise<string> {
     const magic = await page.request.post("/api/auth/magic/request", {
       headers: csrf,
-      data: { email: `push-session-${randomUUID()}@example.com`, display_name: "Push session" },
+      data: { email: `push-session-${randomUUID()}@example.com`, display_name: label },
     });
     expect(magic.status()).toBe(201);
     const login = await page.request.post("/api/auth/magic/consume", {
@@ -616,9 +624,17 @@ test.describe("a device registered under a signed-in session", () => {
       data: { token: ((await magic.json()) as { token: string }).token },
     });
     expect(login.status()).toBe(200);
+    const me = await page.request.get("/api/me");
+    expect(me.ok()).toBe(true);
+    return ((await me.json()) as { user: { id: string } }).user.id;
+  }
+
+  // sessionRoom gives the signed-in account its own workspace and channel,
+  // and a bot there whose messages notify the account.
+  async function sessionRoom(page: Page, label: string) {
     const created = await page.request.post("/api/workspaces", {
       headers: csrf,
-      data: { name: `Push session ${randomUUID().slice(0, 8)}` },
+      data: { name: `${label} ${randomUUID().slice(0, 8)}` },
     });
     expect(created.status()).toBe(201);
     const { workspace } = (await created.json()) as { workspace: { id: string; route_id: string } };
@@ -643,25 +659,229 @@ test.describe("a device registered under a signed-in session", () => {
       });
       expect(posted.ok()).toBe(true);
     };
+    return { route: `/app/${workspace.route_id}/${channel.route_id}`, post };
+  }
 
-    await page.goto(`/app/${workspace.route_id}/${channel.route_id}`);
+  async function devicesOf(request: APIRequestContext): Promise<number> {
+    const response = await request.get("/api/me/push");
+    expect(response.ok()).toBe(true);
+    return ((await response.json()) as { subscriptions: unknown[] }).subscriptions.length;
+  }
+
+  async function expectDeliveries(page: Page, count: number) {
+    await expect
+      .poll(async () => (await relayDeliveries(page)).length, { timeout: 15_000 })
+      .toBe(count);
+  }
+
+  // expectNoDeliveryAfter posts and then gives a push that was going to leave
+  // the time a real one takes, well inside the control's window.
+  async function expectNoDeliveryAfter(page: Page, post: () => Promise<void>) {
+    const before = (await relayDeliveries(page)).length;
+    await post();
+    await page.waitForTimeout(2_000);
+    expect((await relayDeliveries(page)).length).toBe(before);
+  }
+
+  test("stops receiving pushes when that session signs out", async ({ page }) => {
+    const endpoint = `${relayOrigin}/push/${randomUUID()}`;
+    await stubPushManager(page, endpoint);
+    await signInByMagicLink(page, "Push session");
+    const room = await sessionRoom(page, "Push session");
+
+    await page.goto(room.route);
     await waitForAppReady(page);
     await turnPushOn(page);
 
     // Control: the session-bound device receives while the session lives.
     const before = (await relayDeliveries(page)).length;
-    await post("while signed in");
-    await expect
-      .poll(async () => (await relayDeliveries(page)).length, { timeout: 15_000 })
-      .toBe(before + 1);
+    await room.post("while signed in");
+    await expectDeliveries(page, before + 1);
 
     const loggedOut = await page.request.post("/api/auth/logout", { headers: csrf, data: {} });
     expect(loggedOut.status()).toBe(200);
-    await post("after signing out");
-    // The control above arrives well inside this window; a push that was
-    // going to leave for a signed-out session would too.
-    await page.waitForTimeout(2_000);
-    expect((await relayDeliveries(page)).length).toBe(before + 1);
+    await expectNoDeliveryAfter(page, () => room.post("after signing out"));
+  });
+
+  // One browser, one cookie jar. Account A turns push on and its tab stays
+  // open; a second tab signs the browser in as B, who never turned push on.
+  // A renewal reaching A's tab, and A's tab opening again, must not register
+  // the device for B.
+  test("a tab left open for an account another tab replaced registers nothing for the new account", async ({
+    page,
+    context,
+    playwright,
+    baseURL,
+  }) => {
+    const endpoint = `${relayOrigin}/push/${randomUUID()}`;
+    await stubPushManager(page, endpoint);
+    const accountA = await signInByMagicLink(page, "Push stale first");
+    const roomA = await sessionRoom(page, "Push stale first");
+    await page.goto(roomA.route);
+    await waitForAppReady(page);
+    await turnPushOn(page);
+    const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+    let delivered = (await relayDeliveries(page)).length;
+    await roomA.post("to the first account, before the switch");
+    await expectDeliveries(page, delivered + 1);
+    // A's own session, kept aside so A's rows can be read after the jar moves.
+    const asA = await playwright.request.newContext({
+      baseURL,
+      storageState: await context.storageState(),
+    });
+    try {
+      const second = await context.newPage();
+      const accountB = await signInByMagicLink(second, "Push stale second");
+      const roomB = await sessionRoom(second, "Push stale second");
+      expect(accountB).not.toBe(accountA);
+      // A's tab still shows A, but its requests now carry B's cookie.
+      const cookieOwner = await page.evaluate(() =>
+        fetch("/api/me").then(
+          async (response) => ((await response.json()) as { user: { id: string } }).user.id,
+        ),
+      );
+      expect(cookieOwner).toBe(accountB);
+
+      const registrations: number[] = [];
+      context.on("response", (response) => {
+        if (isPushRegistration(response.request())) registrations.push(response.status());
+      });
+      await page.evaluate(() => {
+        const seen: string[] = [];
+        (window as unknown as { __workerMessages: string[] }).__workerMessages = seen;
+        navigator.serviceWorker.addEventListener("message", (event) => {
+          seen.push(String((event.data as { type?: string } | null)?.type));
+        });
+      });
+
+      // The renewal path: the browser replaces the subscription and the
+      // worker tells A's tab.
+      await page.evaluate(() =>
+        (window as unknown as { __pushStub: { drop: () => void } }).__pushStub.drop(),
+      );
+      await fireSubscriptionChange(worker);
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => (window as unknown as { __workerMessages: string[] }).__workerMessages,
+          ),
+        )
+        .toContain("clickclack:push-renew");
+      // Give a wrong implementation room to register before asserting it did not.
+      await page.waitForTimeout(1_000);
+      expect(registrations.filter((status) => status < 300)).toEqual([]);
+      expect(await stubCalls(page)).not.toContain(`subscribe:${endpoint}-2`);
+      expect(await devicesOf(second.request)).toBe(0);
+      await expectNoDeliveryAfter(page, () =>
+        roomB.post("to the second account, which never turned push on"),
+      );
+      // A's device is still A's: its row, its session, its delivery.
+      expect(await devicesOf(asA)).toBe(1);
+      delivered = (await relayDeliveries(page)).length;
+      await roomA.post("to the first account, after the switch");
+      await expectDeliveries(page, delivered + 1);
+
+      // The server holds the same line on its own: a registration naming A
+      // from this browser, whose cookie is B's, writes nothing.
+      const refused = await page.evaluate(
+        async ({ userID, probe, keys }) => {
+          const response = await fetch("/api/me/push/subscriptions", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", "X-ClickClack-CSRF": "1" },
+            body: JSON.stringify({ user_id: userID, endpoint: probe, keys, user_agent: "probe" }),
+          });
+          return { status: response.status, body: await response.text() };
+        },
+        { userID: accountA, probe: `${endpoint}-probe`, keys: exampleSubscriptionKeys },
+      );
+      expect(refused.status).toBe(409);
+      expect(refused.body).toContain("different account");
+      expect(await devicesOf(second.request)).toBe(0);
+      expect(await devicesOf(asA)).toBe(1);
+
+      // The boot path: A's tab opens again under B's cookie. It becomes B's
+      // tab, and B never turned push on here.
+      await page.reload();
+      await waitForAppReady(page);
+      await page.waitForTimeout(1_000);
+      expect(registrations.filter((status) => status < 300)).toEqual([]);
+      expect(await devicesOf(second.request)).toBe(0);
+      expect(await devicesOf(asA)).toBe(1);
+    } finally {
+      await asA.dispose();
+    }
+  });
+
+  // The same switch landing mid-registration: A's tab opens, has checked A is
+  // signed in and is part way through registering, and a second tab signs in
+  // as B before the write. The server refuses the write, so the device stays
+  // with A.
+  test("a registration another tab's sign-in overtakes is refused and the device stays with its account", async ({
+    page,
+    context,
+    playwright,
+    baseURL,
+  }) => {
+    const endpoint = `${relayOrigin}/push/${randomUUID()}`;
+    await stubPushManager(page, endpoint);
+    const accountA = await signInByMagicLink(page, "Push raced first");
+    const roomA = await sessionRoom(page, "Push raced first");
+    await page.goto(roomA.route);
+    await waitForAppReady(page);
+    await turnPushOn(page);
+    let delivered = (await relayDeliveries(page)).length;
+    await roomA.post("to the first account, before the switch");
+    await expectDeliveries(page, delivered + 1);
+    const asA = await playwright.request.newContext({
+      baseURL,
+      storageState: await context.storageState(),
+    });
+    try {
+      // Hold the heal's read of the push state, the last await before the
+      // write, until the other tab has signed in.
+      let reached!: () => void;
+      const healReached = new Promise<void>((resolve) => (reached = resolve));
+      let release!: () => void;
+      const released = new Promise<void>((resolve) => (release = resolve));
+      await page.route(
+        (url) => url.pathname === "/api/me/push",
+        async (route) => {
+          if (route.request().method() === "GET") {
+            reached();
+            await released;
+          }
+          await route.continue();
+        },
+      );
+      const registration = page.waitForResponse((response) =>
+        isPushRegistration(response.request()),
+      );
+      await page.reload();
+      await healReached;
+
+      const second = await context.newPage();
+      const accountB = await signInByMagicLink(second, "Push raced second");
+      const roomB = await sessionRoom(second, "Push raced second");
+      expect(accountB).not.toBe(accountA);
+      release();
+
+      const response = await registration;
+      expect(response.status()).toBe(409);
+      expect(
+        (JSON.parse(response.request().postData() ?? "{}") as { user_id?: string }).user_id,
+      ).toBe(accountA);
+      await page.unroute((url) => url.pathname === "/api/me/push");
+      expect(await devicesOf(second.request)).toBe(0);
+      await expectNoDeliveryAfter(page, () =>
+        roomB.post("to the second account, which never turned push on"),
+      );
+      expect(await devicesOf(asA)).toBe(1);
+      delivered = (await relayDeliveries(page)).length;
+      await roomA.post("to the first account, after the switch");
+      await expectDeliveries(page, delivered + 1);
+    } finally {
+      await asA.dispose();
+    }
   });
 });
 

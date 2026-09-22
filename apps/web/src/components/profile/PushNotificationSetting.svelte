@@ -13,6 +13,7 @@
     forgetSubscription,
     readPushEnabled,
     registerPushWorker,
+    signedInUserID,
     storeSubscription,
     writePushEnabled,
     writeSubscribedKey,
@@ -80,9 +81,17 @@
   }
 
   async function turnOn() {
-    const state = await fetchPushState();
+    const [state, signedIn] = await Promise.all([fetchPushState(), signedInUserID()]);
     if (!state.enabled) {
       available = false;
+      return;
+    }
+    // Another tab may have signed this browser in to a different account.
+    // Whoever is signed in now did not flip this switch.
+    if (signedIn !== user.id) {
+      enabled = false;
+      status = "This browser is now signed in to a different account. Reload to continue.";
+      statusError = true;
       return;
     }
     // The switch click is the user gesture the permission prompt needs.
@@ -99,7 +108,7 @@
     }
     const registration = await registerPushWorker();
     const subscription = await ensurePushSubscription(registration, state.vapid_public_key, user.id);
-    await storeSubscription(subscription);
+    await storeSubscription(subscription, user.id);
     writePushEnabled(user.id, true);
     enabled = true;
     status = "On for this device";

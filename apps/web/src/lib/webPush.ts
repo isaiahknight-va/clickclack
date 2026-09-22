@@ -137,11 +137,27 @@ export async function currentPushSubscription(): Promise<PushSubscription | null
   return registration ? await registration.pushManager.getSubscription() : null;
 }
 
-export async function storeSubscription(subscription: PushSubscription): Promise<PushDevice> {
+// signedInUserID asks the server which account this browser is signed in to
+// now. Every tab shares one cookie jar, so another tab signing in changes it
+// underneath a tab still showing the account before.
+export async function signedInUserID(): Promise<string> {
+  const me = await api<{ user: { id: string } }>("/api/me");
+  return me.user.id;
+}
+
+// storeSubscription registers this device for userID, the account whose
+// opt-in the caller checked. The server refuses it with 409 when the cookie
+// now belongs to someone else, so a switch between the check and this write
+// registers nothing.
+export async function storeSubscription(
+  subscription: PushSubscription,
+  userID: string,
+): Promise<PushDevice> {
   const payload = subscription.toJSON() as { endpoint?: string; keys?: Record<string, string> };
   const result = await api<{ subscription: PushDevice }>("/api/me/push/subscriptions", {
     method: "PUT",
     body: JSON.stringify({
+      user_id: userID,
       endpoint: payload.endpoint ?? subscription.endpoint,
       keys: { p256dh: payload.keys?.p256dh ?? "", auth: payload.keys?.auth ?? "" },
       user_agent: deviceLabel(),
@@ -164,14 +180,20 @@ export async function forgetSubscription(endpoint: string): Promise<void> {
 // reinstall wipes the note that push was on, so it is a fresh opt-in from the
 // switch, not a heal. This is the only path that registers a device without
 // the switch.
+//
+// userID is the account this tab shows, which may no longer be the one the
+// browser is signed in to. The heal goes ahead only when the server names the
+// same account; otherwise the opt-in is not the signed-in account's to use,
+// and both accounts' notes are left as they are.
 export async function healPushSubscription(userID: string): Promise<void> {
   if (!userID || !pushSupported() || !readPushEnabled(userID)) return;
   try {
+    if ((await signedInUserID()) !== userID) return;
     const state = await fetchPushState();
     if (!state.enabled) return;
     const registration = await registerPushWorker();
     const subscription = await ensurePushSubscription(registration, state.vapid_public_key, userID);
-    await storeSubscription(subscription);
+    await storeSubscription(subscription, userID);
   } catch {
     // The settings row is the recovery path; a failed heal must never break
     // the app's boot.
