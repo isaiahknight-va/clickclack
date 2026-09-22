@@ -11,6 +11,7 @@
   import { APIError, api, apiResourceURL, frontendBaseURL, readableAPIError } from "./lib/api";
   import { requestCurrentUser } from "./lib/appearance";
   import { readBrowserNotificationsEnabled, writeBrowserNotificationsEnabled } from "./lib/browserNotifications";
+  import { startPointerModeTracking } from "./lib/pointer-mode.svelte";
   import { desktop } from "./lib/desktop";
   import { healPushSubscription } from "./lib/webPush";
   import { probeMediaDimensions } from "./lib/media";
@@ -368,6 +369,7 @@
   });
 
   onMount(() => {
+    const stopPointerModeTracking = startPointerModeTracking();
     loadActivityPrefs();
     void loadHomeLink((path) => api<unknown>(path)).then((link) => {
       homeLink = link;
@@ -396,6 +398,7 @@
     };
     navigator.serviceWorker?.addEventListener("message", handleServiceWorkerMessage);
     return () => {
+      stopPointerModeTracking();
       mobileNavMedia.removeEventListener("change", handleMobileNavBreakpoint);
       navigator.serviceWorker?.removeEventListener("message", handleServiceWorkerMessage);
       stopDesktopNavigate?.();

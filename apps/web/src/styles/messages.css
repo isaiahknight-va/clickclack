@@ -1383,13 +1383,13 @@
   pointer-events: none;
 }
 
-/* Only devices with no hover-capable pointer at all collapse to the touch
-   anchor (`not all and` is the widely supported spelling of any-hover: none). A tablet with a trackpad or mouse keeps `hover: none` because touch
-   stays its primary input, but `any-hover: hover` reports the pointer, and that
-   pointer can neither hover a hidden toolbar nor long-press. */
-@media not all and (any-hover: hover) {
-  /* Touch devices use the long-press action sheet instead of the hover toolbar. */
-  .message-actions {
+/* Touch devices use the long-press action sheet instead of the hover toolbar,
+   unless the pointer in hand is a mouse or trackpad: a tablet with one attached
+   keeps reporting a coarse, hover-less primary pointer, and that pointer can
+   neither hover a hidden toolbar nor long-press. The root attribute is set from
+   real pointer events (lib/pointer-mode.svelte.ts). */
+@media (hover: none), (pointer: coarse) {
+  :root:not([data-pointer-mode="mouse"]) .message-actions {
     width: 1px;
     height: 1px;
     top: 1px;
@@ -1404,21 +1404,21 @@
     transform: none;
   }
 
-  .message-actions > :not(.message-more) {
+  :root:not([data-pointer-mode="mouse"]) .message-actions > :not(.message-more) {
     display: none;
   }
 
   /* The desktop flip must not move the collapsed 1px touch anchor. */
-  .message-row.actions-flip .message-actions {
+  :root:not([data-pointer-mode="mouse"]) .message-row.actions-flip .message-actions {
     top: 1px;
     bottom: auto;
   }
 
-  .message-actions .message-more {
+  :root:not([data-pointer-mode="mouse"]) .message-actions .message-more {
     position: static;
   }
 
-  .message-actions .message-actions-trigger {
+  :root:not([data-pointer-mode="mouse"]) .message-actions .message-actions-trigger {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -1430,7 +1430,7 @@
     white-space: nowrap;
   }
 
-  .message-actions .message-actions-trigger:focus-visible {
+  :root:not([data-pointer-mode="mouse"]) .message-actions .message-actions-trigger:focus-visible {
     right: 0;
     top: 0;
     width: 36px;
@@ -1444,7 +1444,9 @@
     box-shadow: var(--shadow);
   }
 
-  .message-row:has(.message-actions-trigger:focus-visible) .message-content {
+  :root:not([data-pointer-mode="mouse"])
+    .message-row:has(.message-actions-trigger:focus-visible)
+    .message-content {
     padding-right: 44px;
   }
 }
