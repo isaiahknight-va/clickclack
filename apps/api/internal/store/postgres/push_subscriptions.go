@@ -58,7 +58,7 @@ func (s *Store) UpsertPushSubscription(ctx context.Context, input store.PushSubs
 	if err := tx.Commit(); err != nil {
 		return store.PushSubscription{}, err
 	}
-	return storePushSubscription(row.ID, row.UserID, row.UserAgent, row.CreatedAt, row.UpdatedAt, row.LastSuccessAt, row.FailureCount), nil
+	return storePushSubscription(row.ID, row.UserID, row.Endpoint, row.UserAgent, row.CreatedAt, row.UpdatedAt, row.LastSuccessAt, row.FailureCount), nil
 }
 
 func (s *Store) ListPushSubscriptions(ctx context.Context, userID string) ([]store.PushSubscription, error) {
@@ -68,7 +68,7 @@ func (s *Store) ListPushSubscriptions(ctx context.Context, userID string) ([]sto
 	}
 	out := make([]store.PushSubscription, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, storePushSubscription(row.ID, row.UserID, row.UserAgent, row.CreatedAt, row.UpdatedAt, row.LastSuccessAt, row.FailureCount))
+		out = append(out, storePushSubscription(row.ID, row.UserID, row.Endpoint, row.UserAgent, row.CreatedAt, row.UpdatedAt, row.LastSuccessAt, row.FailureCount))
 	}
 	return out, nil
 }
@@ -165,7 +165,7 @@ func (s *Store) listPushSubscriptionTargets(ctx context.Context, userIDs []strin
 	return targets, nil
 }
 
-func storePushSubscription(id, userID, userAgent, createdAt, updatedAt string, lastSuccessAt sql.NullString, failureCount int64) store.PushSubscription {
+func storePushSubscription(id, userID, endpoint, userAgent, createdAt, updatedAt string, lastSuccessAt sql.NullString, failureCount int64) store.PushSubscription {
 	subscription := store.PushSubscription{
 		ID:           id,
 		UserID:       userID,
@@ -173,6 +173,7 @@ func storePushSubscription(id, userID, userAgent, createdAt, updatedAt string, l
 		CreatedAt:    createdAt,
 		UpdatedAt:    updatedAt,
 		FailureCount: failureCount,
+		EndpointKey:  store.PushEndpointKey(endpoint),
 	}
 	if lastSuccessAt.Valid {
 		value := lastSuccessAt.String

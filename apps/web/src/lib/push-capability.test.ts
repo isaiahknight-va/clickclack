@@ -4,6 +4,7 @@ import {
   appleDevice,
   applicationServerKey,
   deviceLabel,
+  pushDeviceKey,
   pushSupported,
   sameApplicationServerKey,
   subscriptionIsStale,
@@ -131,4 +132,17 @@ test("subscriptionIsStale uses the browser's key when it has one, else the remem
   assert.equal(subscriptionIsStale(null, current, current), false);
   assert.equal(subscriptionIsStale(null, other, current), true);
   assert.equal(subscriptionIsStale(null, "", current), false);
+});
+
+test("pushDeviceKey is the unpadded base64url SHA-256 the server computes", async () => {
+  // The same vectors the server's test holds, so both sides agree on one encoding.
+  assert.equal(
+    await pushDeviceKey("https://push.example.com/send/this-device"),
+    "roAu0n9u864S8b50dqaahZyGG6xEblpUS-e4wI47j74",
+  );
+  assert.equal(
+    await pushDeviceKey("https://push.example.com/send/other-device"),
+    "QRwuTHGa0ab-lUQ-J0DAANtRKTDtZ80bqlhAbRDCtTI",
+  );
+  assert.equal(await pushDeviceKey(""), "");
 });

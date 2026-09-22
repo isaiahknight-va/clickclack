@@ -1,6 +1,8 @@
 package store
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"net/url"
 	"regexp"
@@ -64,6 +66,18 @@ type PushSubscription struct {
 	UpdatedAt     string  `json:"updated_at"`
 	LastSuccessAt *string `json:"last_success_at,omitempty"`
 	FailureCount  int64   `json:"failure_count"`
+	// EndpointKey identifies the device without the endpoint: see
+	// PushEndpointKey. It is compared on the server and never serialized.
+	EndpointKey string `json:"-"`
+}
+
+// PushEndpointKey is the unpadded base64url SHA-256 of a subscription
+// endpoint. A browser computes the same digest of the subscription it holds,
+// so the server can say whether that browser is one of an account's devices
+// without either side sending the endpoint.
+func PushEndpointKey(endpoint string) string {
+	sum := sha256.Sum256([]byte(endpoint))
+	return base64.RawURLEncoding.EncodeToString(sum[:])
 }
 
 // PushSubscriptionInput is one browser PushSubscription being registered.

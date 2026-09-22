@@ -115,6 +115,74 @@ func TestPushEndpointsRegisterAndRemoveADevice(t *testing.T) {
 	}
 }
 
+// A browser holds one subscription for every account on it, so whether the
+// switch is on is a question about this device, not about the account's
+// device count. The client asks with a digest of its endpoint; the endpoint
+// itself never crosses the wire in either direction.
+func TestPushStateAnswersForThisDevice(t *testing.T) {
+	t.Parallel()
+	fixture := newPushTestServer(t, true)
+	// The unpadded base64url SHA-256 of each endpoint, computed outside Go so
+	// the server and the browser are held to one encoding.
+	const (
+		thisEndpoint  = "https://push.example.com/send/this-device"
+		thisKey       = "roAu0n9u864S8b50dqaahZyGG6xEblpUS-e4wI47j74"
+		otherEndpoint = "https://push.example.com/send/other-device"
+		otherKey      = "QRwuTHGa0ab-lUQ-J0DAANtRKTDtZ80bqlhAbRDCtTI"
+	)
+	type pushState struct {
+		Subscriptions []store.PushSubscription `json:"subscriptions"`
+		ThisDevice    bool                     `json:"this_device"`
+	}
+	read := func(query string) (pushState, string) {
+		t.Helper()
+		response, err := http.Get(fixture.server.URL + "/api/me/push" + query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer response.Body.Close()
+		raw, err := io.ReadAll(response.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if response.StatusCode != http.StatusOK {
+			t.Fatalf("GET /api/me/push%s: %d %s", query, response.StatusCode, raw)
+		}
+		var state pushState
+		if err := json.Unmarshal(raw, &state); err != nil {
+			t.Fatal(err)
+		}
+		return state, string(raw)
+	}
+
+	if state, _ := read("?device=" + thisKey); state.ThisDevice {
+		t.Fatal("no device is registered yet")
+	}
+	putPushSubscription(t, fixture.server.URL, otherEndpoint, "phone")
+	if state, _ := read("?device=" + thisKey); state.ThisDevice || len(state.Subscriptions) != 1 {
+		t.Fatalf("a device elsewhere is not this one: %#v", state)
+	}
+	putPushSubscription(t, fixture.server.URL, thisEndpoint, "laptop")
+	state, raw := read("?device=" + thisKey)
+	if !state.ThisDevice {
+		t.Fatalf("the registered endpoint must read as this device: %s", raw)
+	}
+	for _, secret := range []string{thisEndpoint, otherEndpoint, thisKey, otherKey} {
+		if strings.Contains(raw, secret) {
+			t.Fatalf("the state must not carry %q: %s", secret, raw)
+		}
+	}
+	if state, _ := read("?device=" + otherKey); !state.ThisDevice {
+		t.Fatal("each registered endpoint answers for itself")
+	}
+	if state, _ := read(""); state.ThisDevice {
+		t.Fatal("a caller that names no device has none")
+	}
+	if state, _ := read("?device=" + thisEndpoint); state.ThisDevice {
+		t.Fatal("only the digest identifies a device, never the endpoint itself")
+	}
+}
+
 func TestPushEndpointsRejectUnusableSubscriptions(t *testing.T) {
 	t.Parallel()
 	fixture := newPushTestServer(t, true)

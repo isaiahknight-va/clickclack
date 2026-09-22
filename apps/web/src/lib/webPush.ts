@@ -6,6 +6,7 @@ import { api } from "./api";
 import {
   applicationServerKey,
   deviceLabel,
+  pushDeviceKey,
   pushSupported,
   subscriptionIsStale,
 } from "./push-capability";
@@ -23,6 +24,7 @@ export type PushState = {
   enabled: boolean;
   vapid_public_key: string;
   subscriptions: PushDevice[];
+  this_device: boolean;
 };
 
 const STORAGE_PREFIX = "clickclack:web-push-enabled:v1:";
@@ -74,8 +76,13 @@ export function writeSubscribedKey(userID: string, key: string): void {
   }
 }
 
-export function fetchPushState(): Promise<PushState> {
-  return api<PushState>("/api/me/push");
+// fetchPushState reads the account's push state. Given the subscription this
+// browser holds, the answer also says whether that subscription is one of the
+// account's devices, named by a digest so the endpoint never leaves the
+// browser.
+export async function fetchPushState(subscription?: PushSubscription | null): Promise<PushState> {
+  const key = subscription ? await pushDeviceKey(subscription.endpoint) : "";
+  return api<PushState>(key ? `/api/me/push?device=${encodeURIComponent(key)}` : "/api/me/push");
 }
 
 // registerPushWorker installs the worker only when a user asks for push. The
