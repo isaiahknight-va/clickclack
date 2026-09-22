@@ -477,6 +477,91 @@ func TestMessageNotificationsFanOutPerChannel(t *testing.T) {
 	}
 }
 
+// The tap URL pairs the workspace's storage id with a target, so the target
+// must be a storage id too: the route API reads a storage workspace id as a
+// legacy pair and resolves only storage targets under it. A channel's route id
+// there answers 404 and the app falls back to the workspace's default channel.
+func TestWebPushTapURLResolvesToTheChannel(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st, err := sqlitestore.Open("sqlite://" + filepath.Join(t.TempDir(), "clickclack.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	if err := st.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	owner, err := st.EnsureBootstrap(ctx, "Owner", "tap-owner@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspaces, err := st.ListWorkspaces(ctx, owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspace := workspaces[0]
+	channel, _, err := st.CreateChannel(ctx, store.CreateChannelInput{WorkspaceID: workspace.ID, UserID: owner.ID, Name: "elsewhere", Kind: "public"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if channel.RouteID == "" {
+		t.Fatal("the channel needs a route id for this test to mean anything")
+	}
+	recipient, err := st.CreateUser(ctx, store.CreateUserInput{DisplayName: "Recipient", Email: "tap-recipient@example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.AddWorkspaceMember(ctx, workspace.ID, recipient.ID, store.WorkspaceRoleMember); err != nil {
+		t.Fatal(err)
+	}
+	session, err := st.CreateSession(ctx, recipient.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.UpsertPushSubscription(ctx, store.PushSubscriptionInput{
+		UserID:       recipient.ID,
+		Endpoint:     "https://push.example.com/send/tap",
+		P256dh:       exampleClientKey,
+		Auth:         exampleClientAuth,
+		UserAgent:    "phone",
+		SessionToken: session.Token,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	web := &recordingNotifier{}
+	publicKey, _, err := webpush.GenerateKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(New(st, realtime.NewHub(), Options{
+		WebPushNotifier:  web,
+		WebPushPublicKey: publicKey,
+	}).Handler())
+	t.Cleanup(server.Close)
+
+	postJSON[struct {
+		Message store.Message `json:"message"`
+	}](t, server.URL+"/api/channels/"+channel.ID+"/messages", map[string]any{"body": "over here"})
+	if len(web.notifications) != 1 {
+		t.Fatalf("expected one web push call, got %#v", web.notifications)
+	}
+	tap := web.notifications[0].URL
+	if tap != "/app/"+workspace.ID+"/"+channel.ID {
+		t.Fatalf("a channel tap must pair storage ids, got %q", tap)
+	}
+	if strings.Contains(tap, channel.RouteID) {
+		t.Fatalf("a channel tap under a storage workspace id must not carry the route id %q: %q", channel.RouteID, tap)
+	}
+	resolved := getJSONAsUser[struct {
+		Route store.RouteTarget `json:"route"`
+	}](t, recipient.ID, server.URL+"/api/routes"+strings.TrimPrefix(tap, "/app"))
+	if resolved.Route.TargetType != "channel" || resolved.Route.TargetID != channel.ID ||
+		resolved.Route.CanonicalPath != "/app/"+workspace.RouteID+"/"+channel.RouteID {
+		t.Fatalf("the tap must resolve to the channel it names: %#v", resolved.Route)
+	}
+}
+
 func TestWebPushTitleNamesThePlaceItKnows(t *testing.T) {
 	t.Parallel()
 	author := store.Message{AuthorID: "usr_1", Author: &store.User{DisplayName: "Ari"}}
@@ -515,22 +600,21 @@ func TestWebPushBodyAndRouteDescribeTheMessage(t *testing.T) {
 	if got := webPushBody(store.Message{}); got != "New message" {
 		t.Fatalf("empty body is %q", got)
 	}
+	// The workspace segment is a storage id, so the target is one too; the
+	// route API canonicalizes the pair.
 	channel := store.Message{WorkspaceID: "wsp_1", ChannelID: "chn_1"}
-	if got := webPushURL(channel, store.Channel{RouteID: "C123"}); got != "/app/wsp_1/C123" {
+	if got := webPushURL(channel); got != "/app/wsp_1/chn_1" {
 		t.Fatalf("channel route is %q", got)
 	}
-	if got := webPushURL(channel, store.Channel{}); got != "/app/wsp_1/chn_1" {
-		t.Fatalf("channel route without a route id is %q", got)
-	}
 	thread := store.Message{WorkspaceID: "wsp_1", ChannelID: "chn_1", ParentMessageID: &parent, ThreadRootID: parent}
-	if got := webPushURL(thread, store.Channel{RouteID: "C123"}); got != "/app/wsp_1/C123" {
+	if got := webPushURL(thread); got != "/app/wsp_1/chn_1" {
 		t.Fatalf("thread route is %q", got)
 	}
 	dm := store.Message{WorkspaceID: "wsp_1", DirectConversationID: "dm_1"}
-	if got := webPushURL(dm, store.Channel{}); got != "/app/wsp_1/dm_1" {
+	if got := webPushURL(dm); got != "/app/wsp_1/dm_1" {
 		t.Fatalf("direct route is %q", got)
 	}
-	if got := webPushURL(store.Message{}, store.Channel{}); got != "/app" {
+	if got := webPushURL(store.Message{}); got != "/app" {
 		t.Fatalf("unknown route is %q", got)
 	}
 	if got := webPushTag(store.Message{ID: "msg_1"}); got != "clickclack:msg_1" {

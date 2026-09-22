@@ -61,7 +61,7 @@ func (s *Server) notifyMessageCreated(ctx context.Context, message store.Message
 			Title:         webPushTitle(message, place),
 			Message:       webPushBody(message),
 			Tag:           webPushTag(message),
-			URL:           webPushURL(message, place),
+			URL:           webPushURL(message),
 			Subscriptions: recipient.Subscriptions,
 		}
 		if err := s.webPushNotifier.Notify(ctx, notification); err != nil {
@@ -119,18 +119,15 @@ func webPushTag(message store.Message) string {
 }
 
 // webPushURL routes a tap to the conversation or channel the message belongs
-// to, the same destination the in-page notification uses. A thread reply lands
-// in its channel: message routes are minted on demand and a storage id is not
-// one. Channel and conversation identifiers are canonicalized on arrival.
-func webPushURL(message store.Message, place store.Channel) string {
-	target := ""
-	switch {
-	case message.DirectConversationID != "":
+// to. A thread reply lands in its channel: message routes are minted on
+// demand. The workspace segment is a storage id, and the route API resolves
+// only storage targets beside one, so the target is always a storage id too
+// (never a channel's route id) and the app canonicalizes the pair on arrival,
+// as it does for an in-page notification with no route id to hand.
+func webPushURL(message store.Message) string {
+	target := message.ChannelID
+	if message.DirectConversationID != "" {
 		target = message.DirectConversationID
-	case place.RouteID != "":
-		target = place.RouteID
-	default:
-		target = message.ChannelID
 	}
 	if message.WorkspaceID == "" || target == "" {
 		return "/app"
