@@ -66,6 +66,11 @@ func pushDeviceListed(subscriptions []store.PushSubscription, deviceKey string) 
 	return false
 }
 
+var (
+	errPushRegistrationUserRequired   = errors.New("user_id is required")
+	errPushRegistrationAccountChanged = errors.New("this browser is now signed in to a different account; nothing was saved")
+)
+
 func (s *Server) putMyPushSubscription(w http.ResponseWriter, r *http.Request) {
 	act, ok := s.requirePushActor(w, r)
 	if !ok {
@@ -78,9 +83,21 @@ func (s *Server) putMyPushSubscription(w http.ResponseWriter, r *http.Request) {
 			Auth   string `json:"auth"`
 		} `json:"keys"`
 		UserAgent string `json:"user_agent"`
+		UserID    string `json:"user_id"`
 	}
 	if err := readJSON(w, r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	// One cookie jar serves every tab, so the account signed in now may not be
+	// the one whose opt-in the client checked. The client names that account,
+	// and a different one gets nothing written.
+	if strings.TrimSpace(body.UserID) == "" {
+		writeError(w, http.StatusBadRequest, errPushRegistrationUserRequired)
+		return
+	}
+	if body.UserID != act.user.ID {
+		writeError(w, http.StatusConflict, errPushRegistrationAccountChanged)
 		return
 	}
 	if err := validatePushEndpoint(body.Endpoint); err != nil {

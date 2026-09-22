@@ -385,11 +385,13 @@ paths:
                   subscription:
                     $ref: "#/components/schemas/PushSubscription"
         "400":
-          description: The endpoint or the client keys are unusable
+          description: The endpoint or the client keys are unusable, or user_id is missing
         "403":
           description: A bot token, or a caller with no signed-in session for the device to follow
         "404":
           description: Web push is not configured on this server
+        "409":
+          description: user_id is not the signed-in account, as when another tab signed this browser in to a different account. Nothing is written.
     delete:
       operationId: deleteMyPushSubscription
       description: Remove one device. An endpoint that is not registered still answers 204, so the client can call this freely.
@@ -2876,8 +2878,11 @@ components:
           format: int64
     PushSubscriptionRequest:
       type: object
-      required: [endpoint, keys]
+      required: [endpoint, keys, user_id]
       properties:
+        user_id:
+          type: string
+          description: The account the client is registering this device for, the one whose opt-in it checked. It must be the signed-in account, or the request is refused with 409.
         endpoint:
           type: string
           description: The push service URL from pushManager.subscribe. Must be https and must not point inside the deployment's own network.
