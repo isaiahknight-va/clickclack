@@ -357,3 +357,59 @@ func TestMessageNotificationsFanOutPerChannel(t *testing.T) {
 		t.Fatal("a web push recipient has no Pushover key")
 	}
 }
+
+func TestWebPushTitleNamesThePlaceItKnows(t *testing.T) {
+	t.Parallel()
+	author := store.Message{AuthorID: "usr_1", Author: &store.User{DisplayName: "Ari"}}
+	displayTitle := "  Release Room  "
+	for name, testCase := range map[string]struct {
+		message store.Message
+		place   store.Channel
+		want    string
+	}{
+		"channel":       {author, store.Channel{Name: "general"}, "Ari in #general"},
+		"display title": {author, store.Channel{Name: "general", DisplayTitle: &displayTitle}, "Ari in #Release Room"},
+		"direct message": {
+			store.Message{AuthorID: "usr_1", Author: &store.User{DisplayName: "Ari"}, DirectConversationID: "dm_1"},
+			store.Channel{},
+			"Ari in Direct message",
+		},
+		"unreadable channel": {store.Message{AuthorID: "usr_1"}, store.Channel{}, "usr_1"},
+	} {
+		if got := webPushTitle(testCase.message, testCase.place); got != testCase.want {
+			t.Fatalf("%s: title is %q, want %q", name, got, testCase.want)
+		}
+	}
+}
+
+func TestWebPushBodyAndRouteDescribeTheMessage(t *testing.T) {
+	t.Parallel()
+	parent := "msg_root"
+	if got := webPushBody(store.Message{Body: "  hello  "}); got != "hello" {
+		t.Fatalf("body is %q", got)
+	}
+	if got := webPushBody(store.Message{}); got != "New message" {
+		t.Fatalf("empty body is %q", got)
+	}
+	channel := store.Message{WorkspaceID: "wsp_1", ChannelID: "chn_1"}
+	if got := webPushURL(channel, store.Channel{RouteID: "C123"}); got != "/app/wsp_1/C123" {
+		t.Fatalf("channel route is %q", got)
+	}
+	if got := webPushURL(channel, store.Channel{}); got != "/app/wsp_1/chn_1" {
+		t.Fatalf("channel route without a route id is %q", got)
+	}
+	thread := store.Message{WorkspaceID: "wsp_1", ChannelID: "chn_1", ParentMessageID: &parent, ThreadRootID: parent}
+	if got := webPushURL(thread, store.Channel{RouteID: "C123"}); got != "/app/wsp_1/msg_root" {
+		t.Fatalf("thread route is %q", got)
+	}
+	dm := store.Message{WorkspaceID: "wsp_1", DirectConversationID: "dm_1"}
+	if got := webPushURL(dm, store.Channel{}); got != "/app/wsp_1/dm_1" {
+		t.Fatalf("direct route is %q", got)
+	}
+	if got := webPushURL(store.Message{}, store.Channel{}); got != "/app" {
+		t.Fatalf("unknown route is %q", got)
+	}
+	if got := webPushTag(store.Message{ID: "msg_1"}); got != "clickclack:msg_1" {
+		t.Fatalf("tag is %q", got)
+	}
+}
