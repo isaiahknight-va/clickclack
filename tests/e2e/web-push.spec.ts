@@ -5,6 +5,10 @@ import { waitForAppReady } from "./app-ready";
 
 const relayOrigin = `http://127.0.0.1:${Number(process.env.CLICKCLACK_E2E_PORT || "18082") + 2}`;
 
+// The signed-in session case carries a real session cookie, and a trace would
+// keep it. Playwright sets tracing per worker, so it is off for the file.
+test.use({ trace: "off" });
+
 type Delivery = {
   hasVapidToken: boolean;
   contentEncoding?: string;
@@ -467,6 +471,71 @@ test("a notification tap lands at the conversation's newest message", async ({ p
 
   await expect(page).toHaveURL(new RegExp(`${route}$`));
   await expect(page.locator(`[data-message-id="${newest}"]`)).toBeInViewport();
+});
+
+test.describe("a device registered under a signed-in session", () => {
+  const csrf = { "X-ClickClack-CSRF": "1" };
+
+  test("stops receiving pushes when that session signs out", async ({ page }) => {
+    const endpoint = `${relayOrigin}/push/${randomUUID()}`;
+    await stubPushManager(page, endpoint);
+    const magic = await page.request.post("/api/auth/magic/request", {
+      headers: csrf,
+      data: { email: `push-session-${randomUUID()}@example.com`, display_name: "Push session" },
+    });
+    expect(magic.status()).toBe(201);
+    const login = await page.request.post("/api/auth/magic/consume", {
+      headers: csrf,
+      data: { token: ((await magic.json()) as { token: string }).token },
+    });
+    expect(login.status()).toBe(200);
+    const created = await page.request.post("/api/workspaces", {
+      headers: csrf,
+      data: { name: `Push session ${randomUUID().slice(0, 8)}` },
+    });
+    expect(created.status()).toBe(201);
+    const { workspace } = (await created.json()) as { workspace: { id: string; route_id: string } };
+    const channelResponse = await page.request.post(`/api/workspaces/${workspace.id}/channels`, {
+      headers: csrf,
+      data: { name: "general", kind: "public" },
+    });
+    expect(channelResponse.status()).toBe(201);
+    const { channel } = (await channelResponse.json()) as {
+      channel: { id: string; route_id: string };
+    };
+    const poster = await page.request.post(`/api/workspaces/${workspace.id}/bots`, {
+      headers: csrf,
+      data: { display_name: `Poster ${randomUUID().slice(0, 8)}` },
+    });
+    expect(poster.ok()).toBe(true);
+    const { bot_token: botToken } = (await poster.json()) as { bot_token: { token: string } };
+    const post = async (body: string) => {
+      const posted = await page.request.post(`/api/channels/${channel.id}/messages`, {
+        headers: { Authorization: `Bearer ${botToken.token}` },
+        data: { body },
+      });
+      expect(posted.ok()).toBe(true);
+    };
+
+    await page.goto(`/app/${workspace.route_id}/${channel.route_id}`);
+    await waitForAppReady(page);
+    await turnPushOn(page);
+
+    // Control: the session-bound device receives while the session lives.
+    const before = (await relayDeliveries(page)).length;
+    await post("while signed in");
+    await expect
+      .poll(async () => (await relayDeliveries(page)).length, { timeout: 15_000 })
+      .toBe(before + 1);
+
+    const loggedOut = await page.request.post("/api/auth/logout", { headers: csrf, data: {} });
+    expect(loggedOut.status()).toBe(200);
+    await post("after signing out");
+    // The control above arrives well inside this window; a push that was
+    // going to leave for a signed-out session would too.
+    await page.waitForTimeout(2_000);
+    expect((await relayDeliveries(page)).length).toBe(before + 1);
+  });
 });
 
 // fireSubscriptionChange raises the event a browser raises when it replaces a
