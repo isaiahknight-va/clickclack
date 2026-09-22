@@ -2,11 +2,13 @@ package httpapi
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"log"
 	"sync"
 	"time"
 
+	"github.com/openclaw/clickclack/apps/api/internal/store"
 	"github.com/openclaw/clickclack/apps/api/internal/webpush"
 )
 
@@ -36,6 +38,8 @@ type WebPushConfig struct {
 // WebPushSubscriptionStore is the slice of the store the delivery worker
 // needs. Keeping it narrow keeps the notifier liftable.
 type WebPushSubscriptionStore interface {
+	GetPushSubscriptionDelivery(ctx context.Context, userID, endpoint string) (store.PushSubscriptionTarget, error)
+	GetMessage(ctx context.Context, messageID, userID string) (store.Message, error)
 	DeletePushSubscription(ctx context.Context, userID, endpoint string) error
 	MarkPushSubscriptionSuccess(ctx context.Context, userID, endpoint string) error
 	MarkPushSubscriptionFailure(ctx context.Context, userID, endpoint string, retryAfter time.Duration) (int64, error)
@@ -45,10 +49,14 @@ type webPushSender interface {
 	Send(ctx context.Context, subscription webpush.Subscription, message webpush.Message) error
 }
 
+// webPushDelivery is one queued push. It names the device and the message
+// rather than carrying the device's keys: authority is re-read from the store
+// when a worker picks it up, because it can change while the push waits.
 type webPushDelivery struct {
-	userID       string
-	subscription webpush.Subscription
-	message      webpush.Message
+	userID    string
+	endpoint  string
+	messageID string
+	message   webpush.Message
 }
 
 // WebPushNotifier delivers notifications to browser push services from a
@@ -109,13 +117,10 @@ func (n *WebPushNotifier) Notify(_ context.Context, notification PushNotificatio
 	dropped := 0
 	for _, subscription := range notification.Subscriptions {
 		delivery := webPushDelivery{
-			userID:  notification.UserID,
-			message: message,
-			subscription: webpush.Subscription{
-				Endpoint: subscription.Endpoint,
-				P256dh:   subscription.P256dh,
-				Auth:     subscription.Auth,
-			},
+			userID:    notification.UserID,
+			endpoint:  subscription.Endpoint,
+			messageID: notification.MessageID,
+			message:   message,
 		}
 		select {
 		case n.queue <- delivery:
@@ -170,16 +175,22 @@ func (n *WebPushNotifier) deliver(delivery webPushDelivery) {
 	}()
 	ctx, cancel := context.WithTimeout(context.Background(), webPushSendTimeout)
 	defer cancel()
-	err := n.sender.Send(ctx, delivery.subscription, delivery.message)
-	host := webpush.RelayHost(delivery.subscription.Endpoint)
+	subscription, reason := n.authorize(ctx, delivery)
+	if reason != "" {
+		log.Printf("web push delivery skipped for user %s: %s", delivery.userID, reason)
+		return
+	}
+	err := n.sender.Send(ctx, subscription, delivery.message)
+	host := webpush.RelayHost(delivery.endpoint)
 	switch {
 	case err == nil:
-		if err := n.subscriptions.MarkPushSubscriptionSuccess(ctx, delivery.userID, delivery.subscription.Endpoint); err != nil {
+		log.Printf("web push delivered for user %s via %s", delivery.userID, host)
+		if err := n.subscriptions.MarkPushSubscriptionSuccess(ctx, delivery.userID, delivery.endpoint); err != nil {
 			log.Printf("web push bookkeeping failed for user %s: %v", delivery.userID, err)
 		}
 	case errors.Is(err, webpush.ErrSubscriptionGone):
 		log.Printf("web push subscription for user %s removed: %s reports it is gone", delivery.userID, host)
-		if err := n.subscriptions.DeletePushSubscription(ctx, delivery.userID, delivery.subscription.Endpoint); err != nil {
+		if err := n.subscriptions.DeletePushSubscription(ctx, delivery.userID, delivery.endpoint); err != nil {
 			log.Printf("web push cleanup failed for user %s: %v", delivery.userID, err)
 		}
 	default:
@@ -189,13 +200,43 @@ func (n *WebPushNotifier) deliver(delivery webPushDelivery) {
 			retryAfter = relayErr.RetryAfter
 		}
 		log.Printf("web push delivery failed for user %s: %v", delivery.userID, err)
-		count, markErr := n.subscriptions.MarkPushSubscriptionFailure(ctx, delivery.userID, delivery.subscription.Endpoint, retryAfter)
+		count, markErr := n.subscriptions.MarkPushSubscriptionFailure(ctx, delivery.userID, delivery.endpoint, retryAfter)
 		if markErr != nil {
 			log.Printf("web push bookkeeping failed for user %s: %v", delivery.userID, markErr)
 			return
 		}
 		log.Printf("web push to %s backing off for user %s after %d consecutive failures", host, delivery.userID, count)
 	}
+}
+
+// authorize re-reads everything that allowed a push when it was queued: the
+// device must still be registered to this user under a live session with its
+// backoff elapsed, and the user must still be able to read the message. It
+// answers the device's current keys, or the class of reason it may not be
+// sent. A lookup that fails for any other reason also refuses: without an
+// answer, the message text stays on the server.
+func (n *WebPushNotifier) authorize(ctx context.Context, delivery webPushDelivery) (webpush.Subscription, string) {
+	target, err := n.subscriptions.GetPushSubscriptionDelivery(ctx, delivery.userID, delivery.endpoint)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return webpush.Subscription{}, "the device is no longer registered"
+	case errors.Is(err, store.ErrPushSessionEnded):
+		return webpush.Subscription{}, "the session that registered the device has ended"
+	case errors.Is(err, store.ErrPushSubscriptionBackingOff):
+		return webpush.Subscription{}, "the device is backing off"
+	case err != nil:
+		return webpush.Subscription{}, "the device could not be verified"
+	}
+	if delivery.messageID == "" {
+		return webpush.Subscription{}, "the message could not be verified"
+	}
+	if _, err := n.subscriptions.GetMessage(ctx, delivery.messageID, delivery.userID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return webpush.Subscription{}, "the user can no longer read the message"
+		}
+		return webpush.Subscription{}, "the message could not be verified"
+	}
+	return webpush.Subscription{Endpoint: target.Endpoint, P256dh: target.P256dh, Auth: target.Auth}, ""
 }
 
 func (n *WebPushNotifier) reportDropped(dropped int) {

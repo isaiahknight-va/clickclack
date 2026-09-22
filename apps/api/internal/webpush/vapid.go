@@ -5,7 +5,9 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/url"
@@ -92,6 +94,19 @@ func DecodeKey(value string) ([]byte, error) {
 	}
 	value = strings.NewReplacer("+", "-", "/", "_").Replace(strings.TrimRight(value, "="))
 	return base64.RawURLEncoding.DecodeString(value)
+}
+
+// KeyFingerprint names a VAPID public key in a log line: the first twelve hex
+// digits of the SHA-256 of its bytes, so every spelling of one key agrees. The
+// key is public; the fingerprint keeps the line short and changes when the
+// operator rotates the pair.
+func KeyFingerprint(publicKey string) string {
+	raw, err := DecodeKey(publicKey)
+	if err != nil {
+		raw = []byte(strings.TrimSpace(publicKey))
+	}
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:])[:12]
 }
 
 func pushServiceAudience(endpoint string) (string, error) {

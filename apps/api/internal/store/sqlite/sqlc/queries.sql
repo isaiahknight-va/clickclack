@@ -1925,6 +1925,14 @@ UPDATE user_push_subscriptions
 SET next_attempt_at = sqlc.arg(next_attempt_at)
 WHERE user_id = sqlc.arg(user_id) AND endpoint = sqlc.arg(endpoint);
 
+-- name: GetPushSubscriptionDelivery :one
+SELECT ups.user_id, ups.endpoint, ups.p256dh, ups.auth, ups.next_attempt_at, ups.session_token_hash,
+       s.user_id AS session_user_id, s.expires_at AS session_expires_at, s.revoked_at AS session_revoked_at
+FROM user_push_subscriptions ups
+LEFT JOIN sessions s
+  ON s.token_hash = ups.session_token_hash AND ups.session_token_hash <> ''
+WHERE ups.user_id = sqlc.arg(user_id) AND ups.endpoint = sqlc.arg(endpoint);
+
 -- name: ListPushSubscriptionsForUsers :many
 SELECT ups.user_id, ups.endpoint, ups.p256dh, ups.auth, ups.next_attempt_at,
        s.expires_at AS session_expires_at

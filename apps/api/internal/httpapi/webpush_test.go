@@ -2,11 +2,13 @@ package httpapi
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -26,9 +28,28 @@ type recordedPushResult struct {
 }
 
 type fakeSubscriptionStore struct {
-	mu      sync.Mutex
-	results []recordedPushResult
-	err     error
+	mu         sync.Mutex
+	results    []recordedPushResult
+	err        error
+	lookupErr  error
+	messageErr error
+}
+
+// GetPushSubscriptionDelivery answers the device the notification named, with
+// the RFC 8291 example keys, unless the test says the store refuses it.
+func (f *fakeSubscriptionStore) GetPushSubscriptionDelivery(_ context.Context, _, endpoint string) (store.PushSubscriptionTarget, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.lookupErr != nil {
+		return store.PushSubscriptionTarget{}, f.lookupErr
+	}
+	return store.PushSubscriptionTarget{Endpoint: endpoint, P256dh: exampleClientKey, Auth: exampleClientAuth}, nil
+}
+
+func (f *fakeSubscriptionStore) GetMessage(context.Context, string, string) (store.Message, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return store.Message{}, f.messageErr
 }
 
 func (f *fakeSubscriptionStore) DeletePushSubscription(_ context.Context, userID, endpoint string) error {
@@ -57,19 +78,21 @@ func (f *fakeSubscriptionStore) recorded() []recordedPushResult {
 }
 
 type fakeSender struct {
-	mu   sync.Mutex
-	err  error
-	sent int
-	hold chan struct{}
-	panc bool
+	mu            sync.Mutex
+	err           error
+	sent          int
+	hold          chan struct{}
+	panc          bool
+	subscriptions []webpush.Subscription
 }
 
-func (f *fakeSender) Send(context.Context, webpush.Subscription, webpush.Message) error {
+func (f *fakeSender) Send(_ context.Context, subscription webpush.Subscription, _ webpush.Message) error {
 	f.mu.Lock()
 	hold := f.hold
 	err := f.err
 	shouldPanic := f.panc
 	f.sent++
+	f.subscriptions = append(f.subscriptions, subscription)
 	f.mu.Unlock()
 	if hold != nil {
 		<-hold
@@ -88,11 +111,12 @@ func (f *fakeSender) count() int {
 
 func pushNotificationFor(userID, endpoint string) PushNotification {
 	return PushNotification{
-		UserID:  userID,
-		Title:   "Owner in #general",
-		Message: "hello",
-		Tag:     "clickclack:msg_1",
-		URL:     "/app/wsp_1/chn_1",
+		UserID:    userID,
+		MessageID: "msg_1",
+		Title:     "Owner in #general",
+		Message:   "hello",
+		Tag:       "clickclack:msg_1",
+		URL:       "/app/wsp_1/chn_1",
 		Subscriptions: []store.PushSubscriptionTarget{{
 			Endpoint: endpoint,
 			P256dh:   exampleClientKey,
@@ -298,12 +322,17 @@ func TestMessageNotificationsFanOutPerChannel(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	pushSession, err := st.CreateSession(ctx, pushUser.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := st.UpsertPushSubscription(ctx, store.PushSubscriptionInput{
-		UserID:    pushUser.ID,
-		Endpoint:  "https://push.example.com/send/fanout",
-		P256dh:    exampleClientKey,
-		Auth:      exampleClientAuth,
-		UserAgent: "phone",
+		UserID:       pushUser.ID,
+		Endpoint:     "https://push.example.com/send/fanout",
+		P256dh:       exampleClientKey,
+		Auth:         exampleClientAuth,
+		UserAgent:    "phone",
+		SessionToken: pushSession.Token,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -411,5 +440,271 @@ func TestWebPushBodyAndRouteDescribeTheMessage(t *testing.T) {
 	}
 	if got := webPushTag(store.Message{ID: "msg_1"}); got != "clickclack:msg_1" {
 		t.Fatalf("tag is %q", got)
+	}
+}
+
+// TestWebPushNotifierRevalidatesBeforeSending covers every reason a queued push
+// is refused at send time. None of them may reach the push service, and each
+// names its reason in one log line.
+func TestWebPushNotifierRevalidatesBeforeSending(t *testing.T) {
+	for name, testCase := range map[string]struct {
+		lookupErr  error
+		messageErr error
+		messageID  string
+		reason     string
+	}{
+		"device removed":       {lookupErr: sql.ErrNoRows, messageID: "msg_1", reason: "the device is no longer registered"},
+		"session ended":        {lookupErr: store.ErrPushSessionEnded, messageID: "msg_1", reason: "the session that registered the device has ended"},
+		"backing off":          {lookupErr: store.ErrPushSubscriptionBackingOff, messageID: "msg_1", reason: "the device is backing off"},
+		"device lookup failed": {lookupErr: errors.New("database is away"), messageID: "msg_1", reason: "the device could not be verified"},
+		"message unreadable":   {messageErr: sql.ErrNoRows, messageID: "msg_1", reason: "the user can no longer read the message"},
+		"message lookup failed": {
+			messageErr: errors.New("database is away"), messageID: "msg_1", reason: "the message could not be verified",
+		},
+		"no message": {reason: "the message could not be verified"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var captured strings.Builder
+			previousOutput := log.Writer()
+			log.SetOutput(&captured)
+			defer log.SetOutput(previousOutput)
+
+			sender := &fakeSender{}
+			subscriptions := &fakeSubscriptionStore{lookupErr: testCase.lookupErr, messageErr: testCase.messageErr}
+			notifier := newWebPushNotifier(sender, subscriptions)
+			notification := pushNotificationFor("usr_1", "https://push.example.com/send/device")
+			notification.MessageID = testCase.messageID
+			if err := notifier.Notify(context.Background(), notification); err != nil {
+				t.Fatal(err)
+			}
+			notifier.Close()
+			if sender.count() != 0 {
+				t.Fatalf("a refused delivery reached the push service %d times", sender.count())
+			}
+			if len(subscriptions.recorded()) != 0 {
+				t.Fatalf("a refused delivery records nothing: %#v", subscriptions.recorded())
+			}
+			want := "web push delivery skipped for user usr_1: " + testCase.reason
+			if !strings.Contains(captured.String(), want) {
+				t.Fatalf("expected %q in the log, got %q", want, captured.String())
+			}
+			if strings.Contains(captured.String(), "push.example.com/send") {
+				t.Fatalf("the log leaked the endpoint: %s", captured.String())
+			}
+		})
+	}
+}
+
+// TestWebPushNotifierSendsTheKeysOnFileNow proves the queue does not carry
+// device keys: a device re-registered while a push waits is sent under the
+// keys the store holds at send time.
+func TestWebPushNotifierSendsTheKeysOnFileNow(t *testing.T) {
+	t.Parallel()
+	sender := &fakeSender{}
+	notifier := newWebPushNotifier(sender, &fakeSubscriptionStore{})
+	notification := pushNotificationFor("usr_1", "https://push.example.com/send/device")
+	notification.Subscriptions[0].Auth = "queued-auth-is-not-used"
+	if err := notifier.Notify(context.Background(), notification); err != nil {
+		t.Fatal(err)
+	}
+	notifier.Close()
+	sender.mu.Lock()
+	defer sender.mu.Unlock()
+	if len(sender.subscriptions) != 1 || sender.subscriptions[0].Auth != exampleClientAuth {
+		t.Fatalf("expected the stored keys, sent %#v", sender.subscriptions)
+	}
+}
+
+// gatedSender holds every push to a /hold/ endpoint until the gate opens and
+// records the endpoints it actually sent to.
+type gatedSender struct {
+	mu       sync.Mutex
+	gate     chan struct{}
+	inFlight chan struct{}
+	sent     []string
+}
+
+func (g *gatedSender) Send(_ context.Context, subscription webpush.Subscription, _ webpush.Message) error {
+	if strings.Contains(subscription.Endpoint, "/hold/") {
+		g.inFlight <- struct{}{}
+		<-g.gate
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.sent = append(g.sent, subscription.Endpoint)
+	return nil
+}
+
+func (g *gatedSender) sentTo(endpoint string) int {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	count := 0
+	for _, sent := range g.sent {
+		if sent == endpoint {
+			count++
+		}
+	}
+	return count
+}
+
+// TestQueuedWebPushIsRevalidatedBeforeSending holds every worker on a slow
+// relay, queues a real message's push behind them, withdraws the recipient's
+// authority, and then lets the relay go. The push that was already queued
+// must not be sent; with nothing withdrawn, it is sent once.
+func TestQueuedWebPushIsRevalidatedBeforeSending(t *testing.T) {
+	t.Parallel()
+	for name, withdraw := range map[string]func(t *testing.T, fixture queuedPushFixture){
+		"control": func(*testing.T, queuedPushFixture) {},
+		"session revoked": func(t *testing.T, fixture queuedPushFixture) {
+			if err := fixture.store.RevokeSession(context.Background(), fixture.recipientSession); err != nil {
+				t.Fatal(err)
+			}
+		},
+		"subscription deleted": func(t *testing.T, fixture queuedPushFixture) {
+			if err := fixture.store.DeletePushSubscription(context.Background(), fixture.recipient, fixture.recipientEndpoint); err != nil {
+				t.Fatal(err)
+			}
+		},
+		"membership removed": func(t *testing.T, fixture queuedPushFixture) {
+			// No endpoint removes a human member, so this is the row change an
+			// operator would make; message access reads the same row.
+			db, err := sql.Open("sqlite", "file:"+fixture.databasePath+"?_pragma=busy_timeout(5000)")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer db.Close()
+			if _, err := db.Exec(`DELETE FROM workspace_members WHERE user_id = ?`, fixture.recipient); err != nil {
+				t.Fatal(err)
+			}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			fixture := newQueuedPushFixture(t)
+			withdraw(t, fixture)
+			close(fixture.sender.gate)
+			fixture.notifier.Close()
+			want := 0
+			if name == "control" {
+				want = 1
+			}
+			if got := fixture.sender.sentTo(fixture.recipientEndpoint); got != want {
+				t.Fatalf("the recipient's device was sent %d pushes, want %d", got, want)
+			}
+		})
+	}
+}
+
+type queuedPushFixture struct {
+	store             *sqlitestore.Store
+	databasePath      string
+	sender            *gatedSender
+	notifier          *WebPushNotifier
+	recipient         string
+	recipientSession  string
+	recipientEndpoint string
+}
+
+// newQueuedPushFixture returns with every worker held on the relay and the
+// recipient's push for a freshly posted message waiting in the queue.
+func newQueuedPushFixture(t *testing.T) queuedPushFixture {
+	t.Helper()
+	ctx := context.Background()
+	databasePath := filepath.Join(t.TempDir(), "clickclack.db")
+	st, err := sqlitestore.Open("sqlite://" + databasePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	if err := st.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	owner, err := st.EnsureBootstrap(ctx, "Owner", "queued-owner@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspaces, err := st.ListWorkspaces(ctx, owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	channels, err := st.ListChannels(ctx, workspaces[0].ID, owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	member := func(name, email string) string {
+		user, err := st.CreateUser(ctx, store.CreateUserInput{DisplayName: name, Email: email})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := st.AddWorkspaceMember(ctx, workspaces[0].ID, user.ID, store.WorkspaceRoleMember); err != nil {
+			t.Fatal(err)
+		}
+		return user.ID
+	}
+	blocker := member("Blocker", "queued-blocker@example.com")
+	recipient := member("Recipient", "queued-recipient@example.com")
+	// Posted before any device exists, so it queues nothing on its own.
+	warmUp, _, err := st.CreateMessage(ctx, store.CreateMessageInput{ChannelID: channels[0].ID, AuthorID: owner.ID, Body: "warm up"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	register := func(userID, endpoint string) string {
+		session, err := st.CreateSession(ctx, userID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.UpsertPushSubscription(ctx, store.PushSubscriptionInput{
+			UserID: userID, Endpoint: endpoint, P256dh: exampleClientKey, Auth: exampleClientAuth, SessionToken: session.Token,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		return session.Token
+	}
+	var blockers []store.PushSubscriptionTarget
+	for index := range webPushWorkers {
+		endpoint := "https://push.example.com/hold/" + strconv.Itoa(index)
+		register(blocker, endpoint)
+		blockers = append(blockers, store.PushSubscriptionTarget{Endpoint: endpoint})
+	}
+	recipientEndpoint := "https://push.example.com/send/recipient"
+	recipientSession := register(recipient, recipientEndpoint)
+
+	sender := &gatedSender{gate: make(chan struct{}), inFlight: make(chan struct{}, 4*webPushWorkers)}
+	notifier := newWebPushNotifier(sender, st)
+	t.Cleanup(notifier.Close)
+	publicKey, _, err := webpush.GenerateKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(New(st, realtime.NewHub(), Options{
+		WebPushNotifier:  notifier,
+		WebPushPublicKey: publicKey,
+	}).Handler())
+	t.Cleanup(server.Close)
+
+	if err := notifier.Notify(ctx, PushNotification{UserID: blocker, MessageID: warmUp.ID, Subscriptions: blockers}); err != nil {
+		t.Fatal(err)
+	}
+	for range webPushWorkers {
+		select {
+		case <-sender.inFlight:
+		case <-time.After(5 * time.Second):
+			t.Fatal("the workers never reached the held relay")
+		}
+	}
+	postJSON[struct {
+		Message store.Message `json:"message"`
+	}](t, server.URL+"/api/channels/"+channels[0].ID+"/messages", map[string]any{"body": "queued behind a slow relay"})
+	if got := sender.sentTo(recipientEndpoint); got != 0 {
+		t.Fatalf("the recipient's push left before the workers were free: %d", got)
+	}
+	return queuedPushFixture{
+		store:             st,
+		databasePath:      databasePath,
+		sender:            sender,
+		notifier:          notifier,
+		recipient:         recipient,
+		recipientSession:  recipientSession,
+		recipientEndpoint: recipientEndpoint,
 	}
 }

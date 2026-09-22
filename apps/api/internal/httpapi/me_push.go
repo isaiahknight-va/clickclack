@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -73,13 +74,17 @@ func (s *Server) putMyPushSubscription(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	subscription, err := s.store.UpsertPushSubscription(r.Context(), store.PushSubscriptionInput{
-		UserID:       act.user.ID,
-		Endpoint:     body.Endpoint,
-		P256dh:       body.Keys.P256dh,
-		Auth:         body.Keys.Auth,
-		UserAgent:    body.UserAgent,
-		SessionToken: act.sessionToken,
+		UserID:           act.user.ID,
+		Endpoint:         body.Endpoint,
+		P256dh:           body.Keys.P256dh,
+		Auth:             body.Keys.Auth,
+		UserAgent:        body.UserAgent,
+		SessionToken:     pushSessionToken(act),
+		DevelopmentActor: act.developmentFallback,
 	})
+	if err == nil {
+		log.Printf("web push device %s for user %s via %s", pushRegistrationKind(subscription), act.user.ID, webpush.RelayHost(body.Endpoint))
+	}
 	writeResult(w, map[string]any{"subscription": subscription}, err)
 }
 
@@ -104,6 +109,7 @@ func (s *Server) deleteMyPushSubscription(w http.ResponseWriter, r *http.Request
 		writeStoreError(w, err)
 		return
 	}
+	log.Printf("web push device removed by user %s", act.user.ID)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -124,7 +130,38 @@ func (s *Server) requirePushActor(w http.ResponseWriter, r *http.Request) (actor
 		writeError(w, http.StatusNotFound, errors.New("web push is not configured"))
 		return actor{}, false
 	}
+	// A device follows the session that registered it. Only the development
+	// fallback is signed in with no session; any other sessionless caller
+	// would leave a row that signing out could never stop.
+	if !pushRegistrationAllowed(act) {
+		writeError(w, http.StatusForbidden, store.ErrPushSubscriptionNeedsSession)
+		return actor{}, false
+	}
 	return act, true
+}
+
+// pushRegistrationAllowed is true for a caller with a session to bind the
+// device to, and for the development fallback, the one identity with none.
+func pushRegistrationAllowed(act actor) bool {
+	return pushSessionToken(act) != "" || act.developmentFallback
+}
+
+// pushSessionToken is the session a registration binds to: the one the caller
+// presented, or the one a trusted-proxy assertion minted for this request.
+func pushSessionToken(act actor) string {
+	if act.sessionToken != "" {
+		return act.sessionToken
+	}
+	return act.accessSessionToken
+}
+
+// pushRegistrationKind names a registration for the log. A first write has
+// matching timestamps; a later one for the same endpoint moves only one.
+func pushRegistrationKind(subscription store.PushSubscription) string {
+	if subscription.CreatedAt == subscription.UpdatedAt {
+		return "registered"
+	}
+	return "refreshed"
 }
 
 func validatePushEndpoint(endpoint string) error {

@@ -3,8 +3,10 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +14,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/openclaw/clickclack/apps/api/internal/realtime"
 	"github.com/openclaw/clickclack/apps/api/internal/store"
@@ -227,4 +232,143 @@ func offCurveClientKey(t *testing.T) string {
 	}
 	raw[10] ^= 0xff
 	return base64.RawURLEncoding.EncodeToString(raw)
+}
+
+func TestPushRegistrationNeedsASessionOrTheDevelopmentIdentity(t *testing.T) {
+	t.Parallel()
+	user := store.User{ID: "usr_1"}
+	for name, testCase := range map[string]struct {
+		act  actor
+		want bool
+	}{
+		"session":             {actor{user: user, sessionToken: "session"}, true},
+		"access session":      {actor{user: user, accessSessionToken: "minted"}, true},
+		"development":         {actor{user: user, developmentFallback: true}, true},
+		"no session at all":   {actor{user: user}, false},
+		"empty access minted": {actor{user: user, accessSessionToken: ""}, false},
+	} {
+		if got := pushRegistrationAllowed(testCase.act); got != testCase.want {
+			t.Fatalf("%s: allowed is %v, want %v", name, got, testCase.want)
+		}
+	}
+}
+
+// TestPushRegistrationFollowsTheCookieSession registers on a production
+// server, where the development fallback is off, and signs the session out.
+func TestPushRegistrationFollowsTheCookieSession(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := newAccessTestStore(t)
+	owner, err := st.EnsureBootstrap(ctx, "Owner", "push-cookie@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := st.CreateSession(ctx, owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := newProductionPushHandler(t, st, AccessConfig{})
+	endpoint := "https://push.example.com/send/cookie"
+	recorder := servePushPut(handler, endpoint, func(request *http.Request) {
+		request.AddCookie(&http.Cookie{Name: "cc_session", Value: session.Token})
+	})
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+	if _, err := st.GetPushSubscriptionDelivery(ctx, owner.ID, endpoint); err != nil {
+		t.Fatalf("a signed-in device must be deliverable: %v", err)
+	}
+	if err := st.RevokeSession(ctx, session.Token); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.GetPushSubscriptionDelivery(ctx, owner.ID, endpoint); !errors.Is(err, store.ErrPushSessionEnded) {
+		t.Fatalf("signing out must stop the device: %v", err)
+	}
+
+	anonymous := servePushPut(handler, endpoint+"-anonymous", func(*http.Request) {})
+	if anonymous.Code != http.StatusUnauthorized {
+		t.Fatalf("a production server must refuse an anonymous registration: %d", anonymous.Code)
+	}
+}
+
+// TestPushRegistrationThroughAccessBindsTheMintedSession is the trusted-proxy
+// path: a request carrying only a Cloudflare Access assertion. The session the
+// assertion mints is the one the device follows, so signing out of it stops
+// delivery the same as for a cookie.
+func TestPushRegistrationThroughAccessBindsTheMintedSession(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	key := newAccessTestKey(t)
+	jwks, _ := newAccessTestJWKSServer(t, func() map[string]*rsa.PublicKey {
+		return map[string]*rsa.PublicKey{"key-1": &key.PublicKey}
+	})
+	st := newAccessTestStore(t)
+	handler := newProductionPushHandler(t, st, AccessConfig{TeamDomain: jwks.URL, Audience: "test-push-aud", HTTPClient: jwks.Client()})
+	assertion := signAccessTestToken(t, key, "key-1", jwt.SigningMethodRS256, jwt.MapClaims{
+		"iss": jwks.URL, "aud": "test-push-aud",
+		"exp": time.Now().Add(time.Hour).Unix(), "iat": time.Now().Add(-time.Minute).Unix(),
+		"email": "push-access@example.com",
+	})
+	endpoint := "https://push.example.com/send/access"
+	recorder := servePushPut(handler, endpoint, func(request *http.Request) {
+		request.Header.Set(accessAssertionHeader, assertion)
+	})
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+	cookies := recorder.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].Value == "" {
+		t.Fatalf("the assertion must mint a session cookie: %#v", cookies)
+	}
+	user, err := st.GetSessionUser(ctx, cookies[0].Value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.GetPushSubscriptionDelivery(ctx, user.ID, endpoint); err != nil {
+		t.Fatalf("the device must follow the minted session: %v", err)
+	}
+	if err := st.RevokeSession(ctx, cookies[0].Value); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.GetPushSubscriptionDelivery(ctx, user.ID, endpoint); !errors.Is(err, store.ErrPushSessionEnded) {
+		t.Fatalf("signing out of the minted session must stop the device: %v", err)
+	}
+}
+
+// TestPushRegistrationByTheDevelopmentIdentity keeps local development
+// working: the loopback fallback has no session, and its row has none to
+// follow.
+func TestPushRegistrationByTheDevelopmentIdentity(t *testing.T) {
+	t.Parallel()
+	fixture := newPushTestServer(t, true)
+	endpoint := "https://push.example.com/send/development"
+	putPushSubscription(t, fixture.server.URL, endpoint, "laptop")
+	if _, err := fixture.store.GetPushSubscriptionDelivery(context.Background(), fixture.owner.ID, endpoint); err != nil {
+		t.Fatalf("a development registration must be deliverable: %v", err)
+	}
+}
+
+func newProductionPushHandler(t *testing.T, st *sqlitestore.Store, access AccessConfig) http.Handler {
+	t.Helper()
+	publicKey, _, err := webpush.GenerateKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return New(st, realtime.NewHub(), Options{
+		DisableDevAuth:   true,
+		Access:           access,
+		WebPushNotifier:  &recordingNotifier{},
+		WebPushPublicKey: publicKey,
+	}).Handler()
+}
+
+func servePushPut(handler http.Handler, endpoint string, authenticate func(*http.Request)) *httptest.ResponseRecorder {
+	body := `{"endpoint":"` + endpoint + `","keys":{"p256dh":"` + exampleClientKey + `","auth":"` + exampleClientAuth + `"},"user_agent":"phone"}`
+	request := httptest.NewRequest(http.MethodPut, "/api/me/push/subscriptions", strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set(csrfHeaderName, "1")
+	authenticate(request)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	return recorder
 }

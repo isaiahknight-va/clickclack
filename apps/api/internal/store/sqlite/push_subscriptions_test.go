@@ -2,6 +2,8 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"strconv"
 	"strings"
 	"testing"
@@ -94,6 +96,9 @@ func TestPushSubscriptionsRejectBadInput(t *testing.T) {
 		"no keys": {UserID: owner.ID, Endpoint: valid.Endpoint},
 		"bad keys": {
 			UserID: owner.ID, Endpoint: valid.Endpoint, P256dh: "not base64!", Auth: valid.Auth,
+		},
+		"no session": {
+			UserID: owner.ID, Endpoint: valid.Endpoint, P256dh: valid.P256dh, Auth: valid.Auth,
 		},
 	} {
 		if _, err := st.UpsertPushSubscription(ctx, input); err == nil {
@@ -289,6 +294,85 @@ func TestPushSubscriptionDeliveryFollowsTheSessionAndBackoff(t *testing.T) {
 	}
 }
 
+// TestPushSubscriptionDeliveryIsRereadBeforeSending covers the send-time
+// check the delivery worker makes on a push that already sat in its queue.
+func TestPushSubscriptionDeliveryIsRereadBeforeSending(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := newTestStore(t)
+	owner, err := st.EnsureBootstrap(ctx, "Owner", "reread-owner@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspace, err := st.EnsureDefaultWorkspaceMember(ctx, owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	member := addPushMember(t, st, workspace.ID, "Member", "reread-member@example.com")
+	session, err := st.CreateSession(ctx, member)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := pushInput(member, "https://push.example.com/send/reread", "phone")
+	input.SessionToken = session.Token
+	input.DevelopmentActor = false
+	if _, err := st.UpsertPushSubscription(ctx, input); err != nil {
+		t.Fatal(err)
+	}
+
+	target, err := st.GetPushSubscriptionDelivery(ctx, member, input.Endpoint)
+	if err != nil || target.Endpoint != input.Endpoint || target.P256dh != input.P256dh || target.Auth != input.Auth {
+		t.Fatalf("a live device must be deliverable: %#v %v", target, err)
+	}
+	if _, err := st.GetPushSubscriptionDelivery(ctx, owner.ID, input.Endpoint); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("another user's device must not be found: %v", err)
+	}
+	if _, err := st.GetPushSubscriptionDelivery(ctx, member, "https://push.example.com/send/unknown"); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("an unknown device must not be found: %v", err)
+	}
+
+	if _, err := st.MarkPushSubscriptionFailure(ctx, member, input.Endpoint, 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.GetPushSubscriptionDelivery(ctx, member, input.Endpoint); !errors.Is(err, store.ErrPushSubscriptionBackingOff) {
+		t.Fatalf("a backed-off device must wait: %v", err)
+	}
+	if err := st.MarkPushSubscriptionSuccess(ctx, member, input.Endpoint); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := st.db.ExecContext(ctx, `UPDATE sessions SET expires_at = '2000-01-01T00:00:00Z' WHERE user_id = ?`, member); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.GetPushSubscriptionDelivery(ctx, member, input.Endpoint); !errors.Is(err, store.ErrPushSessionEnded) {
+		t.Fatalf("an expired session must stop delivery: %v", err)
+	}
+	if _, err := st.db.ExecContext(ctx, `UPDATE sessions SET expires_at = '2999-01-01T00:00:00Z' WHERE user_id = ?`, member); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.RevokeSession(ctx, session.Token); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.GetPushSubscriptionDelivery(ctx, member, input.Endpoint); !errors.Is(err, store.ErrPushSessionEnded) {
+		t.Fatalf("a revoked session must stop delivery: %v", err)
+	}
+
+	if err := st.DeletePushSubscription(ctx, member, input.Endpoint); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.GetPushSubscriptionDelivery(ctx, member, input.Endpoint); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("a deleted device must not be found: %v", err)
+	}
+
+	development := pushInput(member, "https://push.example.com/send/development", "laptop")
+	if _, err := st.UpsertPushSubscription(ctx, development); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.GetPushSubscriptionDelivery(ctx, member, development.Endpoint); err != nil {
+		t.Fatalf("a development registration has no session to follow: %v", err)
+	}
+}
+
 func TestMarkPushSubscriptionFailureIgnoresUnknownRows(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -346,5 +430,8 @@ func pushInput(userID, endpoint, label string) store.PushSubscriptionInput {
 		P256dh:    "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4",
 		Auth:      "BTBZMqHH6r4Tts7J_aSIgg",
 		UserAgent: label,
+		// Most of these tests are about storage, not authority, so they
+		// register the way the local development identity does.
+		DevelopmentActor: true,
 	}
 }

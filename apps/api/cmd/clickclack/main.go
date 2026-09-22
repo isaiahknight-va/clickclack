@@ -26,6 +26,7 @@ import (
 	postgresstore "github.com/openclaw/clickclack/apps/api/internal/store/postgres"
 	sqlitestore "github.com/openclaw/clickclack/apps/api/internal/store/sqlite"
 	"github.com/openclaw/clickclack/apps/api/internal/uploadstore"
+	"github.com/openclaw/clickclack/apps/api/internal/webpush"
 )
 
 var (
@@ -152,6 +153,7 @@ func serve(args []string) error {
 		}, st)
 		defer notifier.Close()
 		webPushNotifier = notifier
+		log.Printf("web push enabled: application server key %s", webpush.KeyFingerprint(cfg.WebPushVAPIDPublicKey))
 	}
 	log.Printf("ClickClack listening on %s", displayURL(cfg.Addr))
 	server := httpapi.New(st, realtime.NewHub(), httpapi.Options{

@@ -1740,6 +1740,49 @@ func (q *Queries) GetPushSubscription(ctx context.Context, arg GetPushSubscripti
 	return i, err
 }
 
+const getPushSubscriptionDelivery = `-- name: GetPushSubscriptionDelivery :one
+SELECT ups.user_id, ups.endpoint, ups.p256dh, ups.auth, ups.next_attempt_at, ups.session_token_hash,
+       s.user_id AS session_user_id, s.expires_at AS session_expires_at, s.revoked_at AS session_revoked_at
+FROM user_push_subscriptions ups
+LEFT JOIN sessions s
+  ON s.token_hash = ups.session_token_hash AND ups.session_token_hash <> ''
+WHERE ups.user_id = $1 AND ups.endpoint = $2
+`
+
+type GetPushSubscriptionDeliveryParams struct {
+	UserID   string `json:"user_id"`
+	Endpoint string `json:"endpoint"`
+}
+
+type GetPushSubscriptionDeliveryRow struct {
+	UserID           string         `json:"user_id"`
+	Endpoint         string         `json:"endpoint"`
+	P256dh           string         `json:"p256dh"`
+	Auth             string         `json:"auth"`
+	NextAttemptAt    sql.NullString `json:"next_attempt_at"`
+	SessionTokenHash string         `json:"session_token_hash"`
+	SessionUserID    sql.NullString `json:"session_user_id"`
+	SessionExpiresAt sql.NullString `json:"session_expires_at"`
+	SessionRevokedAt sql.NullString `json:"session_revoked_at"`
+}
+
+func (q *Queries) GetPushSubscriptionDelivery(ctx context.Context, arg GetPushSubscriptionDeliveryParams) (GetPushSubscriptionDeliveryRow, error) {
+	row := q.db.QueryRowContext(ctx, getPushSubscriptionDelivery, arg.UserID, arg.Endpoint)
+	var i GetPushSubscriptionDeliveryRow
+	err := row.Scan(
+		&i.UserID,
+		&i.Endpoint,
+		&i.P256dh,
+		&i.Auth,
+		&i.NextAttemptAt,
+		&i.SessionTokenHash,
+		&i.SessionUserID,
+		&i.SessionExpiresAt,
+		&i.SessionRevokedAt,
+	)
+	return i, err
+}
+
 const getSessionUser = `-- name: GetSessionUser :one
 SELECT u.id, u.kind, u.owner_user_id, u.display_name, u.handle, u.avatar_url, u.created_at, s.expires_at AS session_expires_at,
        COALESCE(uns.pushover_enabled, 0) AS pushover_enabled,
