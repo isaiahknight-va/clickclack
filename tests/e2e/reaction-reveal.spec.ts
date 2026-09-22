@@ -155,7 +155,7 @@ test("revealing a reaction on a message with tall attachments keeps the chip in 
   const text = `stacked images ${randomUUID().slice(0, 6)}`;
   await page.getByLabel("Message body").fill(text);
   await page.getByRole("button", { name: "Send" }).click();
-  const row = page.locator(".message-row").filter({ hasText: text });
+  const row = page.locator(".message-row:not(.is-pending)").filter({ hasText: text });
   await expect(row.getByRole("button", { name: "Open image tall-c.png" })).toBeVisible();
   const messageID = (await row.getAttribute("data-message-id"))!;
   await settleScrollFrames(page);
@@ -230,7 +230,7 @@ test("removing the last reaction does not move the list", async ({ page }) => {
   const text = `remove me ${randomUUID().slice(0, 6)}`;
   await page.getByLabel("Message body").fill(text);
   await page.getByRole("button", { name: "Send" }).click();
-  const row = page.locator(".message-row").filter({ hasText: text });
+  const row = page.locator(".message-row:not(.is-pending)").filter({ hasText: text });
   await expect(row.getByRole("button", { name: "Open image tall-b.png" })).toBeVisible();
   const messageID = (await row.getAttribute("data-message-id"))!;
   await settleScrollFrames(page);
