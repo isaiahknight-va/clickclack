@@ -4,6 +4,7 @@
 
 - Added roaming personal channel order, so a sidebar reordered on one device appears in the same order on every other device signed in to the same account, with localStorage still serving the pre-paint cache and the offline fallback.
 - Fixed message and thread actions being unreachable from a trackpad or mouse on a touch-first device such as an iPad, by collapsing to the long-press sheet only when no attached pointer can hover.
+
 ## 0.5.1 - 2026-09-21
 
 **Highlights:** Safer exports, reliable sign-in, and chat status indicators that stay clear of messages.
