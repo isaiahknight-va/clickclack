@@ -441,6 +441,13 @@ type UserPushSubscription struct {
 	FailureCount     int64          `json:"failure_count"`
 }
 
+type UserSidebarChannelOrder struct {
+	UserID      string `json:"user_id"`
+	WorkspaceID string `json:"workspace_id"`
+	ChannelIds  string `json:"channel_ids"`
+	UpdatedAt   string `json:"updated_at"`
+}
+
 type Workspace struct {
 	ID        string         `json:"id"`
 	Name      string         `json:"name"`

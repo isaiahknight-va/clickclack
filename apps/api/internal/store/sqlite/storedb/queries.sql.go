@@ -4243,6 +4243,66 @@ func (q *Queries) ListPushSubscriptionsForUsers(ctx context.Context, userIdsJson
 	return items, nil
 }
 
+const listReactionUsersForMessages = `-- name: ListReactionUsersForMessages :many
+SELECT
+  r.message_id,
+  r.emoji,
+  r.user_id,
+  u.display_name,
+  u.handle
+FROM reactions r
+JOIN users u ON u.id = r.user_id
+WHERE r.message_id IN (/*SLICE:message_ids*/?)
+ORDER BY r.message_id, r.emoji, r.created_at, r.user_id
+`
+
+type ListReactionUsersForMessagesRow struct {
+	MessageID   string `json:"message_id"`
+	Emoji       string `json:"emoji"`
+	UserID      string `json:"user_id"`
+	DisplayName string `json:"display_name"`
+	Handle      string `json:"handle"`
+}
+
+func (q *Queries) ListReactionUsersForMessages(ctx context.Context, messageIds []string) ([]ListReactionUsersForMessagesRow, error) {
+	query := listReactionUsersForMessages
+	var queryParams []interface{}
+	if len(messageIds) > 0 {
+		for _, v := range messageIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:message_ids*/?", strings.Repeat(",?", len(messageIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:message_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListReactionUsersForMessagesRow
+	for rows.Next() {
+		var i ListReactionUsersForMessagesRow
+		if err := rows.Scan(
+			&i.MessageID,
+			&i.Emoji,
+			&i.UserID,
+			&i.DisplayName,
+			&i.Handle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listReactionsForMessages = `-- name: ListReactionsForMessages :many
 SELECT
   r.message_id,
@@ -4293,6 +4353,41 @@ func (q *Queries) ListReactionsForMessages(ctx context.Context, arg ListReaction
 			&i.ReactionCount,
 			&i.ReactedByMe,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSidebarChannelOrder = `-- name: ListSidebarChannelOrder :many
+SELECT workspace_id, channel_ids
+FROM user_sidebar_channel_order
+WHERE user_id = ?1
+ORDER BY workspace_id
+`
+
+type ListSidebarChannelOrderRow struct {
+	WorkspaceID string `json:"workspace_id"`
+	ChannelIds  string `json:"channel_ids"`
+}
+
+func (q *Queries) ListSidebarChannelOrder(ctx context.Context, userID string) ([]ListSidebarChannelOrderRow, error) {
+	rows, err := q.db.QueryContext(ctx, listSidebarChannelOrder, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSidebarChannelOrderRow
+	for rows.Next() {
+		var i ListSidebarChannelOrderRow
+		if err := rows.Scan(&i.WorkspaceID, &i.ChannelIds); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -4832,6 +4927,36 @@ func (q *Queries) ListWorkspaceBots(ctx context.Context, workspaceID string) ([]
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listWorkspaceChannelIDs = `-- name: ListWorkspaceChannelIDs :many
+SELECT id
+FROM channels
+WHERE workspace_id = ?1
+ORDER BY id
+`
+
+func (q *Queries) ListWorkspaceChannelIDs(ctx context.Context, workspaceID string) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listWorkspaceChannelIDs, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
@@ -6572,6 +6697,31 @@ func (q *Queries) UpsertPushSubscription(ctx context.Context, arg UpsertPushSubs
 		arg.UserAgent,
 		arg.SessionTokenHash,
 		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
+const upsertSidebarChannelOrder = `-- name: UpsertSidebarChannelOrder :exec
+INSERT INTO user_sidebar_channel_order (user_id, workspace_id, channel_ids, updated_at)
+VALUES (?1, ?2, ?3, ?4)
+ON CONFLICT(user_id, workspace_id) DO UPDATE SET
+  channel_ids = excluded.channel_ids,
+  updated_at = excluded.updated_at
+`
+
+type UpsertSidebarChannelOrderParams struct {
+	UserID      string `json:"user_id"`
+	WorkspaceID string `json:"workspace_id"`
+	ChannelIds  string `json:"channel_ids"`
+	UpdatedAt   string `json:"updated_at"`
+}
+
+func (q *Queries) UpsertSidebarChannelOrder(ctx context.Context, arg UpsertSidebarChannelOrderParams) error {
+	_, err := q.db.ExecContext(ctx, upsertSidebarChannelOrder,
+		arg.UserID,
+		arg.WorkspaceID,
+		arg.ChannelIds,
 		arg.UpdatedAt,
 	)
 	return err
