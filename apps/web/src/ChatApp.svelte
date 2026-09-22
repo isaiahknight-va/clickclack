@@ -12,6 +12,7 @@
   import { requestCurrentUser } from "./lib/appearance";
   import { readBrowserNotificationsEnabled, writeBrowserNotificationsEnabled } from "./lib/browserNotifications";
   import { desktop } from "./lib/desktop";
+  import { healPushSubscription } from "./lib/webPush";
   import { probeMediaDimensions } from "./lib/media";
   import { markdownImageViewerURL } from "./lib/actions/markdown";
   import {
@@ -387,8 +388,16 @@
     });
     const stopDesktopQuickCompose = desktop?.onQuickCompose(() => focusActiveComposer());
     mobileNavMedia.addEventListener("change", handleMobileNavBreakpoint);
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      const data = event.data as { type?: string; url?: string } | null;
+      if (data?.type !== "clickclack:notification-click") return;
+      if (typeof data.url !== "string" || !data.url.startsWith("/app")) return;
+      void goto(data.url, { keepFocus: true, noScroll: true });
+    };
+    navigator.serviceWorker?.addEventListener("message", handleServiceWorkerMessage);
     return () => {
       mobileNavMedia.removeEventListener("change", handleMobileNavBreakpoint);
+      navigator.serviceWorker?.removeEventListener("message", handleServiceWorkerMessage);
       stopDesktopNavigate?.();
       stopDesktopQuickCompose?.();
     };
@@ -452,6 +461,9 @@
       const me = await requestCurrentUser();
       user = me.user;
       syncBrowserNotificationState();
+      // A reinstall or a key rotation gives this device a new endpoint, so
+      // re-register the one it holds now. The PUT replaces in place.
+      if (!desktop) void healPushSubscription(user.id);
       await loadWorkspaces();
       // Let workspace projections settle before admitting routes in a later flush.
       appReady = true;
