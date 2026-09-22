@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Added roaming personal channel order, so a sidebar reordered on one device appears in the same order on every other device signed in to the same account, with localStorage still serving the pre-paint cache and the offline fallback.
-- Fixed message and thread actions being unreachable from a trackpad or mouse on a touch-first device such as an iPad, by collapsing to the long-press sheet only when no attached pointer can hover.
+- Fixed message and thread actions being unreachable from a trackpad or mouse on a touch-first device such as an iPad, by collapsing to the long-press sheet only when no attached pointer can hover, and scroll a reaction the user just added into view when it lands below the fold.
 - Added Web Push notifications, so an installed ClickClack can alert a phone with no third-party account: `clickclack admin webpush keygen` plus the two VAPID keys turn it on, and each user opts in per device from account settings. Pushover and tab notifications are unchanged. Thanks @isaiahknight-va.
 - Added a web app manifest and home-screen icons, which iOS requires before a browser can subscribe to push.
 
