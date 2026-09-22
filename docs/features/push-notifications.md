@@ -38,7 +38,11 @@ reference leaves them out on purpose.
 
 Keep the private key like any other server secret. Rotating it invalidates
 every registered device; each one re-registers the next time its owner opens
-the app.
+the app. The app compares the key its subscription was made under with the
+server's current key, and replaces a subscription made under the old one. At
+startup the server logs a short fingerprint of the configured public key
+(`web push enabled: application server key ...`), so a rotation is visible in
+the log, followed by a `registered` line as each device returns.
 
 With no key pair configured, `GET /api/me/push` reports `enabled: false`, the
 settings row is hidden, the write endpoints answer 404, and no subscription is
@@ -76,7 +80,12 @@ rather than two. The body is truncated to 240 characters. Tapping the
 notification focuses an open app window and routes it, or opens one.
 
 Delivery happens off the request path in a small worker pool, so posting a
-message never waits on a push service. The push service is called through the
+message never waits on a push service. A push can wait in that queue behind a
+slow push service, so it is checked again immediately before it is sent: the
+device must still be registered to the recipient, under a session that is
+still live, with any backoff elapsed, and the recipient must still be able to
+read the message. A push that fails any of these is dropped with one log line
+naming the reason, and nothing is sent. The push service is called through the
 same outbound policy as webhooks: no proxy, no redirects, and no destination
 inside the deployment's own network.
 
@@ -88,9 +97,10 @@ Failures are handled by what the push service says:
   longer `Retry-After`). The row is never deleted for this: a relay outage must
   not cost users their devices. A success clears the backoff.
 
-Log lines name the push service host, the user, and the failure. They never
-contain an endpoint or a key: an endpoint's path is the device's delivery
-secret.
+Log lines name the push service host, the user, and what happened: a device
+registered, refreshed, or removed; a push delivered, skipped and why, or
+failed. They never contain an endpoint or a key: an endpoint's path is the
+device's delivery secret.
 
 ## What is stored
 
@@ -98,12 +108,21 @@ One row per device in `user_push_subscriptions`: the endpoint, the two client
 keys, a short device label, timestamps, the failure count and backoff, and the
 session that registered it. `GET /api/me/push` returns only the label, the
 timestamps, and the failure count. The endpoint and the keys never leave the
-server, and a JSON export carries them because a restored backup needs them to
-keep delivering.
+server.
+
+A database-level backup preserves device registrations: `clickclack backup`
+for SQLite, or the operator's own PostgreSQL dump. A JSON export does not. It
+leaves `user_push_subscriptions` out entirely, and it redacts session tokens,
+which a restored registration would need in order to follow its session.
+After restoring from a JSON export, each device registers again the next time
+its owner opens the app.
 
 A subscription follows its session. Signing out, a revoked session, or an
 expired one stops that device receiving message text, even if the device never
-unsubscribed.
+unsubscribed. Every registration needs a session to follow: a browser session
+cookie, or, behind Cloudflare Access, the session the Access assertion creates
+for that request. Only the loopback development identity may register without
+one; any other caller is refused with `403`.
 
 ## Endpoints
 
@@ -138,3 +157,9 @@ depending on the browser.
 - Permission and subscriptions belong to an origin. Moving the server to a
   different hostname ends both, and every device has to opt in again.
 - The desktop app shows its own notifications and hides this switch.
+- When the browser replaces a subscription on its own, the service worker does
+  not register the replacement, because it cannot tell which account on the
+  device turned push on. It asks an open app window to re-register, and only
+  an account that turned push on there does. If the app is closed when this
+  happens, the device re-registers the next time the app opens and receives
+  nothing until then.
