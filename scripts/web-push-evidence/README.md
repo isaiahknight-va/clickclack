@@ -35,9 +35,14 @@ Requires `go`, `node`, and `sqlite3`.
 ```sh
 scripts/web-push-evidence/upgrade.sh \
   --sqlite-snapshot <existing.db> \
-  --postgres-admin-dsn 'postgres://user@host:port/postgres?sslmode=disable' \
+  --postgres-admin-dsn "$PGADMIN_DSN" \
   --out <dir> [--base v0.5.1]
 ```
+
+`PGADMIN_DSN` holds a PostgreSQL connection URL for a role that may create
+and drop databases, naming any existing database on the server. The run
+creates and drops its throwaway database through it, and reaches that
+database by swapping the database name in the URL.
 
 Exports the release tag and `HEAD` with `git archive`, builds both, and copies
 `upgradeevidence/evidence_test.go` into each tree so the same code questions
