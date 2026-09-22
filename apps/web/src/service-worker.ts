@@ -25,10 +25,6 @@ interface NotificationEvent extends ExtendableEvent {
   readonly notification: Notification;
 }
 
-interface PushSubscriptionChangeEvent extends ExtendableEvent {
-  readonly oldSubscription: PushSubscription | null;
-}
-
 interface WindowClient {
   readonly url: string;
   focus(): Promise<WindowClient>;
@@ -50,7 +46,7 @@ interface WorkerScope {
   addEventListener(type: "notificationclick", listener: (event: NotificationEvent) => void): void;
   addEventListener(
     type: "pushsubscriptionchange",
-    listener: (event: PushSubscriptionChangeEvent) => void,
+    listener: (event: ExtendableEvent) => void,
   ): void;
 }
 
@@ -100,8 +96,16 @@ worker.addEventListener("notificationclick", (event) => {
   event.waitUntil(openApp(typeof data?.url === "string" ? data.url : FALLBACK_URL));
 });
 
+// The browser replaced or dropped this device's subscription on its own. The
+// worker never registers the replacement: it cannot know which account on this
+// device turned push on, and the cookies it would send belong to whoever is
+// signed in now, who may never have opted in. It asks an open app window to
+// run the account-scoped heal instead, which registers only for a user who
+// turned push on here. The cost is deliberate: a device whose subscription
+// rotates while the app is closed re-registers the next time the app opens,
+// and receives nothing until then.
 worker.addEventListener("pushsubscriptionchange", (event) => {
-  event.waitUntil(resubscribe(event));
+  event.waitUntil(askAppToRenew());
 });
 
 function readPayload(data: PushMessageData | null): PushPayload {
@@ -127,49 +131,14 @@ async function openApp(url: string): Promise<void> {
   await worker.clients.openWindow(url);
 }
 
-// resubscribe handles the rare event where the browser replaces a subscription
-// on its own. The app also re-registers on start, which is the path that
-// actually heals most devices.
-async function resubscribe(event: PushSubscriptionChangeEvent): Promise<void> {
-  const key =
-    event.oldSubscription?.options.applicationServerKey ?? (await fetchApplicationServerKey());
-  if (!key) return;
-  const subscription = await worker.registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: key,
-  });
-  const payload = subscription.toJSON() as { endpoint?: string; keys?: Record<string, string> };
-  await fetch("/api/me/push/subscriptions", {
-    method: "PUT",
-    credentials: "include",
-    headers: { "Content-Type": "application/json", "X-ClickClack-CSRF": "1" },
-    body: JSON.stringify({
-      endpoint: payload.endpoint ?? subscription.endpoint,
-      keys: { p256dh: payload.keys?.p256dh ?? "", auth: payload.keys?.auth ?? "" },
-      user_agent: "",
-    }),
-  });
-}
-
-async function fetchApplicationServerKey(): Promise<Uint8Array<ArrayBuffer> | null> {
-  try {
-    const response = await fetch("/api/me/push", { credentials: "include" });
-    if (!response.ok) return null;
-    const state = (await response.json()) as { vapid_public_key?: string };
-    return state.vapid_public_key ? decodeKey(state.vapid_public_key) : null;
-  } catch {
-    return null;
+async function askAppToRenew(): Promise<void> {
+  const clients = await worker.clients.matchAll({ type: "window", includeUncontrolled: true });
+  for (const client of clients) {
+    // Embedded channels live inside someone else's page; only the app heals.
+    if (new URL(client.url).pathname.startsWith("/app")) {
+      client.postMessage({ type: "clickclack:push-renew" });
+    }
   }
-}
-
-function decodeKey(value: string): Uint8Array<ArrayBuffer> {
-  const padded = value.trim().replace(/-/g, "+").replace(/_/g, "/");
-  const binary = atob(padded + "=".repeat((4 - (padded.length % 4)) % 4));
-  // The buffer is allocated explicitly so the array is typed over a plain
-  // ArrayBuffer, which is what pushManager.subscribe accepts.
-  const bytes = new Uint8Array(new ArrayBuffer(binary.length));
-  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-  return bytes;
 }
 
 export {};

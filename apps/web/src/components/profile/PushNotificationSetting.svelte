@@ -2,13 +2,13 @@
   import { readableAPIError } from "../../lib/api";
   import {
     appleDevice,
-    applicationServerKey,
     deviceLabel,
     installedToHomeScreen,
     pushSupported,
   } from "../../lib/push-capability";
   import {
     currentPushSubscription,
+    ensurePushSubscription,
     fetchPushState,
     forgetSubscription,
     readPushEnabled,
@@ -93,12 +93,7 @@
       return;
     }
     const registration = await registerPushWorker();
-    const subscription =
-      (await registration.pushManager.getSubscription()) ??
-      (await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: applicationServerKey(state.vapid_public_key),
-      }));
+    const subscription = await ensurePushSubscription(registration, state.vapid_public_key);
     await storeSubscription(subscription);
     writePushEnabled(user.id, true);
     enabled = true;

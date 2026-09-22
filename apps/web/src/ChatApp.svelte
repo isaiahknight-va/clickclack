@@ -390,6 +390,12 @@
     mobileNavMedia.addEventListener("change", handleMobileNavBreakpoint);
     const handleServiceWorkerMessage = (event: MessageEvent) => {
       const data = event.data as { type?: string; url?: string } | null;
+      if (data?.type === "clickclack:push-renew") {
+        // The browser replaced this device's subscription. Only the signed-in
+        // user's own opt-in may register the replacement.
+        if (user && !desktop) void healPushSubscription(user.id);
+        return;
+      }
       if (data?.type !== "clickclack:notification-click") return;
       if (typeof data.url !== "string" || !data.url.startsWith("/app")) return;
       // The tap means "show me that message". Land in the conversation and

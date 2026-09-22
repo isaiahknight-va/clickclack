@@ -63,6 +63,22 @@ export function deviceLabel(
   return browser ? `${platform} ${browser}` : platform;
 }
 
+// sameApplicationServerKey reports whether a subscription's key is the one the
+// server signs with now. A browser that does not expose the key cannot be
+// compared, so it counts as a match: treating it as stale would replace the
+// subscription on every start.
+export function sameApplicationServerKey(
+  existing: ArrayBuffer | ArrayBufferView | null | undefined,
+  configured: Uint8Array,
+): boolean {
+  if (!existing) return true;
+  const bytes = ArrayBuffer.isView(existing)
+    ? new Uint8Array(existing.buffer, existing.byteOffset, existing.byteLength)
+    : new Uint8Array(existing);
+  if (bytes.length !== configured.length) return false;
+  return bytes.every((value, index) => value === configured[index]);
+}
+
 // applicationServerKey converts the base64url VAPID public key into the byte
 // array pushManager.subscribe requires.
 export function applicationServerKey(value: string): Uint8Array<ArrayBuffer> {

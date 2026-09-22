@@ -3,7 +3,12 @@
 // keeps a per-user note of which devices the user turned on.
 
 import { api } from "./api";
-import { applicationServerKey, deviceLabel, pushSupported } from "./push-capability";
+import {
+  applicationServerKey,
+  deviceLabel,
+  pushSupported,
+  sameApplicationServerKey,
+} from "./push-capability";
 
 export type PushDevice = {
   id: string;
@@ -52,10 +57,34 @@ export function fetchPushState(): Promise<PushState> {
 
 // registerPushWorker installs the worker only when a user asks for push. The
 // app never registers it on load, and it is never registered from an embed.
+// It resolves once a worker is active: on first activation register() returns
+// while the worker is still installing, and a push manager without an active
+// worker refuses to subscribe.
 export async function registerPushWorker(): Promise<ServiceWorkerRegistration> {
   const existing = await navigator.serviceWorker.getRegistration("/");
-  if (existing) return existing;
-  return navigator.serviceWorker.register(WORKER_URL, { scope: "/" });
+  if (!existing) await navigator.serviceWorker.register(WORKER_URL, { scope: "/" });
+  return navigator.serviceWorker.ready;
+}
+
+// ensurePushSubscription returns this device's subscription under the key the
+// server signs with now. One made under an earlier key is replaced, because
+// its push service refuses everything signed with the new one, and its row on
+// the server is removed since it can never deliver again.
+export async function ensurePushSubscription(
+  registration: ServiceWorkerRegistration,
+  vapidPublicKey: string,
+): Promise<PushSubscription> {
+  const key = applicationServerKey(vapidPublicKey);
+  const existing = await registration.pushManager.getSubscription();
+  if (existing && sameApplicationServerKey(existing.options.applicationServerKey, key)) {
+    return existing;
+  }
+  if (existing) {
+    const staleEndpoint = existing.endpoint;
+    await existing.unsubscribe();
+    await forgetSubscription(staleEndpoint).catch(() => undefined);
+  }
+  return registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
 }
 
 export async function currentPushSubscription(): Promise<PushSubscription | null> {
@@ -84,21 +113,18 @@ export async function forgetSubscription(endpoint: string): Promise<void> {
   });
 }
 
-// healPushSubscription re-registers this device on app start when the user
-// left push on here. Reinstalls and key rotations both change the endpoint, so
-// without this a device goes quiet with nothing on screen to explain it.
+// healPushSubscription re-registers this device on app start, and when the
+// service worker reports the browser replaced its subscription, but only for a
+// user who turned push on here. Reinstalls and key rotations both change the
+// endpoint, so without this a device goes quiet with nothing on screen to
+// explain it. It is the only path that registers a device without the switch.
 export async function healPushSubscription(userID: string): Promise<void> {
   if (!userID || !pushSupported() || !readPushEnabled(userID)) return;
   try {
     const state = await fetchPushState();
     if (!state.enabled) return;
     const registration = await registerPushWorker();
-    const subscription =
-      (await registration.pushManager.getSubscription()) ??
-      (await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: applicationServerKey(state.vapid_public_key),
-      }));
+    const subscription = await ensurePushSubscription(registration, state.vapid_public_key);
     await storeSubscription(subscription);
   } catch {
     // The settings row is the recovery path; a failed heal must never break
