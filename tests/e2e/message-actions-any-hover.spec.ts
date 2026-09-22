@@ -71,3 +71,50 @@ test("trackpad on a touch-first device can open message actions", async ({ page 
   await row.locator("button.emoji-option").first().click();
   await expect(row.locator(".reactions-bar button").first()).toBeVisible();
 });
+
+test("trackpad on a touch-first device can reply and react in the thread pane", async ({
+  page,
+}) => {
+  const x = randomUUID().slice(0, 8);
+  const ws = (await (
+    await page.request.post("/api/workspaces", { data: { name: `Pad thread ${x}` } })
+  ).json()) as any;
+  const ch = (await (
+    await page.request.post(`/api/workspaces/${ws.workspace.id}/channels`, {
+      data: { name: `pad-thread-${x}`, kind: "public" },
+    })
+  ).json()) as any;
+  const posted = await page.request.post(`/api/channels/${ch.channel.id}/messages`, {
+    data: { body: `Pad thread root ${x}` },
+  });
+  expect(posted.ok()).toBe(true);
+  const root = ((await posted.json()) as any).message;
+  const replied = await page.request.post(`/api/messages/${root.id}/thread/replies`, {
+    data: { body: `Pad thread reply ${x}` },
+  });
+  expect(replied.ok()).toBe(true);
+  const reply = ((await replied.json()) as any).message;
+  await page.goto(`/app/${ws.workspace.route_id}/${ch.channel.route_id}`);
+  await waitForAppReady(page);
+  await expect(page.locator(".messages.is-revealing")).toHaveCount(0);
+  const rootRow = page.locator(`.message-row[data-message-id="${root.id}"]`);
+  await rootRow.hover();
+  await expect(page.locator("html")).toHaveAttribute("data-pointer-mode", "mouse");
+  await rootRow.getByRole("button", { name: "Open thread", exact: true }).click();
+  const threadPane = page.getByRole("complementary", { name: "Thread pane" });
+  await expect(threadPane).toBeVisible();
+  const quote = threadPane.locator(".reply-composer").getByLabel("Replying to message");
+  for (const target of [root, reply]) {
+    const message = threadPane.locator(`[data-message-id="${target.id}"]`);
+    await expect(message).toBeVisible();
+    await message.hover();
+    const replyButton = message.getByRole("button", { name: "Reply", exact: true });
+    const addReaction = message.getByRole("button", { name: "Add reaction" });
+    await expect(replyButton).toBeVisible();
+    await expect(addReaction).toBeVisible();
+    expect((await replyButton.boundingBox())!.width).toBeGreaterThan(12);
+    expect((await addReaction.boundingBox())!.width).toBeGreaterThan(12);
+    await replyButton.click();
+    await expect(quote).toContainText(target.body);
+  }
+});

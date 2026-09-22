@@ -234,7 +234,7 @@
     padding-right: 32px;
   }
 
-  .thread .reply-quote-btn,
+  :root:not([data-pointer-mode="mouse"]) .thread .reply-quote-btn,
   :root:not([data-pointer-mode="mouse"]) .thread .thread-action-btn:not(.thread-more-actions) {
     display: none;
   }
