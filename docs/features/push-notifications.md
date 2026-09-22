@@ -18,23 +18,23 @@ This is the third notification path, beside the in-page alerts a tab shows and
 
 ## Turning it on as an operator
 
+Web push takes three settings. They are documented on this page, not in the
+[configuration reference](../configuration.md):
+
+- `CLICKCLACK_WEBPUSH_VAPID_PUBLIC_KEY` (config file key `webpush_vapid_public_key`)
+- `CLICKCLACK_WEBPUSH_VAPID_PRIVATE_KEY` (config file key `webpush_vapid_private_key`)
+- `CLICKCLACK_WEBPUSH_SUBJECT` (config file key `webpush_subject`), a `mailto:`
+  address or an `https` URL the push services can use to reach the operator.
+  It defaults to `CLICKCLACK_PUBLIC_URL`.
+
 Web push is off until the server has a VAPID key pair. Generate one:
 
 ```sh
 clickclack admin webpush keygen
 ```
 
-It prints the two environment variables once. Put them in the server's
-configuration, along with a contact address, and restart:
-
-- `CLICKCLACK_WEBPUSH_VAPID_PUBLIC_KEY` (config file key `webpush_vapid_public_key`)
-- `CLICKCLACK_WEBPUSH_VAPID_PRIVATE_KEY` (`webpush_vapid_private_key`)
-- `CLICKCLACK_WEBPUSH_SUBJECT` (`webpush_subject`), a `mailto:` address or an
-  `https` URL the push services can use to reach the operator. It defaults to
-  `CLICKCLACK_PUBLIC_URL`.
-
-The two keys are the pair `admin webpush keygen` prints; the configuration
-reference leaves them out on purpose.
+It prints the two key variables once. Put them in the server's configuration,
+along with the subject, and restart.
 
 Keep the private key like any other server secret. Rotating it invalidates
 every registered device; each one re-registers the next time its owner opens
@@ -63,6 +63,10 @@ The switch is per device. A user with a phone and a laptop turns it on in each,
 and the account keeps up to ten devices; registering an eleventh drops the
 oldest.
 
+Deleting the Home Screen app deletes its storage, so a reinstalled app is a
+fresh opt-in: turn the switch on again. A key rotation, by contrast, heals on
+the next open without the user doing anything.
+
 iOS 16.4 or later is required. Android and desktop browsers use the same
 standard and work where the browser supports it.
 
@@ -74,17 +78,19 @@ Each notification is a JSON payload under 3 KB, encrypted for one subscription:
 { "title": "Ari in #general", "body": "the build is green", "tag": "clickclack:msg_...", "url": "/app/wsp_.../chn_..." }
 ```
 
-The title matches the one an open tab shows, and the tag matches too, so a
+The title matches the one an open tab shows, including "ClickClack" in place of
+an author with no name, and the tag matches too, so a
 device that both has the app open and receives a push shows one notification
 rather than two. The body is truncated to 240 characters. Tapping the
-notification focuses an open app window and routes it, or opens one.
+notification focuses an open app window and routes it, or opens one; the app
+waits for the conversation to load and then shows its newest message.
 
 Delivery happens off the request path in a small worker pool, so posting a
 message never waits on a push service. A push can wait in that queue behind a
 slow push service, so it is checked again immediately before it is sent: the
 device must still be registered to the recipient, under a session that is
 still live, with any backoff elapsed, and the recipient must still be able to
-read the message. A push that fails any of these is dropped with one log line
+read the message, which must not have been deleted. A push that fails any of these is dropped with one log line
 naming the reason, and nothing is sent. The push service is called through the
 same outbound policy as webhooks: no proxy, no redirects, and no destination
 inside the deployment's own network.
@@ -95,7 +101,9 @@ Failures are handled by what the push service says:
 - Anything else, including 429, a 5xx, and a timeout, sets a backoff (one
   minute, then five, thirty, two hours, six, and a day at most, honoring a
   longer `Retry-After`). The row is never deleted for this: a relay outage must
-  not cost users their devices. A success clears the backoff.
+  not cost users their devices. A success clears the backoff. The failure is
+  recorded on its own deadline, so a push service that used the whole send
+  timeout still gets its backoff.
 
 Log lines name the push service host, the user, and what happened: a device
 registered, refreshed, or removed; a push delivered, skipped and why, or
@@ -157,6 +165,12 @@ depending on the browser.
 - Permission and subscriptions belong to an origin. Moving the server to a
   different hostname ends both, and every device has to opt in again.
 - The desktop app shows its own notifications and hides this switch.
+- A browser holds one push subscription for every account signed in on it, and
+  the server keeps that device for the account that registered it last. On a
+  device several accounts use, the switch reads off for an account the server
+  lists no device for, and opening the app as an account that turned push on
+  there moves the device back to it. The device list names no endpoints, so an
+  account with a device elsewhere still reads on here.
 - When the browser replaces a subscription on its own, the service worker does
   not register the replacement, because it cannot tell which account on the
   device turned push on. It asks an open app window to re-register, and only
