@@ -18,6 +18,7 @@ type PushNotification struct {
 	Title         string
 	Message       string
 	UserID        string
+	MessageID     string
 	Tag           string
 	URL           string
 	Subscriptions []store.PushSubscriptionTarget
@@ -56,6 +57,7 @@ func (s *Server) notifyMessageCreated(ctx context.Context, message store.Message
 		}
 		notification := PushNotification{
 			UserID:        recipient.UserID,
+			MessageID:     message.ID,
 			Title:         webPushTitle(message, place),
 			Message:       webPushBody(message),
 			Tag:           webPushTag(message),

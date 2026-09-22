@@ -44,6 +44,15 @@ var pushRetryLadder = []time.Duration{
 
 var pushSubscriptionKeyPattern = regexp.MustCompile(`^[A-Za-z0-9_=-]+$`)
 
+var (
+	// ErrPushSessionEnded reports that the session a device was registered
+	// under has been signed out, revoked, or expired since the push was queued.
+	ErrPushSessionEnded = errors.New("push subscription session has ended")
+	// ErrPushSubscriptionBackingOff reports that the push service asked for a
+	// pause that the next attempt has not waited out yet.
+	ErrPushSubscriptionBackingOff = errors.New("push subscription is backing off")
+)
+
 // PushSubscription is the summary of a registered device. It deliberately
 // omits the endpoint and the client keys: those are delivery secrets and never
 // leave the server.
@@ -59,15 +68,22 @@ type PushSubscription struct {
 
 // PushSubscriptionInput is one browser PushSubscription being registered.
 // SessionToken binds the device to the session that registered it, so signing
-// out stops that device receiving message text.
+// out stops that device receiving message text. A registration without one is
+// refused unless DevelopmentActor says the caller is the local development
+// fallback, the only way to be signed in without a session.
 type PushSubscriptionInput struct {
-	UserID       string
-	Endpoint     string
-	P256dh       string
-	Auth         string
-	UserAgent    string
-	SessionToken string
+	UserID           string
+	Endpoint         string
+	P256dh           string
+	Auth             string
+	UserAgent        string
+	SessionToken     string
+	DevelopmentActor bool
 }
+
+// ErrPushSubscriptionNeedsSession refuses a device registration that has no
+// session to follow. Such a row could never be stopped by signing out.
+var ErrPushSubscriptionNeedsSession = errors.New("push registration needs a signed-in session")
 
 // PushSubscriptionTarget carries what a delivery needs and nothing else.
 type PushSubscriptionTarget struct {
@@ -81,6 +97,9 @@ type PushSubscriptionTarget struct {
 // and a short device label. Which endpoint hosts the server is willing to call
 // is a transport question, decided before the store is reached.
 func NormalizePushSubscriptionInput(input PushSubscriptionInput) (PushSubscriptionInput, error) {
+	if input.SessionToken == "" && !input.DevelopmentActor {
+		return PushSubscriptionInput{}, ErrPushSubscriptionNeedsSession
+	}
 	endpoint := strings.TrimSpace(input.Endpoint)
 	if endpoint == "" {
 		return PushSubscriptionInput{}, errors.New("endpoint is required")
@@ -108,12 +127,13 @@ func NormalizePushSubscriptionInput(input PushSubscriptionInput) (PushSubscripti
 		return PushSubscriptionInput{}, errors.New("user_agent must be valid UTF-8")
 	}
 	return PushSubscriptionInput{
-		UserID:       input.UserID,
-		Endpoint:     endpoint,
-		P256dh:       p256dh,
-		Auth:         auth,
-		UserAgent:    userAgent,
-		SessionToken: input.SessionToken,
+		UserID:           input.UserID,
+		Endpoint:         endpoint,
+		P256dh:           p256dh,
+		Auth:             auth,
+		UserAgent:        userAgent,
+		SessionToken:     input.SessionToken,
+		DevelopmentActor: input.DevelopmentActor,
 	}, nil
 }
 
@@ -154,6 +174,42 @@ func PushSubscriptionReady(nextAttemptAt, sessionExpiresAt string, now time.Time
 	}
 	expiresAt, err := time.Parse(time.RFC3339Nano, sessionExpiresAt)
 	return err == nil && now.Before(expiresAt)
+}
+
+// PushDeliveryState is a stored subscription as the delivery worker re-reads
+// it immediately before sending: the device's own row, and the session it was
+// registered under, which is absent when that session no longer exists.
+type PushDeliveryState struct {
+	UserID           string
+	NextAttemptAt    string
+	SessionTokenHash string
+	SessionUserID    string
+	SessionExpiresAt string
+	SessionRevokedAt string
+}
+
+// CheckPushDelivery applies the rule recipient selection uses a second time,
+// at send time, because a push can sit in the delivery queue after the
+// session behind it ends. It answers ErrPushSessionEnded when the registering
+// session is gone, revoked, expired, or belongs to someone else, and
+// ErrPushSubscriptionBackingOff when the backoff has not elapsed.
+func CheckPushDelivery(state PushDeliveryState, now time.Time) error {
+	if state.SessionTokenHash != "" {
+		if state.SessionUserID == "" || state.SessionUserID != state.UserID || state.SessionRevokedAt != "" {
+			return ErrPushSessionEnded
+		}
+		expiresAt, err := time.Parse(time.RFC3339Nano, state.SessionExpiresAt)
+		if err != nil || !now.Before(expiresAt) {
+			return ErrPushSessionEnded
+		}
+	}
+	if state.NextAttemptAt != "" {
+		next, err := time.Parse(time.RFC3339Nano, state.NextAttemptAt)
+		if err != nil || now.Before(next) {
+			return ErrPushSubscriptionBackingOff
+		}
+	}
+	return nil
 }
 
 func normalizePushSubscriptionKey(value, name string) (string, error) {

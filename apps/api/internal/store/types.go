@@ -1252,6 +1252,7 @@ type Store interface {
 	UpsertPushSubscription(ctx context.Context, input PushSubscriptionInput) (PushSubscription, error)
 	ListPushSubscriptions(ctx context.Context, userID string) ([]PushSubscription, error)
 	DeletePushSubscription(ctx context.Context, userID, endpoint string) error
+	GetPushSubscriptionDelivery(ctx context.Context, userID, endpoint string) (PushSubscriptionTarget, error)
 	MarkPushSubscriptionSuccess(ctx context.Context, userID, endpoint string) error
 	MarkPushSubscriptionFailure(ctx context.Context, userID, endpoint string, retryAfter time.Duration) (int64, error)
 	UpsertChannelNotificationSettings(ctx context.Context, input ChannelNotificationInput) error

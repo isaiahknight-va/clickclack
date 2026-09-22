@@ -140,3 +140,29 @@ func TestDecodeKeyAcceptsCommonEncodings(t *testing.T) {
 		t.Fatal("expected an empty key to fail")
 	}
 }
+
+func TestKeyFingerprintNamesTheKeyNotItsSpelling(t *testing.T) {
+	t.Parallel()
+	first, _, err := GenerateKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, _, err := GenerateKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fingerprint := KeyFingerprint(first)
+	if len(fingerprint) != 12 {
+		t.Fatalf("fingerprint %q is not twelve hex digits", fingerprint)
+	}
+	raw, err := DecodeKey(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if padded := base64.StdEncoding.EncodeToString(raw); KeyFingerprint(padded) != fingerprint {
+		t.Fatal("a padded standard spelling of the same key must fingerprint the same")
+	}
+	if KeyFingerprint(second) == fingerprint {
+		t.Fatal("a rotated key must fingerprint differently")
+	}
+}

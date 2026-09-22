@@ -80,6 +80,34 @@ func (s *Store) DeletePushSubscription(ctx context.Context, userID, endpoint str
 	})
 }
 
+// GetPushSubscriptionDelivery re-reads one device immediately before a
+// queued push is sent. A missing row answers sql.ErrNoRows; a row whose
+// session or backoff forbids sending answers the matching store error.
+func (s *Store) GetPushSubscriptionDelivery(ctx context.Context, userID, endpoint string) (store.PushSubscriptionTarget, error) {
+	row, err := s.q.GetPushSubscriptionDelivery(ctx, storedb.GetPushSubscriptionDeliveryParams{
+		UserID:   userID,
+		Endpoint: endpoint,
+	})
+	if err != nil {
+		return store.PushSubscriptionTarget{}, err
+	}
+	if err := store.CheckPushDelivery(store.PushDeliveryState{
+		UserID:           row.UserID,
+		NextAttemptAt:    row.NextAttemptAt.String,
+		SessionTokenHash: row.SessionTokenHash,
+		SessionUserID:    row.SessionUserID.String,
+		SessionExpiresAt: row.SessionExpiresAt.String,
+		SessionRevokedAt: row.SessionRevokedAt.String,
+	}, time.Now()); err != nil {
+		return store.PushSubscriptionTarget{}, err
+	}
+	return store.PushSubscriptionTarget{
+		Endpoint: row.Endpoint,
+		P256dh:   row.P256dh,
+		Auth:     row.Auth,
+	}, nil
+}
+
 func (s *Store) MarkPushSubscriptionSuccess(ctx context.Context, userID, endpoint string) error {
 	timestamp := now()
 	return s.q.MarkPushSubscriptionSuccess(ctx, storedb.MarkPushSubscriptionSuccessParams{
