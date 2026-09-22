@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Fixed the typing indicator covering and clipping the last message, and the responding indicator resizing thread replies, by reserving one steady status band above both composers.
+- Fixed the typing indicator covering and clipping the last message, and the responding indicator resizing thread replies, by reserving one steady status band above both composers. Thanks @isaiahknight-va.
 - Reduce server archive downloads by omitting development proof captures, and include all offline guides and README images on every platform.
 - Prevent JSON exports from overwriting their source SQLite database or its journal files, including paths reached through filesystem aliases.
 - Avoid PostgreSQL test fixture collisions when parallel tests start within the same clock tick.
