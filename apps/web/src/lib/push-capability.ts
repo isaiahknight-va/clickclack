@@ -38,12 +38,15 @@ export function appleDevice(): boolean {
 // label, not the user agent string, and the server truncates it regardless.
 export function deviceLabel(
   userAgent = typeof navigator === "undefined" ? "" : navigator.userAgent,
+  touchPoints = typeof navigator === "undefined" ? 0 : navigator.maxTouchPoints || 0,
 ): string {
+  // iPadOS presents itself as a Mac; the touch points give it away.
+  const iPadAsMac = /Macintosh/.test(userAgent) && touchPoints > 1;
   const platforms: [RegExp, string][] = [
     [/iPhone/, "iPhone"],
     [/iPad/, "iPad"],
     [/Android/, "Android"],
-    [/Macintosh|Mac OS X/, "Mac"],
+    [/Macintosh|Mac OS X/, iPadAsMac ? "iPad" : "Mac"],
     [/Windows/, "Windows"],
     [/Linux/, "Linux"],
   ];
