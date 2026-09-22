@@ -233,10 +233,11 @@
   }
 
   // Only the reactions bar is measured: attachments render below it, so the
-  // row's own bottom can be a screen further down.
+  // row's own bottom can be a screen further down. Removing the last
+  // reaction leaves no bar, and then there is nothing to reveal.
   function revealReactionsBar() {
     const scroller = rowEl?.closest(".messages-scroll");
-    const bar = rowEl?.querySelector(".reactions-bar") ?? rowEl;
+    const bar = rowEl?.querySelector(".reactions-bar");
     if (!bar || !scroller) return;
     const target = bar.getBoundingClientRect();
     const view = scroller.getBoundingClientRect();

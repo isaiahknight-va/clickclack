@@ -214,3 +214,39 @@ test("a scroll made while the reaction request is pending stands", async ({ page
   const settled = await page.locator(".messages-scroll").evaluate((el) => el.scrollTop);
   expect(Math.abs(settled - scrolledUp)).toBeLessThan(4);
 });
+
+test("removing the last reaction does not move the list", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const fixture = await setup(page, "Remove");
+  await seed(page, fixture.channelID, 3);
+  await openSettled(page, fixture.route);
+  const image = tallPNG(320, 700);
+  for (const name of ["a", "b"]) {
+    await page
+      .getByLabel("Upload file")
+      .setInputFiles({ name: `tall-${name}.png`, mimeType: "image/png", buffer: image });
+    await expect(page.getByText(`tall-${name}.png`)).toBeVisible();
+  }
+  const text = `remove me ${randomUUID().slice(0, 6)}`;
+  await page.getByLabel("Message body").fill(text);
+  await page.getByRole("button", { name: "Send" }).click();
+  const row = page.locator(".message-row").filter({ hasText: text });
+  await expect(row.getByRole("button", { name: "Open image tall-b.png" })).toBeVisible();
+  const messageID = (await row.getAttribute("data-message-id"))!;
+  await settleScrollFrames(page);
+  await reactFromToolbar(page, messageID);
+  const chip = row.locator(".reactions-bar button").first();
+  await page.evaluate((id) => {
+    const scroller = document.querySelector(".messages-scroll")!;
+    const el = document.querySelector(`[data-message-id="${id}"]`)!;
+    scroller.scrollTop += el.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 8;
+    scroller.dispatchEvent(new Event("scroll", { bubbles: true }));
+  }, messageID);
+  await settleScrollFrames(page);
+  const before = await page.locator(".messages-scroll").evaluate((el) => el.scrollTop);
+  await chip.click();
+  await expect(row.locator(".reactions-bar")).toHaveCount(0);
+  await settleScrollFrames(page);
+  const after = await page.locator(".messages-scroll").evaluate((el) => el.scrollTop);
+  expect(Math.abs(after - before)).toBeLessThan(4);
+});
