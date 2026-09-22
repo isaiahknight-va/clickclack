@@ -1389,6 +1389,10 @@
    neither hover a hidden toolbar nor long-press. The root attribute is set from
    real pointer events (lib/pointer-mode.svelte.ts). */
 @media (hover: none), (pointer: coarse) {
+  :root:not([data-pointer-mode="mouse"]) .message-row {
+    -webkit-touch-callout: none;
+  }
+
   :root:not([data-pointer-mode="mouse"]) .message-actions {
     width: 1px;
     height: 1px;
@@ -1507,6 +1511,16 @@
   border: 0;
   background: transparent;
   padding: 0;
+}
+
+/* The sheet opens while the long-pressing finger is still down. Without this,
+   iOS carries the same press into a text selection on whatever is now under
+   the finger, which is the sheet's first row. */
+.message-sheet-scrim,
+.message-sheet-scrim * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .message-action-sheet {
