@@ -399,7 +399,7 @@ func TestWebPushBodyAndRouteDescribeTheMessage(t *testing.T) {
 		t.Fatalf("channel route without a route id is %q", got)
 	}
 	thread := store.Message{WorkspaceID: "wsp_1", ChannelID: "chn_1", ParentMessageID: &parent, ThreadRootID: parent}
-	if got := webPushURL(thread, store.Channel{RouteID: "C123"}); got != "/app/wsp_1/msg_root" {
+	if got := webPushURL(thread, store.Channel{RouteID: "C123"}); got != "/app/wsp_1/C123" {
 		t.Fatalf("thread route is %q", got)
 	}
 	dm := store.Message{WorkspaceID: "wsp_1", DirectConversationID: "dm_1"}

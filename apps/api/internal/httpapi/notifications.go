@@ -114,14 +114,13 @@ func webPushTag(message store.Message) string {
 	return "clickclack:" + message.ID
 }
 
-// webPushURL routes a tap to the thread, conversation, or channel the message
-// belongs to. Storage identifiers are valid route parameters; the app
-// canonicalizes them on arrival.
+// webPushURL routes a tap to the conversation or channel the message belongs
+// to, the same destination the in-page notification uses. A thread reply lands
+// in its channel: message routes are minted on demand and a storage id is not
+// one. Channel and conversation identifiers are canonicalized on arrival.
 func webPushURL(message store.Message, place store.Channel) string {
 	target := ""
 	switch {
-	case message.ParentMessageID != nil && message.ThreadRootID != "":
-		target = message.ThreadRootID
 	case message.DirectConversationID != "":
 		target = message.DirectConversationID
 	case place.RouteID != "":
