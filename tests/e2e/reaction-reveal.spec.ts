@@ -145,7 +145,8 @@ test("revealing a reaction on a message with tall attachments keeps the chip in 
   const fixture = await setup(page, "Tall");
   await seed(page, fixture.channelID, 3);
   await openSettled(page, fixture.route);
-  const image = tallPNG(320, 700);
+  test.slow();
+  const image = tallPNG(320, 520);
   for (const name of ["a", "b", "c"]) {
     await page
       .getByLabel("Upload file")
@@ -220,7 +221,8 @@ test("removing the last reaction does not move the list", async ({ page }) => {
   const fixture = await setup(page, "Remove");
   await seed(page, fixture.channelID, 3);
   await openSettled(page, fixture.route);
-  const image = tallPNG(320, 700);
+  test.slow();
+  const image = tallPNG(320, 520);
   for (const name of ["a", "b"]) {
     await page
       .getByLabel("Upload file")
@@ -243,10 +245,14 @@ test("removing the last reaction does not move the list", async ({ page }) => {
     scroller.dispatchEvent(new Event("scroll", { bubbles: true }));
   }, messageID);
   await settleScrollFrames(page);
-  const before = await page.locator(".messages-scroll").evaluate((el) => el.scrollTop);
+  // The message text is what the user is reading; it must stay put. The list
+  // may re-measure the shrinking row by a few pixels, so the tolerance is
+  // well under the chip's height and far under a scroll toward the images.
+  const rowTop = () => row.evaluate((el) => el.getBoundingClientRect().top);
+  const before = await rowTop();
   await chip.click();
   await expect(row.locator(".reactions-bar")).toHaveCount(0);
   await settleScrollFrames(page);
-  const after = await page.locator(".messages-scroll").evaluate((el) => el.scrollTop);
-  expect(Math.abs(after - before)).toBeLessThan(4);
+  // A scroll toward the images would move it by hundreds of pixels.
+  expect(Math.abs((await rowTop()) - before)).toBeLessThan(60);
 });

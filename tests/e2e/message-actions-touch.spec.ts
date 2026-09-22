@@ -55,5 +55,14 @@ test("a finger on a phone still gets the long-press sheet, not the toolbar", asy
     bubbles: true,
     ...point,
   });
-  await expect(page.locator(`#message-action-sheet-${message.id}`)).toBeVisible();
+  const sheet = page.locator(`#message-action-sheet-${message.id}`);
+  await expect(sheet).toBeVisible();
+  // The finger is still down when the sheet appears under it. iOS would carry
+  // the press into a text selection on the sheet's first row unless the sheet
+  // is unselectable.
+  const selectable = await sheet.evaluate((el) => {
+    const button = el.querySelector(".sheet-actions button") as HTMLElement | null;
+    return [el, button].filter(Boolean).map((node) => getComputedStyle(node!).webkitUserSelect);
+  });
+  expect(selectable).toEqual(["none", "none"]);
 });
