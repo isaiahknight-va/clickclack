@@ -20,3 +20,5 @@ Real device: iPhone, ClickClack installed to the Home Screen, switch on, DM from
 iphone-first-activation-banner.png: fresh install (app deleted and re-added to the Home Screen), switch on at the first tap, server log 'web push device registered ... via web.push.apple.com' at 17:30:53 ET, push delivered 17:31:24 ET, lock screen shown.
 iphone-tap-landed.png: the tap opened the installed app on the conversation at the newest message.
 e1-*: authorization rejection on the built server path (see the summary table). e2-*: populated v0.5.1 upgrade on a real SQLite snapshot, a Pushover-enabled copy, and a seeded PostgreSQL.
+
+iphone-after-rotation-banner.png: test seven on the lock screen after the rotation and the fresh load; e3-rotation-log.txt is the server log sequence with the user id and key fingerprints replaced by placeholders.
