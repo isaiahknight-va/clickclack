@@ -19,14 +19,20 @@ const (
 	// webPushQueueSize bounds the memory a wedged push service can cost. Chat
 	// notifications are not durable mail: an overflow is dropped and counted.
 	webPushQueueSize = 1024
-	// webPushSendTimeout bounds one delivery, including connect and TLS.
-	webPushSendTimeout = 10 * time.Second
+	// webPushBookkeepingTimeout bounds recording what the push service said.
+	// It starts after Send returns, so a relay that used the whole send budget
+	// still gets its failure and backoff written.
+	webPushBookkeepingTimeout = 5 * time.Second
 	// webPushDrainTimeout bounds how long shutdown waits for queued pushes.
 	webPushDrainTimeout = 5 * time.Second
 	// webPushDropReportInterval throttles the dropped-delivery log so a wedged
 	// relay cannot write a line per message.
 	webPushDropReportInterval = time.Minute
 )
+
+// webPushSendTimeout bounds the device check and one delivery, including
+// connect and TLS. It is a variable so a test can stand in a hanging relay.
+var webPushSendTimeout = 10 * time.Second
 
 // WebPushConfig is the application server identity used for every push.
 type WebPushConfig struct {
@@ -173,14 +179,16 @@ func (n *WebPushNotifier) deliver(delivery webPushDelivery) {
 			log.Printf("web push delivery panicked for user %s: %v", delivery.userID, recovered)
 		}
 	}()
-	ctx, cancel := context.WithTimeout(context.Background(), webPushSendTimeout)
-	defer cancel()
-	subscription, reason := n.authorize(ctx, delivery)
+	sendCtx, cancelSend := context.WithTimeout(context.Background(), webPushSendTimeout)
+	defer cancelSend()
+	subscription, reason := n.authorize(sendCtx, delivery)
 	if reason != "" {
 		log.Printf("web push delivery skipped for user %s: %s", delivery.userID, reason)
 		return
 	}
-	err := n.sender.Send(ctx, subscription, delivery.message)
+	err := n.sender.Send(sendCtx, subscription, delivery.message)
+	ctx, cancel := context.WithTimeout(context.Background(), webPushBookkeepingTimeout)
+	defer cancel()
 	host := webpush.RelayHost(delivery.endpoint)
 	switch {
 	case err == nil:
@@ -211,10 +219,10 @@ func (n *WebPushNotifier) deliver(delivery webPushDelivery) {
 
 // authorize re-reads everything that allowed a push when it was queued: the
 // device must still be registered to this user under a live session with its
-// backoff elapsed, and the user must still be able to read the message. It
-// answers the device's current keys, or the class of reason it may not be
-// sent. A lookup that fails for any other reason also refuses: without an
-// answer, the message text stays on the server.
+// backoff elapsed, and the user must still be able to read the message, which
+// must not have been deleted. It answers the device's current keys, or the
+// class of reason it may not be sent. A lookup that fails for any other reason
+// also refuses: without an answer, the message text stays on the server.
 func (n *WebPushNotifier) authorize(ctx context.Context, delivery webPushDelivery) (webpush.Subscription, string) {
 	target, err := n.subscriptions.GetPushSubscriptionDelivery(ctx, delivery.userID, delivery.endpoint)
 	switch {
@@ -230,11 +238,14 @@ func (n *WebPushNotifier) authorize(ctx context.Context, delivery webPushDeliver
 	if delivery.messageID == "" {
 		return webpush.Subscription{}, "the message could not be verified"
 	}
-	if _, err := n.subscriptions.GetMessage(ctx, delivery.messageID, delivery.userID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return webpush.Subscription{}, "the user can no longer read the message"
-		}
+	message, err := n.subscriptions.GetMessage(ctx, delivery.messageID, delivery.userID)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return webpush.Subscription{}, "the user can no longer read the message"
+	case err != nil:
 		return webpush.Subscription{}, "the message could not be verified"
+	case message.DeletedAt != nil:
+		return webpush.Subscription{}, "the message was deleted"
 	}
 	return webpush.Subscription{Endpoint: target.Endpoint, P256dh: target.P256dh, Auth: target.Auth}, ""
 }

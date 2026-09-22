@@ -273,6 +273,96 @@ func TestWebPushNotifierKeepsEndpointsOutOfTheLog(t *testing.T) {
 	}
 }
 
+// TestWebPushNotifierBacksOffATimedOutRelay sends to a relay that never
+// answers, so the send budget is spent before the failure is recorded. The
+// failure and its backoff must still reach the store. Not parallel: it
+// shortens the package send timeout.
+func TestWebPushNotifierBacksOffATimedOutRelay(t *testing.T) {
+	release := make(chan struct{})
+	relay := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { <-release }))
+	defer func() {
+		close(release)
+		relay.Close()
+	}()
+	previousTimeout := webPushSendTimeout
+	webPushSendTimeout = 200 * time.Millisecond
+	defer func() { webPushSendTimeout = previousTimeout }()
+
+	ctx := context.Background()
+	databasePath := filepath.Join(t.TempDir(), "clickclack.db")
+	st, err := sqlitestore.Open("sqlite://" + databasePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err := st.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	owner, err := st.EnsureBootstrap(ctx, "Owner", "timeout-owner@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspaces, err := st.ListWorkspaces(ctx, owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	channels, err := st.ListChannels(ctx, workspaces[0].ID, owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	message, _, err := st.CreateMessage(ctx, store.CreateMessageInput{ChannelID: channels[0].ID, AuthorID: owner.ID, Body: "into the void"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := st.CreateSession(ctx, owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	endpoint := relay.URL + "/send/device"
+	if _, err := st.UpsertPushSubscription(ctx, store.PushSubscriptionInput{
+		UserID: owner.ID, Endpoint: endpoint, P256dh: exampleClientKey, Auth: exampleClientAuth, SessionToken: session.Token,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	publicKey, privateKey, err := webpush.GenerateKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	notifier := newWebPushNotifier(&webpush.Sender{
+		PublicKey:  publicKey,
+		PrivateKey: privateKey,
+		Subject:    "https://chat.example.com",
+		Client:     relay.Client(),
+	}, st)
+	if err := notifier.Notify(ctx, PushNotification{
+		UserID:        owner.ID,
+		MessageID:     message.ID,
+		Subscriptions: []store.PushSubscriptionTarget{{Endpoint: endpoint}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	notifier.Close()
+
+	db, err := sql.Open("sqlite", "file:"+databasePath+"?_pragma=busy_timeout(5000)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var failures int64
+	var nextAttempt sql.NullString
+	if err := db.QueryRow(
+		`SELECT failure_count, next_attempt_at FROM user_push_subscriptions WHERE endpoint = ?`, endpoint,
+	).Scan(&failures, &nextAttempt); err != nil {
+		t.Fatal(err)
+	}
+	if failures != 1 {
+		t.Fatalf("the timed-out delivery recorded %d failures, want 1", failures)
+	}
+	if !nextAttempt.Valid || nextAttempt.String == "" {
+		t.Fatal("the timed-out device has no backoff, so every message would retry it")
+	}
+}
+
 // TestMessageNotificationsFanOutPerChannel proves the two delivery paths stay
 // separate: a Pushover-only user produces exactly one Pushover call and no web
 // push, and a push-only user the reverse.
@@ -403,7 +493,12 @@ func TestWebPushTitleNamesThePlaceItKnows(t *testing.T) {
 			store.Channel{},
 			"Ari in Direct message",
 		},
-		"unreadable channel": {store.Message{AuthorID: "usr_1"}, store.Channel{}, "usr_1"},
+		"blank author": {
+			store.Message{AuthorID: "usr_1", Author: &store.User{DisplayName: "  "}},
+			store.Channel{Name: "general"},
+			"ClickClack in #general",
+		},
+		"unreadable channel": {store.Message{AuthorID: "usr_1"}, store.Channel{}, "ClickClack"},
 	} {
 		if got := webPushTitle(testCase.message, testCase.place); got != testCase.want {
 			t.Fatalf("%s: title is %q, want %q", name, got, testCase.want)
@@ -565,6 +660,13 @@ func TestQueuedWebPushIsRevalidatedBeforeSending(t *testing.T) {
 				t.Fatal(err)
 			}
 		},
+		"message deleted": func(t *testing.T, fixture queuedPushFixture) {
+			if _, _, err := fixture.store.DeleteMessage(context.Background(), store.DeleteMessageInput{
+				MessageID: fixture.messageID, UserID: fixture.owner,
+			}); err != nil {
+				t.Fatal(err)
+			}
+		},
 		"membership removed": func(t *testing.T, fixture queuedPushFixture) {
 			// No endpoint removes a human member, so this is the row change an
 			// operator would make; message access reads the same row.
@@ -600,6 +702,8 @@ type queuedPushFixture struct {
 	databasePath      string
 	sender            *gatedSender
 	notifier          *WebPushNotifier
+	owner             string
+	messageID         string
 	recipient         string
 	recipientSession  string
 	recipientEndpoint string
@@ -692,7 +796,7 @@ func newQueuedPushFixture(t *testing.T) queuedPushFixture {
 			t.Fatal("the workers never reached the held relay")
 		}
 	}
-	postJSON[struct {
+	posted := postJSON[struct {
 		Message store.Message `json:"message"`
 	}](t, server.URL+"/api/channels/"+channels[0].ID+"/messages", map[string]any{"body": "queued behind a slow relay"})
 	if got := sender.sentTo(recipientEndpoint); got != 0 {
@@ -703,6 +807,8 @@ func newQueuedPushFixture(t *testing.T) queuedPushFixture {
 		databasePath:      databasePath,
 		sender:            sender,
 		notifier:          notifier,
+		owner:             owner.ID,
+		messageID:         posted.Message.ID,
 		recipient:         recipient,
 		recipientSession:  recipientSession,
 		recipientEndpoint: recipientEndpoint,
