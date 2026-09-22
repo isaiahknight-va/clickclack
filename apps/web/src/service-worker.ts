@@ -9,6 +9,8 @@
 // reference: the app typechecks as one program, and pulling that library in
 // beside the DOM one redeclares hundreds of shared names.
 
+import { pushLandingURL } from "./lib/push-landing";
+
 interface ExtendableEvent extends Event {
   waitUntil(promise: Promise<unknown>): void;
 }
@@ -128,7 +130,9 @@ async function openApp(url: string): Promise<void> {
     await appClient.focus();
     return;
   }
-  await worker.clients.openWindow(url);
+  // A fresh window may not be listening yet when a message would arrive, so
+  // the tap travels in the URL instead.
+  await worker.clients.openWindow(pushLandingURL(url));
 }
 
 async function askAppToRenew(): Promise<void> {
@@ -140,5 +144,3 @@ async function askAppToRenew(): Promise<void> {
     }
   }
 }
-
-export {};

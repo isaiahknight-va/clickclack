@@ -523,6 +523,83 @@ test("a notification tap lands at the conversation's newest message", async ({ p
   await expect(page.locator(`[data-message-id="${newest}"]`)).toBeInViewport();
 });
 
+test("a notification tap with no app window open lands at the newest message", async ({
+  page,
+  context,
+}) => {
+  const { workspace, channel, route } = await createGeneralChannel(page, "Push cold tap", true);
+  const elsewhere = await page.request.post(`/api/workspaces/${workspace.id}/channels`, {
+    data: { name: "elsewhere", kind: "public" },
+  });
+  expect(elsewhere.ok()).toBe(true);
+  const { channel: away } = (await elsewhere.json()) as { channel: { route_id: string } };
+  await page.goto(`/app/${workspace.route_id}/${away.route_id}`);
+  await waitForAppReady(page);
+  const userID = await page.evaluate(() =>
+    fetch("/api/me").then(
+      async (response) => ((await response.json()) as { user: { id: string } }).user.id,
+    ),
+  );
+  // The worker a device that turned push on has installed.
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.register("/service-worker.js", { scope: "/" });
+    await navigator.serviceWorker.ready;
+  });
+  const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+
+  const poster = await page.request.post(`/api/workspaces/${workspace.id}/bots`, {
+    data: { display_name: `Cold tapper ${randomUUID().slice(0, 8)}` },
+  });
+  expect(poster.ok()).toBe(true);
+  const { bot_token: botToken } = (await poster.json()) as { bot_token: { token: string } };
+  let newest = "";
+  for (let index = 1; index <= 60; index += 1) {
+    const posted = await page.request.post(`/api/channels/${channel.id}/messages`, {
+      headers: { Authorization: `Bearer ${botToken.token}` },
+      data: { body: `unread ${index}` },
+    });
+    expect(posted.ok()).toBe(true);
+    newest = ((await posted.json()) as { message: { id: string } }).message.id;
+  }
+
+  // The app is closed: nothing in this browser is an app window.
+  await page.goto("about:blank");
+
+  // Only a real tap lets a worker open a window, so the window this synthetic
+  // tap asks for is recorded here and then opened the way the browser would.
+  const opened = await worker.evaluate(async (url) => {
+    const scope = self as unknown as {
+      clients: { openWindow: (target: string) => Promise<null> };
+      dispatchEvent: (event: Event) => boolean;
+      ExtendableEvent: new (type: string) => Event;
+    };
+    let requested = "";
+    scope.clients.openWindow = async (target) => {
+      requested = target;
+      return null;
+    };
+    const click = new scope.ExtendableEvent("notificationclick");
+    Object.defineProperty(click, "notification", { value: { data: { url }, close() {} } });
+    try {
+      scope.dispatchEvent(click);
+    } catch {
+      // A synthetic event cannot extend its lifetime; the handler has already
+      // started, which is all this needs.
+    }
+    for (let attempt = 0; attempt < 100 && !requested; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    return requested;
+  }, `/app/${workspace.id}/${channel.id}`);
+  expect(opened).toBe(`/app/${workspace.id}/${channel.id}?from=push`);
+
+  const fresh = await context.newPage();
+  await fresh.setExtraHTTPHeaders({ "X-ClickClack-User": userID });
+  await fresh.goto(opened);
+  await expect(fresh).toHaveURL(new RegExp(`${route}$`));
+  await expect(fresh.locator(`[data-message-id="${newest}"]`)).toBeInViewport();
+});
+
 test.describe("a device registered under a signed-in session", () => {
   const csrf = { "X-ClickClack-CSRF": "1" };
 
