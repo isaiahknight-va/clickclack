@@ -19,3 +19,5 @@ message-actions-touch.spec.ts (iPhone profile) + reaction-reveal.spec.ts (four c
   22 passed (21.8s)
 
 iphone-sheet-before.png: a real iPhone, long press on a message before the fix. The sheet opened AND iOS carried the press into a text selection on the sheet's first row (Reply highlighted, Copy / Look Up callout over the emoji row).
+
+iphone-sheet-after.png: the same iPhone after the fix, long press on a message: the sheet opens with nothing selected and no callout.
