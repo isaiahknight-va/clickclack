@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/openclaw/clickclack/apps/api/internal/store"
 )
@@ -75,6 +76,53 @@ func TestPushSubscriptionsUpsertAndCap(t *testing.T) {
 	remaining, err = st.ListPushSubscriptions(ctx, owner.ID)
 	if err != nil || len(remaining) != store.MaxPushSubscriptionsPerUser-1 {
 		t.Fatalf("expected one fewer device: %d %v", len(remaining), err)
+	}
+}
+
+// A shared device's one subscription moves to whichever account registers it
+// last. For the new owner that is a first registration: its created_at is the
+// moment it moved, so the log reads "registered" and the ten-device cap does
+// not evict it as the owner's oldest device.
+func TestPushSubscriptionMovedToAnotherAccountStartsFresh(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := newMigratedPostgresTestStore(t)
+	first, err := st.EnsureBootstrap(ctx, "Owner", "push-move-first@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := st.CreateUser(ctx, store.CreateUserInput{DisplayName: "Second", Email: "push-move-second@example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const endpoint = "https://push.example.com/send/shared"
+	original, err := st.UpsertPushSubscription(ctx, pushInput(first.ID, endpoint, "laptop"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(2 * time.Millisecond)
+	registeredFrom := time.Now().UTC()
+	moved, err := st.UpsertPushSubscription(ctx, pushInput(second.ID, endpoint, "laptop"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	registeredBy := time.Now().UTC()
+	createdAt, err := time.Parse(time.RFC3339Nano, moved.CreatedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if createdAt.Before(registeredFrom) || createdAt.After(registeredBy) || moved.CreatedAt == original.CreatedAt {
+		t.Fatalf("the moved device must carry the second account's registration time, got %q (first registered %q)", moved.CreatedAt, original.CreatedAt)
+	}
+	if moved.CreatedAt != moved.UpdatedAt {
+		t.Fatalf("the move must read as a registration, not a refresh: created %q, updated %q", moved.CreatedAt, moved.UpdatedAt)
+	}
+	refreshed, err := st.UpsertPushSubscription(ctx, pushInput(second.ID, endpoint, "laptop"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if refreshed.CreatedAt != moved.CreatedAt {
+		t.Fatalf("a refresh by the same account keeps created_at: %q, then %q", moved.CreatedAt, refreshed.CreatedAt)
 	}
 }
 

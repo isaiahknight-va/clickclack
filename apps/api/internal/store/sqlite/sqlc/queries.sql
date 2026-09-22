@@ -1872,6 +1872,10 @@ VALUES (
 )
 ON CONFLICT (endpoint) DO UPDATE SET
   user_id = excluded.user_id,
+  created_at = CASE
+    WHEN user_push_subscriptions.user_id <> excluded.user_id THEN excluded.created_at
+    ELSE user_push_subscriptions.created_at
+  END,
   p256dh = excluded.p256dh,
   auth = excluded.auth,
   user_agent = excluded.user_agent,
