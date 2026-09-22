@@ -5,6 +5,7 @@ import {
   applicationServerKey,
   deviceLabel,
   pushSupported,
+  sameApplicationServerKey,
 } from "./push-capability.ts";
 
 const globals = globalThis as {
@@ -93,4 +94,26 @@ test("deviceLabel names the platform and browser without copying the user agent"
     "Mac Chrome",
   );
   assert.equal(deviceLabel("something else entirely"), "This device");
+});
+
+test("sameApplicationServerKey replaces a subscription made under a rotated key", () => {
+  // The RFC 8291 example application server key, and a second real P-256
+  // point standing in for the key after an operator rotates the pair.
+  const current = applicationServerKey(
+    "BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8",
+  );
+  const rotated = applicationServerKey(
+    "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4",
+  );
+  // A subscription reports its key as an ArrayBuffer.
+  assert.equal(sameApplicationServerKey(current.slice().buffer, current), true);
+  assert.equal(sameApplicationServerKey(rotated.slice().buffer, current), false);
+  // A view over a larger buffer compares only its own bytes.
+  const padded = new Uint8Array(current.length + 8);
+  padded.set(current, 4);
+  assert.equal(sameApplicationServerKey(padded.subarray(4, 4 + current.length), current), true);
+  assert.equal(sameApplicationServerKey(current.slice(0, 64).buffer, current), false);
+  // A browser that hides the key cannot be compared and keeps its subscription.
+  assert.equal(sameApplicationServerKey(null, current), true);
+  assert.equal(sameApplicationServerKey(undefined, current), true);
 });

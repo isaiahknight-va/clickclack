@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Request, type Worker } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { createGeneralChannel } from "./channel-fixture";
 import { waitForAppReady } from "./app-ready";
@@ -18,9 +18,17 @@ type Delivery = {
 // the push manager is replaced with one that points at the fake relay. The
 // service worker, the settings row, the API, and the server's encryption and
 // delivery are all the real ones.
-async function stubPushManager(page: Page, endpoint: string) {
+//
+// The stand-in keeps the two browser rules this feature depends on: subscribe
+// refuses while the registration has no active worker, the way Chromium does
+// on first activation, and a subscription reports the application server key
+// it was made under. A test can also start the page holding an older
+// subscription, or drop the current one the way a browser rotating it would.
+type StubOptions = { stale?: { endpoint: string; key: string } };
+
+async function stubPushManager(page: Page, endpoint: string, options: StubOptions = {}) {
   await page.addInitScript(
-    ({ endpoint }) => {
+    ({ endpoint, stale }) => {
       const subscriptionKeys = {
         // The RFC 8291 example subscription keys: a real point on P-256 and a
         // 16 byte auth secret, so the server can encrypt for them.
@@ -28,28 +36,75 @@ async function stubPushManager(page: Page, endpoint: string) {
           "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4",
         auth: "BTBZMqHH6r4Tts7J_aSIgg",
       };
-      let current: unknown = null;
-      const subscription = {
-        endpoint,
-        options: { applicationServerKey: null },
-        toJSON: () => ({ endpoint, keys: subscriptionKeys }),
-        unsubscribe: async () => {
-          current = null;
-          return true;
-        },
+      const calls: string[] = [];
+      let subscribed = 0;
+      type StubSubscription = {
+        endpoint: string;
+        options: { applicationServerKey: ArrayBuffer | null };
+        toJSON: () => unknown;
+        unsubscribe: () => Promise<boolean>;
       };
-      const pushManager = {
-        subscribe: async () => {
-          current = subscription;
-          return subscription;
-        },
-        getSubscription: async () => current,
-        permissionState: async () => "granted",
+      let current: StubSubscription | null = null;
+      const makeSubscription = (subscriptionEndpoint: string, key: ArrayBuffer | null) => {
+        const subscription: StubSubscription = {
+          endpoint: subscriptionEndpoint,
+          options: { applicationServerKey: key },
+          toJSON: () => ({ endpoint: subscriptionEndpoint, keys: subscriptionKeys }),
+          unsubscribe: async () => {
+            calls.push(`unsubscribe:${subscriptionEndpoint}`);
+            if (current === subscription) current = null;
+            return true;
+          },
+        };
+        return subscription;
+      };
+      if (stale) {
+        const padded = stale.key.replace(/-/g, "+").replace(/_/g, "/");
+        const binary = atob(padded + "=".repeat((4 - (padded.length % 4)) % 4));
+        const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+        current = makeSubscription(stale.endpoint, bytes.buffer);
+      }
+      const managers = new WeakMap<ServiceWorkerRegistration, unknown>();
+      const managerFor = (registration: ServiceWorkerRegistration) => {
+        let manager = managers.get(registration);
+        if (!manager) {
+          manager = {
+            subscribe: async (subscribeOptions: { applicationServerKey?: BufferSource }) => {
+              if (!registration.active) {
+                throw new DOMException(
+                  "Subscription failed - no active Service Worker",
+                  "AbortError",
+                );
+              }
+              subscribed += 1;
+              const next = subscribed === 1 ? endpoint : `${endpoint}-${subscribed}`;
+              const key = subscribeOptions.applicationServerKey
+                ? new Uint8Array(subscribeOptions.applicationServerKey as ArrayBuffer).slice()
+                    .buffer
+                : null;
+              current = makeSubscription(next, key);
+              calls.push(`subscribe:${next}`);
+              return current;
+            },
+            getSubscription: async () => current,
+            permissionState: async () => "granted",
+          };
+          managers.set(registration, manager);
+        }
+        return manager;
       };
       Object.defineProperty(ServiceWorkerRegistration.prototype, "pushManager", {
         configurable: true,
-        get: () => pushManager,
+        get(this: ServiceWorkerRegistration) {
+          return managerFor(this);
+        },
       });
+      (window as unknown as { __pushStub: unknown }).__pushStub = {
+        calls,
+        drop: () => {
+          current = null;
+        },
+      };
       // Chromium denies notifications to an automated profile, and the
       // permission is not what this test is about.
       class GrantedNotification {
@@ -59,7 +114,13 @@ async function stubPushManager(page: Page, endpoint: string) {
       }
       (window as unknown as { Notification: unknown }).Notification = GrantedNotification;
     },
-    { endpoint },
+    { endpoint, stale: options.stale },
+  );
+}
+
+async function stubCalls(page: Page): Promise<string[]> {
+  return page.evaluate(
+    () => (window as unknown as { __pushStub: { calls: string[] } }).__pushStub.calls,
   );
 }
 
@@ -164,5 +225,147 @@ for (const surface of ["desktop", "phone"] as const) {
     await control2.uncheck();
     await expect(reopened.getByText("Off for this device")).toBeVisible();
     expect((await pushState(page)).subscriptions).toHaveLength(0);
+  });
+}
+
+// rememberPushEnabled marks push as turned on for the signed-in account on
+// this device, the state a returning user opens the app in. The page's own
+// fetch is the one that carries the account's identity.
+async function rememberPushEnabled(page: Page) {
+  await page.evaluate(async () => {
+    const response = await fetch("/api/me");
+    const { user } = (await response.json()) as { user: { id: string } };
+    window.localStorage.setItem(`clickclack:web-push-enabled:v1:${user.id}`, "enabled");
+  });
+}
+
+function isPushRegistration(request: Request): boolean {
+  return request.url().includes("/api/me/push/subscriptions") && request.method() === "PUT";
+}
+
+test("a device holding a subscription under an old key replaces it when the app opens", async ({
+  page,
+}) => {
+  const endpoint = `${relayOrigin}/push/${randomUUID()}`;
+  const staleEndpoint = `${relayOrigin}/push/stale-${randomUUID()}`;
+  // A second real P-256 point, standing in for the key the server used before
+  // its operator rotated the pair.
+  const staleKey =
+    "BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8";
+  await stubPushManager(page, endpoint, { stale: { endpoint: staleEndpoint, key: staleKey } });
+  const { route } = await createGeneralChannel(page, "Push rotation", true);
+  await page.goto(route);
+  await waitForAppReady(page);
+  await rememberPushEnabled(page);
+
+  const registered = page.waitForRequest(
+    (request) =>
+      isPushRegistration(request) &&
+      (JSON.parse(request.postData() ?? "{}") as { endpoint?: string }).endpoint === endpoint,
+  );
+  await page.reload();
+  await waitForAppReady(page);
+  await registered;
+
+  await expect
+    .poll(() => stubCalls(page))
+    .toEqual([`unsubscribe:${staleEndpoint}`, `subscribe:${endpoint}`]);
+  await expect.poll(async () => (await pushState(page)).subscriptions.length).toBe(1);
+});
+
+test("a renewed subscription registers only for the account that turned push on", async ({
+  page,
+  context,
+}) => {
+  const workerRequests: string[] = [];
+  context.on("request", (request) => {
+    if (request.serviceWorker() && request.url().includes("/api/me/push")) {
+      workerRequests.push(`${request.method()} ${new URL(request.url()).pathname}`);
+    }
+  });
+  const endpoint = `${relayOrigin}/push/${randomUUID()}`;
+  await stubPushManager(page, endpoint);
+  const { route } = await createGeneralChannel(page, "Push renewal", true);
+  await page.goto(route);
+  await waitForAppReady(page);
+  await rememberPushEnabled(page);
+
+  // The returning user's device registers on open, which also installs the
+  // worker whose renewal message this test sends.
+  const firstRegistration = page.waitForRequest(isPushRegistration);
+  await page.reload();
+  await waitForAppReady(page);
+  await firstRegistration;
+  const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+
+  // The browser drops the subscription and tells the worker. The worker only
+  // asks the app; the app's heal registers the replacement for this user.
+  await page.evaluate(() =>
+    (window as unknown as { __pushStub: { drop: () => void } }).__pushStub.drop(),
+  );
+  const renewed = page.waitForRequest(
+    (request) =>
+      isPushRegistration(request) &&
+      (JSON.parse(request.postData() ?? "{}") as { endpoint?: string }).endpoint ===
+        `${endpoint}-2`,
+  );
+  await fireSubscriptionChange(worker);
+  const renewal = await renewed;
+  expect(renewal.serviceWorker()).toBeNull();
+  expect(workerRequests).toEqual([]);
+});
+
+test("a renewal on a device where this account never turned push on registers nothing", async ({
+  page,
+  context,
+}) => {
+  const endpoint = `${relayOrigin}/push/${randomUUID()}`;
+  await stubPushManager(page, endpoint);
+  const { route } = await createGeneralChannel(page, "Push other account", true);
+  await page.goto(route);
+  await waitForAppReady(page);
+  // Another account turned push on here earlier, so the worker is installed;
+  // this account never did.
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.register("/service-worker.js", { scope: "/" });
+    await navigator.serviceWorker.ready;
+  });
+  const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+  const registrations: string[] = [];
+  context.on("request", (request) => {
+    if (request.url().includes("/api/me/push")) registrations.push(request.method());
+  });
+  await page.evaluate(() => {
+    const seen: string[] = [];
+    (window as unknown as { __workerMessages: string[] }).__workerMessages = seen;
+    navigator.serviceWorker.addEventListener("message", (event) => {
+      seen.push(String((event.data as { type?: string } | null)?.type));
+    });
+  });
+
+  await fireSubscriptionChange(worker);
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as unknown as { __workerMessages: string[] }).__workerMessages),
+    )
+    .toContain("clickclack:push-renew");
+  // The heal returns before any request for an account without the opt-in;
+  // this settle only gives a wrong implementation room to show itself.
+  await page.waitForTimeout(500);
+  expect(registrations).toEqual([]);
+  expect(await stubCalls(page)).toEqual([]);
+});
+
+// fireSubscriptionChange raises the event a browser raises when it replaces a
+// subscription. A synthetic event cannot extend its lifetime, so the worker's
+// waitUntil throws after the handler has already started its work; that is
+// the browser's rule, not the handler failing.
+async function fireSubscriptionChange(worker: Worker) {
+  await worker.evaluate(() => {
+    const scope = self as unknown as {
+      dispatchEvent: (event: Event) => boolean;
+      ExtendableEvent: new (type: string) => Event;
+    };
+    scope.dispatchEvent(new scope.ExtendableEvent("pushsubscriptionchange"));
   });
 }
