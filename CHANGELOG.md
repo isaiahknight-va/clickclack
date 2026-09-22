@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added Web Push notifications, so an installed ClickClack can alert a phone with no third-party account: `clickclack admin webpush keygen` plus the two VAPID keys turn it on, and each user opts in per device from account settings. Pushover and tab notifications are unchanged. Thanks @isaiahknight-va.
+- Added a web app manifest and home-screen icons, which iOS requires before a browser can subscribe to push.
+
 ## 0.5.1 - 2026-09-21
 
 **Highlights:** Safer exports, reliable sign-in, and chat status indicators that stay clear of messages.
