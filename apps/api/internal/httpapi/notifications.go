@@ -85,9 +85,11 @@ func (s *Server) notificationPlace(ctx context.Context, message store.Message) s
 }
 
 // webPushTitle matches the title the in-page notification uses, so a device
-// that sees both paths reads one sentence, not two shapes of it.
+// that sees both paths reads one sentence, not two shapes of it. An author
+// without a name reads as the product, as it does in the page, never as an
+// internal id on a lock screen.
 func webPushTitle(message store.Message, place store.Channel) string {
-	author := message.AuthorID
+	author := "ClickClack"
 	if message.Author != nil && strings.TrimSpace(message.Author.DisplayName) != "" {
 		author = message.Author.DisplayName
 	}
