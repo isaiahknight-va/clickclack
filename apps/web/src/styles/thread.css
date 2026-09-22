@@ -227,7 +227,7 @@
   display: none;
 }
 
-@media (hover: none), (pointer: coarse) {
+@media not all and (any-hover: hover) {
   .thread .group-body > header {
     position: relative;
     min-height: 28px;

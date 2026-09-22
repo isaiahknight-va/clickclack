@@ -1383,7 +1383,11 @@
   pointer-events: none;
 }
 
-@media (hover: none), (pointer: coarse) {
+/* Only devices with no hover-capable pointer at all collapse to the touch
+   anchor (`not all and` is the widely supported spelling of any-hover: none). A tablet with a trackpad or mouse keeps `hover: none` because touch
+   stays its primary input, but `any-hover: hover` reports the pointer, and that
+   pointer can neither hover a hidden toolbar nor long-press. */
+@media not all and (any-hover: hover) {
   /* Touch devices use the long-press action sheet instead of the hover toolbar. */
   .message-actions {
     width: 1px;

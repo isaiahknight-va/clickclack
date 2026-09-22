@@ -375,7 +375,7 @@
   const MESSAGE_INTERACTIVE_TARGETS =
     "a, button, input, textarea, select, .attachment-grid, .media-tile, .markdown img, .gif-player, .markdown-table-scroll, .message-actions, .message-failed";
   const coarseQuery =
-    typeof window !== "undefined" ? window.matchMedia("(hover: none), (pointer: coarse)") : null;
+    typeof window !== "undefined" ? window.matchMedia("not all and (any-hover: hover)") : null;
   let coarsePointer = $state(coarseQuery?.matches ?? false);
   let showActionSheet = $state(false);
   let longPressTimer: number | undefined;
