@@ -192,12 +192,16 @@ depending on the browser.
   device, even when another account has devices elsewhere, and opening the
   app as an account that turned push on there moves the device back to it.
   Turning the switch off on a shared device unsubscribes the browser, so every
-  account on that device stops receiving until one turns it on again. A
+  account on that device stops receiving until one turns it on again. Only the
+  account holding the device can turn it off; for another account the switch
+  reads off, and to stop the first account's pushes arriving on this browser it
+  turns its own switch on, which moves the device to it, and then off. A
   registration is refused when the signed-in account changed underneath it: a
   tab still showing one account after another tab signed the browser in to a
   different account registers nothing, for either account. Turning the switch
   off in that tab is refused the same way: the browser keeps its subscription
-  and the first account keeps its device, and the row asks for a reload.
+  and the first account keeps its device, and the row asks for a reload. A row
+  that reads the device after such a sign-in shows it off with the same line.
 - When the browser replaces a subscription on its own, the service worker does
   not register the replacement, because it cannot tell which account on the
   device turned push on. It asks an open app window to re-register, and only
