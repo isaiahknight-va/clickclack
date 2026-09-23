@@ -3078,6 +3078,8 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          /** @description The account the client is turning this device off for. It must be the signed-in account, or the request is refused with 409. */
+          user_id: string;
           /** @description The push service URL returned by pushManager.subscribe. */
           endpoint: string;
         };
@@ -3091,7 +3093,7 @@ export interface operations {
         };
         content?: never;
       };
-      /** @description The endpoint is missing */
+      /** @description The endpoint or user_id is missing */
       400: {
         headers: {
           [name: string]: unknown;
@@ -3107,6 +3109,13 @@ export interface operations {
       };
       /** @description Web push is not configured on this server */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description user_id is not the signed-in account, as when another tab signed this browser in to a different account. Nothing is removed. */
+      409: {
         headers: {
           [name: string]: unknown;
         };

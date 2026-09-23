@@ -69,6 +69,7 @@ func pushDeviceListed(subscriptions []store.PushSubscription, deviceKey string) 
 var (
 	errPushRegistrationUserRequired   = errors.New("user_id is required")
 	errPushRegistrationAccountChanged = errors.New("this browser is now signed in to a different account; nothing was saved")
+	errPushRemovalAccountChanged      = errors.New("this browser is now signed in to a different account; nothing was removed")
 )
 
 func (s *Server) putMyPushSubscription(w http.ResponseWriter, r *http.Request) {
@@ -130,9 +131,21 @@ func (s *Server) deleteMyPushSubscription(w http.ResponseWriter, r *http.Request
 	}
 	var body struct {
 		Endpoint string `json:"endpoint"`
+		UserID   string `json:"user_id"`
 	}
 	if err := readJSON(w, r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	// The removal is scoped to the signed-in account, so a tab still showing
+	// another one would remove nothing of that account's while it believed the
+	// device was off. The client names the account it is turning off for.
+	if strings.TrimSpace(body.UserID) == "" {
+		writeError(w, http.StatusBadRequest, errPushRegistrationUserRequired)
+		return
+	}
+	if body.UserID != act.user.ID {
+		writeError(w, http.StatusConflict, errPushRemovalAccountChanged)
 		return
 	}
 	endpoint := strings.TrimSpace(body.Endpoint)
