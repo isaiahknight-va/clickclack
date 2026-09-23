@@ -1,0 +1,1 @@
+Negative control for the upgrade evidence: the same harness run against a throwaway head whose SQLite 0044 defaulted vapid_key_id to a non-empty value. It must fail, and it did: seven failed checks on SQLite (the retired-key rule fired, the failing-old device was removed, the selection digest diverged), PostgreSQL untouched and clean.

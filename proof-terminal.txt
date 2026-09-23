@@ -36,3 +36,5 @@ Revision 4 (2026-09-22, dead-row handling): a real iPad whose subscription was m
 Revision 4 final (head e8668106): e1r7-* is the built-server authorization run at the pushed head, including the key-retired skip (zero sends, the retired-key skip line).
 
 Revision 4 upgrade evidence (head 1fe45150, apps tree identical to e8668106): e2r2-upgrade/ covers SQLite and PostgreSQL from v0.5.1 through 0043 and 0044 (0036 and 0037), and from the PR's previous head 4fdae122 through 0044 (0037) with seven seeded devices, then boots head's server on the upgraded copy and records the start sweep. RESULT: PASS. A negative control (0044 defaulting the key id to a non-empty value) made the same run fail with seven failed checks.
+
+Revision 4 final upgrade evidence (head 2df1c2f6, apps tree identical to e8668106): e2r3-upgrade/ is the same run as e2r2 with a bounded server stop in the harness; RESULT: PASS. e2r3-upgrade/negative-control/ is the mutant run, RESULT: FAIL, published so the check count can be verified.
