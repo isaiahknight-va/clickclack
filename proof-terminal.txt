@@ -28,3 +28,5 @@ Head 31e2df0b (revision 2 final, 2026-09-22): full browser suite 403 passed (2.4
 Revision 3 (2026-09-22, head after the stale-tab fix): e1r3-* is the built-server authorization run with real session cookies, including the shared-browser case where a registration naming an account that is no longer signed in is refused with 409 and nothing is written.
 
 Revision 3 final (2026-09-22, head 0aad022b): e1r4-* is the built-server authorization run at the pushed head, covering the four queued-revocation cases and the shared-browser registration and removal refusals (409, nothing written or removed) with real session cookies. Full browser suite at this head: 409 passed.
+
+Revision 3 final (head 4fdae122): e1r5-* is the built-server authorization run at the pushed head; e1r3 and e1r4 are the same run at earlier heads of this revision.
