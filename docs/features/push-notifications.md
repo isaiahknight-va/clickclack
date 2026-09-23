@@ -161,7 +161,10 @@ registering the device for. It replaces any existing registration for the same
 endpoint. When `user_id` is not the signed-in account the answer is `409` and
 nothing is written. The endpoint must be an `https` URL at a public host;
 the client keys are rejected unless the public key is a point on P-256 and the
-auth secret is 16 bytes. `DELETE` takes an endpoint and is idempotent.
+auth secret is 16 bytes. `DELETE` takes an endpoint and `user_id`, the
+account the client is turning the device off for, and is idempotent. When
+`user_id` is not the signed-in account the answer is `409` and nothing is
+removed.
 
 ## Privacy
 
@@ -192,7 +195,9 @@ depending on the browser.
   account on that device stops receiving until one turns it on again. A
   registration is refused when the signed-in account changed underneath it: a
   tab still showing one account after another tab signed the browser in to a
-  different account registers nothing, for either account.
+  different account registers nothing, for either account. Turning the switch
+  off in that tab is refused the same way: the browser keeps its subscription
+  and the first account keeps its device, and the row asks for a reload.
 - When the browser replaces a subscription on its own, the service worker does
   not register the replacement, because it cannot tell which account on the
   device turned push on. It asks an open app window to re-register, and only
