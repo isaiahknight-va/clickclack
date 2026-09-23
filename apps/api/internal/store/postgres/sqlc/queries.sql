@@ -2052,7 +2052,8 @@ ORDER BY ups.user_id, ups.created_at, ups.id;
 -- name: PruneFailingPushSubscriptions :execrows
 DELETE FROM user_push_subscriptions
 WHERE failing_since IS NOT NULL
-  AND failing_since < sqlc.arg(failing_before);
+  AND failing_since < sqlc.arg(failing_before)
+  AND failure_count >= sqlc.arg(min_failures);
 
 -- name: PruneRetiredKeyPushSubscriptions :execrows
 DELETE FROM user_push_subscriptions

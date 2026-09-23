@@ -34,6 +34,10 @@ const (
 	// before its row is pruned. An outage is shorter than a week, and the
 	// daily retry gives the device seven chances.
 	PushFailingPruneAfter = 7 * 24 * time.Hour
+	// PushFailingPruneMinFailures is how many refusals that week must hold.
+	// Retries ride on messages, so a quiet account can go a week on one
+	// refusal, and one refusal never removes a device.
+	PushFailingPruneMinFailures = 2
 	// PushRetiredKeyPruneAfter is how long a device registered under a
 	// retired key may go without registering again before its row is pruned.
 	// Opening the app replaces its subscription; a month without that means
@@ -270,7 +274,8 @@ func CheckPushDelivery(state PushDeliveryState, currentKeyID string, now time.Ti
 // The reverse can fail inside the cutoff's own second, which only leaves a
 // removal to the next pass and never makes one early.
 type PushPruneCutoffs struct {
-	// FailingBefore: a device refused since before this is pruned.
+	// FailingBefore: a device refused since before this, at least
+	// PushFailingPruneMinFailures times, is pruned.
 	FailingBefore string
 	// RetiredKeyUpdatedBefore: a device under a retired key last written
 	// before this is pruned.
