@@ -25,6 +25,7 @@ export type PushState = {
   vapid_public_key: string;
   subscriptions: PushDevice[];
   this_device: boolean;
+  this_device_stale: boolean;
 };
 
 const STORAGE_PREFIX = "clickclack:web-push-enabled:v1:";
@@ -99,12 +100,15 @@ export async function registerPushWorker(): Promise<ServiceWorkerRegistration> {
 // ensurePushSubscription returns this device's subscription under the key the
 // server signs with now. One made under an earlier key is replaced, because
 // its push service refuses everything signed with the new one, and its row on
-// the server is removed for userID since it can never deliver again.
+// the server is removed for userID since it can never deliver again. state is
+// the push state the caller read naming this browser's subscription, so the
+// server can say the device is stale when the browser cannot.
 export async function ensurePushSubscription(
   registration: ServiceWorkerRegistration,
-  vapidPublicKey: string,
+  state: PushState,
   userID: string,
 ): Promise<PushSubscription> {
+  const vapidPublicKey = state.vapid_public_key;
   const key = applicationServerKey(vapidPublicKey);
   const existing = await registration.pushManager.getSubscription();
   if (
@@ -113,6 +117,7 @@ export async function ensurePushSubscription(
       existing.options.applicationServerKey,
       readSubscribedKey(userID),
       vapidPublicKey,
+      state.this_device_stale,
     )
   ) {
     writeSubscribedKey(userID, vapidPublicKey);
@@ -192,10 +197,12 @@ export async function healPushSubscription(userID: string): Promise<void> {
   if (!userID || !pushSupported() || !readPushEnabled(userID)) return;
   try {
     if ((await signedInUserID()) !== userID) return;
-    const state = await fetchPushState();
+    // Named by the subscription this browser holds, the state also says
+    // whether the server holds it under a retired key.
+    const state = await fetchPushState(await currentPushSubscription());
     if (!state.enabled) return;
     const registration = await registerPushWorker();
-    const subscription = await ensurePushSubscription(registration, state.vapid_public_key, userID);
+    const subscription = await ensurePushSubscription(registration, state, userID);
     await storeSubscription(subscription, userID);
   } catch {
     // The settings row is the recovery path; a failed heal must never break
