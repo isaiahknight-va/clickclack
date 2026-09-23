@@ -272,7 +272,10 @@ for (const name of CASES) {
   if (name === "session-revoked") {
     await api(recipient.session, "POST", "/api/auth/logout", {});
   } else if (name === "subscription-deleted") {
-    await api(recipient.session, "DELETE", "/api/me/push/subscriptions", { endpoint });
+    await api(recipient.session, "DELETE", "/api/me/push/subscriptions", {
+      user_id: recipient.id,
+      endpoint,
+    });
   } else if (name === "membership-removed") {
     // No endpoint removes a human member, so the harness makes the row change
     // an operator would. The delivery check reads the same row.

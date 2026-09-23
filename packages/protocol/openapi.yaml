@@ -401,8 +401,11 @@ paths:
           application/json:
             schema:
               type: object
-              required: [endpoint]
+              required: [endpoint, user_id]
               properties:
+                user_id:
+                  type: string
+                  description: The account the client is turning this device off for. It must be the signed-in account, or the request is refused with 409.
                 endpoint:
                   type: string
                   description: The push service URL returned by pushManager.subscribe.
@@ -410,11 +413,13 @@ paths:
         "204":
           description: The device is no longer registered
         "400":
-          description: The endpoint is missing
+          description: The endpoint or user_id is missing
         "403":
           description: Bot tokens cannot register push subscriptions
         "404":
           description: Web push is not configured on this server
+        "409":
+          description: user_id is not the signed-in account, as when another tab signed this browser in to a different account. Nothing is removed.
   /api/event-types:
     get:
       operationId: listEventTypes

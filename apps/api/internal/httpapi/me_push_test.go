@@ -103,8 +103,9 @@ func TestPushEndpointsRegisterAndRemoveADevice(t *testing.T) {
 		t.Fatalf("expected the device to be listed, got %#v", state.Subscriptions)
 	}
 
-	expectStatus(t, http.MethodDelete, fixture.server.URL+"/api/me/push/subscriptions", strings.NewReader(`{"endpoint":"`+endpoint+`"}`), http.StatusNoContent)
-	expectStatus(t, http.MethodDelete, fixture.server.URL+"/api/me/push/subscriptions", strings.NewReader(`{"endpoint":"`+endpoint+`"}`), http.StatusNoContent)
+	removal := `{"user_id":"` + fixture.owner.ID + `","endpoint":"` + endpoint + `"}`
+	expectStatus(t, http.MethodDelete, fixture.server.URL+"/api/me/push/subscriptions", strings.NewReader(removal), http.StatusNoContent)
+	expectStatus(t, http.MethodDelete, fixture.server.URL+"/api/me/push/subscriptions", strings.NewReader(removal), http.StatusNoContent)
 	state = getJSON[struct {
 		Enabled       bool                     `json:"enabled"`
 		VAPIDKey      string                   `json:"vapid_public_key"`
@@ -210,8 +211,15 @@ func TestPushEndpointsRejectUnusableSubscriptions(t *testing.T) {
 			expectStatus(t, http.MethodPut, fixture.server.URL+"/api/me/push/subscriptions", strings.NewReader(body), http.StatusBadRequest)
 		})
 	}
-	expectStatus(t, http.MethodDelete, fixture.server.URL+"/api/me/push/subscriptions", strings.NewReader(`{"endpoint":""}`), http.StatusBadRequest)
-	expectStatus(t, http.MethodDelete, fixture.server.URL+"/api/me/push/subscriptions", strings.NewReader(`{`), http.StatusBadRequest)
+	for name, body := range map[string]string{
+		"no endpoint": `{` + who + `"endpoint":""}`,
+		"no account":  `{"endpoint":"https://push.example.com/send/x"}`,
+		"not json":    `{`,
+	} {
+		t.Run("removal "+name, func(t *testing.T) {
+			expectStatus(t, http.MethodDelete, fixture.server.URL+"/api/me/push/subscriptions", strings.NewReader(body), http.StatusBadRequest)
+		})
+	}
 }
 
 func TestPushEndpointsAreInvisibleWhenTheFeatureIsOff(t *testing.T) {
@@ -227,7 +235,7 @@ func TestPushEndpointsAreInvisibleWhenTheFeatureIsOff(t *testing.T) {
 	}
 	body := `{"endpoint":"https://push.example.com/send/x","keys":{"p256dh":"` + exampleClientKey + `","auth":"` + exampleClientAuth + `"}}`
 	expectStatus(t, http.MethodPut, fixture.server.URL+"/api/me/push/subscriptions", strings.NewReader(body), http.StatusNotFound)
-	expectStatus(t, http.MethodDelete, fixture.server.URL+"/api/me/push/subscriptions", strings.NewReader(`{"endpoint":"https://push.example.com/send/x"}`), http.StatusNotFound)
+	expectStatus(t, http.MethodDelete, fixture.server.URL+"/api/me/push/subscriptions", strings.NewReader(`{"user_id":"`+fixture.owner.ID+`","endpoint":"https://push.example.com/send/x"}`), http.StatusNotFound)
 	subscriptions, err := fixture.store.ListPushSubscriptions(context.Background(), fixture.owner.ID)
 	if err != nil || len(subscriptions) != 0 {
 		t.Fatalf("a disabled feature must never write a row: %#v %v", subscriptions, err)
@@ -411,6 +419,68 @@ func TestPushRegistrationRefusesAnAccountChangedUnderneath(t *testing.T) {
 	}
 }
 
+// TestPushRemovalRefusesAnAccountChangedUnderneath is the same shared cookie
+// jar on the way out: a tab still showing A turns push off while the cookie
+// belongs to B. B's cookie cannot reach A's row, so the removal is refused
+// before anything is touched, and A's device stays listed and deliverable.
+// Naming the signed-in account removes it.
+func TestPushRemovalRefusesAnAccountChangedUnderneath(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := newAccessTestStore(t)
+	accountA, err := st.EnsureBootstrap(ctx, "Owner", "push-removal-a@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	accountB, err := st.CreateUser(ctx, store.CreateUserInput{DisplayName: "Other", Email: "push-removal-b@example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessionA, err := st.CreateSession(ctx, accountA.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessionB, err := st.CreateSession(ctx, accountB.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := newProductionPushHandler(t, st, AccessConfig{})
+	asA := func(request *http.Request) {
+		request.AddCookie(&http.Cookie{Name: "cc_session", Value: sessionA.Token})
+	}
+	asB := func(request *http.Request) {
+		request.AddCookie(&http.Cookie{Name: "cc_session", Value: sessionB.Token})
+	}
+	endpoint := "https://push.example.com/send/shared-browser-off"
+	if registered := servePushPut(handler, accountA.ID, endpoint, asA); registered.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", registered.Code, registered.Body.String())
+	}
+
+	stale := servePushDelete(handler, accountA.ID, endpoint, asB)
+	if stale.Code != http.StatusConflict {
+		t.Fatalf("status = %d, body = %s", stale.Code, stale.Body.String())
+	}
+	if !strings.Contains(stale.Body.String(), errPushRemovalAccountChanged.Error()) {
+		t.Fatalf("the refusal must say why: %s", stale.Body.String())
+	}
+	subscriptions, err := st.ListPushSubscriptions(ctx, accountA.ID)
+	if err != nil || len(subscriptions) != 1 {
+		t.Fatalf("a refused removal must leave the device listed: %#v %v", subscriptions, err)
+	}
+	if _, err := st.GetPushSubscriptionDelivery(ctx, accountA.ID, endpoint); err != nil {
+		t.Fatalf("a refused removal must leave the device deliverable: %v", err)
+	}
+
+	current := servePushDelete(handler, accountA.ID, endpoint, asA)
+	if current.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, body = %s", current.Code, current.Body.String())
+	}
+	subscriptions, err = st.ListPushSubscriptions(ctx, accountA.ID)
+	if err != nil || len(subscriptions) != 0 {
+		t.Fatalf("the signed-in account naming itself must remove the device: %#v %v", subscriptions, err)
+	}
+}
+
 // TestPushRegistrationThroughAccessBindsTheMintedSession is the trusted-proxy
 // path: a request carrying only a Cloudflare Access assertion. The session the
 // assertion mints is the one the device follows, so signing out of it stops
@@ -497,6 +567,17 @@ func newProductionPushHandler(t *testing.T, st *sqlitestore.Store, access Access
 func servePushPut(handler http.Handler, userID, endpoint string, authenticate func(*http.Request)) *httptest.ResponseRecorder {
 	body := `{"user_id":"` + userID + `","endpoint":"` + endpoint + `","keys":{"p256dh":"` + exampleClientKey + `","auth":"` + exampleClientAuth + `"},"user_agent":"phone"}`
 	request := httptest.NewRequest(http.MethodPut, "/api/me/push/subscriptions", strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set(csrfHeaderName, "1")
+	authenticate(request)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	return recorder
+}
+
+func servePushDelete(handler http.Handler, userID, endpoint string, authenticate func(*http.Request)) *httptest.ResponseRecorder {
+	body := `{"user_id":"` + userID + `","endpoint":"` + endpoint + `"}`
+	request := httptest.NewRequest(http.MethodDelete, "/api/me/push/subscriptions", strings.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set(csrfHeaderName, "1")
 	authenticate(request)
