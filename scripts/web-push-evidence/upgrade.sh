@@ -268,6 +268,16 @@ from_previous() {
     waited=$((waited + 1))
   done
   kill -TERM "$server_pid" 2>/dev/null || true
+  # Bounded like every other wait here: a server that ignores TERM or stalls
+  # in its drain is killed after ten seconds instead of hanging the run.
+  local stopping=0
+  while kill -0 "$server_pid" 2>/dev/null && [[ "$stopping" -lt 100 ]]; do
+    sleep 0.1
+    stopping=$((stopping + 1))
+  done
+  if kill -0 "$server_pid" 2>/dev/null; then
+    kill -KILL "$server_pid" 2>/dev/null || true
+  fi
   wait "$server_pid" 2>/dev/null || true
   server_pid=""
   local leaked=0 value

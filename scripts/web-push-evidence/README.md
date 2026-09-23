@@ -57,7 +57,10 @@ swapping the database name in the URL.
 
 Exports the release tag, the pull request's previous head (the last one
 published before the dead-device sweep, with the first push migration and not
-the second), and `HEAD` with `git archive`, and builds all three. It copies
+the second), and `HEAD` with `git archive`, and builds all three. The previous
+head must be reachable in the clone; after a squash merge it is not, so pass
+`--previous` with any revision that holds the first push migration and not the
+second. It copies
 `upgradeevidence/evidence_test.go` into each tree, and
 `upgradeevidence/push_test.go` into the two that have push subscriptions, so
 the same code questions every version. The snapshot is only read; every pass
