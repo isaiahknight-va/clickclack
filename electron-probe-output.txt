@@ -1,0 +1,17 @@
+## New assets (HEAD: 18px trayTemplate.png + 36px trayTemplate@2x.png)
+electron=43.7.3 platform=darwin assets=<scratch>/traywt/apps/desktop/assets
+createFromPath only (before setTemplateImage): template=true size={"width":18,"height":18} scaleFactors=[1,2] empty=false
+HEAD createTray (setTemplateImage(true), no resize): template=true size={"width":18,"height":18} scaleFactors=[1,2] empty=false
+PARENT createTray (setTemplateImage(true) then resize({ height: 18 })): template=false size={"width":18,"height":18} scaleFactors=[1,2] empty=false
+
+## Parent assets (origin/main: single 36px trayTemplate.png)
+electron=43.7.3 platform=darwin assets=<scratch>/tray-proof/parent-assets
+createFromPath only (before setTemplateImage): template=true size={"width":36,"height":36} scaleFactors=[1] empty=false
+HEAD createTray (setTemplateImage(true), no resize): template=true size={"width":36,"height":36} scaleFactors=[1] empty=false
+PARENT createTray (setTemplateImage(true) then resize({ height: 18 })): template=false size={"width":18,"height":18} scaleFactors=[1,2] empty=false
+
+## Packaged app.asar (release/mac-arm64/ClickClack.app)
+electron=43.7.3 platform=darwin assets=<scratch>/traywt/apps/desktop/release/mac-arm64/ClickClack.app/Contents/Resources/app.asar/assets
+createFromPath only (before setTemplateImage): template=true size={"width":18,"height":18} scaleFactors=[1,2] empty=false
+HEAD createTray (setTemplateImage(true), no resize): template=true size={"width":18,"height":18} scaleFactors=[1,2] empty=false
+PARENT createTray (setTemplateImage(true) then resize({ height: 18 })): template=false size={"width":18,"height":18} scaleFactors=[1,2] empty=false
