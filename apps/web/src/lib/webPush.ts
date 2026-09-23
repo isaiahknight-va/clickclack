@@ -99,11 +99,11 @@ export async function registerPushWorker(): Promise<ServiceWorkerRegistration> {
 // ensurePushSubscription returns this device's subscription under the key the
 // server signs with now. One made under an earlier key is replaced, because
 // its push service refuses everything signed with the new one, and its row on
-// the server is removed since it can never deliver again.
+// the server is removed for userID since it can never deliver again.
 export async function ensurePushSubscription(
   registration: ServiceWorkerRegistration,
   vapidPublicKey: string,
-  userID = "",
+  userID: string,
 ): Promise<PushSubscription> {
   const key = applicationServerKey(vapidPublicKey);
   const existing = await registration.pushManager.getSubscription();
@@ -121,7 +121,7 @@ export async function ensurePushSubscription(
   if (existing) {
     const staleEndpoint = existing.endpoint;
     await existing.unsubscribe();
-    await forgetSubscription(staleEndpoint).catch(() => undefined);
+    await forgetSubscription(staleEndpoint, userID).catch(() => undefined);
   }
   const fresh = await registration.pushManager.subscribe({
     userVisibleOnly: true,
@@ -166,10 +166,13 @@ export async function storeSubscription(
   return result.subscription;
 }
 
-export async function forgetSubscription(endpoint: string): Promise<void> {
+// forgetSubscription removes this device for userID, the account the caller
+// is turning it off for. The server refuses it with 409 when the cookie now
+// belongs to someone else, and removes nothing.
+export async function forgetSubscription(endpoint: string, userID: string): Promise<void> {
   await api<void>("/api/me/push/subscriptions", {
     method: "DELETE",
-    body: JSON.stringify({ endpoint }),
+    body: JSON.stringify({ user_id: userID, endpoint }),
   });
 }
 
