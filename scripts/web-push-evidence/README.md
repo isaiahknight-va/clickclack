@@ -22,10 +22,13 @@ posts a message so the recipient's push waits in the queue, then:
 | `session-revoked` | the recipient signs out |
 | `subscription-deleted` | the recipient removes the device |
 | `membership-removed` | the recipient's workspace membership row is deleted |
+| `key-retired` | the recipient's device row is moved to a key the server does not sign with, as a rotation leaves it |
 
 and releases the workers. The recipient's device must receive one push in the
 control case and none in the others, each with a `web push delivery skipped`
-line naming the reason.
+line naming the reason. After `key-retired`, `GET /api/me/push` naming the
+device must answer `this_device_stale: true`, and a message posted with the
+workers free must queue nothing for it: no push and no log line.
 
 A last case is one browser shared by two accounts, signed in by cookie the
 way a browser is. Signed in as A, the device registers for A; the same jar then

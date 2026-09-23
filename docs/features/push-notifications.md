@@ -38,9 +38,12 @@ along with the subject, and restart.
 
 Keep the private key like any other server secret. Rotating it invalidates
 every registered device; each one re-registers the next time its owner opens
-the app. The app compares the key its subscription was made under with the
-server's current key, and replaces a subscription made under the old one. At
-startup the server logs a short fingerprint of the configured public key
+the app. The server records which key each device registered under, stops
+sending to a device under a key it no longer signs with, and tells the app so
+when it opens; the app also compares the key its subscription was made under
+with the server's current key where the browser reports it. Either way it
+replaces a subscription made under the old key. At startup the server logs a
+short fingerprint of the configured public key
 (`web push enabled: application server key ...`), so a rotation is visible in
 the log, followed by a `registered` line as each device returns.
 
@@ -64,8 +67,10 @@ and the account keeps up to ten devices; registering an eleventh drops the
 oldest.
 
 Deleting the Home Screen app deletes its storage, so a reinstalled app is a
-fresh opt-in: turn the switch on again. A key rotation, by contrast, heals on
-the next open without the user doing anything.
+fresh opt-in: turn the switch on again. The deleted app's device is removed
+from the account when the session it was registered under ends, as described
+under [Dead devices](#dead-devices). A key rotation, by contrast, heals on the
+next open without the user doing anything.
 
 iOS 16.4 or later is required. Android and desktop browsers use the same
 standard and work where the browser supports it.
@@ -99,8 +104,9 @@ Delivery happens off the request path in a small worker pool, so posting a
 message never waits on a push service. A push can wait in that queue behind a
 slow push service, so it is checked again immediately before it is sent: the
 device must still be registered to the recipient, under a session that is
-still live, with any backoff elapsed, and the recipient must still be able to
-read the message, which must not have been deleted. A push that fails any of these is dropped with one log line
+still live and the key the server signs with now, with any backoff elapsed,
+and the recipient must still be able to read the message, which must not have
+been deleted. A push that fails any of these is dropped with one log line
 naming the reason, and nothing is sent. The push service is called through the
 same outbound policy as webhooks: no proxy, no redirects, and no destination
 inside the deployment's own network.
@@ -110,21 +116,53 @@ Failures are handled by what the push service says:
 - 404 or 410 means the subscription is dead. The row is deleted.
 - Anything else, including 429, a 5xx, and a timeout, sets a backoff (one
   minute, then five, thirty, two hours, six, and a day at most, honoring a
-  longer `Retry-After`). The row is never deleted for this: a relay outage must
-  not cost users their devices. A success clears the backoff. The failure is
-  recorded on its own deadline, so a push service that used the whole send
-  timeout still gets its backoff.
+  longer `Retry-After`). No single failure deletes the row: a relay outage
+  must not cost users their devices. The first failure of a run records when
+  the run began, and a success clears the backoff and ends the run. The
+  failure is recorded on its own deadline, so a push service that used the
+  whole send timeout still gets its backoff.
 
 Log lines name the push service host, the user, and what happened: a device
 registered, refreshed, or removed; a push delivered, skipped and why, or
-failed. They never contain an endpoint or a key: an endpoint's path is the
-device's delivery secret.
+failed; and how many dead devices a sweep removed. They never contain an
+endpoint or a key: an endpoint's path is the device's delivery secret.
+
+## Dead devices
+
+A device can stop receiving without anyone turning it off: its app is deleted,
+the server's key is rotated while it is closed, or the session it was
+registered under ends. The server finds these rows itself. Once at startup and
+then hourly, one sweep removes, in a single transaction:
+
+- a device its push service has refused for seven days straight. A relay
+  outage is shorter than a week, and the daily retry gives the device seven
+  chances. Only a delivery ends the run; registering the device again does
+  not.
+- a device registered under a key the server no longer signs with that has not
+  registered again for thirty days. Opening the app replaces such a
+  subscription, so a month without that means nobody is opening it.
+- a device whose session has been signed out, revoked, or expired, or no longer
+  exists. Delivery already skips such a device; the sweep removes the row.
+
+A device registered by the loopback development identity has no session, and
+is outside the session rule. A device registered before the server recorded
+keys has no key on file, and is never treated as under a retired key. A sweep
+that removes anything logs one line with the count under each rule
+(`web push pruned 3 devices: ...`).
+
+A device under a retired key is never sent to: recipient selection leaves it
+out, and a push already queued for it is skipped with
+`the device was registered under a retired key`. When the app opens,
+`GET /api/me/push` names the device stale and the app replaces its
+subscription. This works on every browser, including Safari, which never
+reports the key a subscription was made under.
 
 ## What is stored
 
 One row per device in `user_push_subscriptions`: the endpoint, the two client
-keys, a short device label, timestamps, the failure count and backoff, and the
-session that registered it. `GET /api/me/push` returns only the label, the
+keys, a short device label, timestamps, the failure count and backoff, when
+the current run of failures began, the session that registered it, and a short
+fingerprint of the server key it registered under. `GET /api/me/push` returns only the label, the
 timestamps, and the failure count for each device, plus whether the asking
 browser is one of them. The endpoint and the keys never leave the server.
 
@@ -154,6 +192,9 @@ DELETE /api/me/push/subscriptions
 endpoint the browser holds. The answer's `this_device` is true when that
 digest matches one of the user's devices, and false when it matches none or
 no device is named. The settings switch reads on only when it is true.
+`this_device_stale` is true when that device is registered under a key the
+server no longer signs with, and false otherwise; the app then replaces the
+subscription. The answer never names a key or an endpoint.
 
 `PUT` takes the browser's subscription (`endpoint` and the `p256dh` and `auth`
 keys), a short `user_agent` label, and `user_id`, the account the client is
@@ -208,3 +249,9 @@ depending on the browser.
   an account that turned push on there does. If the app is closed when this
   happens, the device re-registers the next time the app opens and receives
   nothing until then.
+- A device registered before the server recorded keys has none on file. If
+  its subscription was made under a key since rotated away, and its browser
+  hides the key (Safari) and remembers none, neither side can tell: the
+  device is removed after a week of refusals, and the next open registers the
+  same subscription again, now recorded under the current key. Turning the
+  switch off and back on replaces the subscription.
