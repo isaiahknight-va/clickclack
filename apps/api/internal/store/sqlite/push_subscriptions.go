@@ -177,11 +177,12 @@ func (s *Store) listPushSubscriptionTargets(ctx context.Context, userIDs []strin
 }
 
 // PrunePushSubscriptions removes, in one transaction, the devices that can
-// no longer receive: refused by their push service for a week, registered
-// under a retired key and not registered again for a month, or bound to a
-// session that is gone, revoked, or expired. A development row, with no
-// session, and a row whose key was never recorded are each outside the rule
-// that would need what they lack.
+// no longer receive: refused by their push service in a run of failures that
+// began a week ago and holds more than one, registered under a retired key
+// and not registered again for a month, or bound to a session that is gone,
+// revoked, or expired. A development row, with no session, and a row whose
+// key was never recorded are each outside the rule that would need what they
+// lack.
 func (s *Store) PrunePushSubscriptions(ctx context.Context, currentKeyID string, now time.Time) (store.PushPruneResult, error) {
 	cutoffs := store.NewPushPruneCutoffs(now)
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -191,7 +192,10 @@ func (s *Store) PrunePushSubscriptions(ctx context.Context, currentKeyID string,
 	defer tx.Rollback()
 	qtx := s.q.WithTx(tx)
 	var result store.PushPruneResult
-	if result.Failing, err = qtx.PruneFailingPushSubscriptions(ctx, sql.NullString{String: cutoffs.FailingBefore, Valid: true}); err != nil {
+	if result.Failing, err = qtx.PruneFailingPushSubscriptions(ctx, storedb.PruneFailingPushSubscriptionsParams{
+		FailingBefore: sql.NullString{String: cutoffs.FailingBefore, Valid: true},
+		MinFailures:   store.PushFailingPruneMinFailures,
+	}); err != nil {
 		return store.PushPruneResult{}, err
 	}
 	if currentKeyID != "" {

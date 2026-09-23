@@ -5720,10 +5720,16 @@ const pruneFailingPushSubscriptions = `-- name: PruneFailingPushSubscriptions :e
 DELETE FROM user_push_subscriptions
 WHERE failing_since IS NOT NULL
   AND failing_since < $1
+  AND failure_count >= $2
 `
 
-func (q *Queries) PruneFailingPushSubscriptions(ctx context.Context, failingBefore sql.NullString) (int64, error) {
-	result, err := q.db.ExecContext(ctx, pruneFailingPushSubscriptions, failingBefore)
+type PruneFailingPushSubscriptionsParams struct {
+	FailingBefore sql.NullString `json:"failing_before"`
+	MinFailures   int64          `json:"min_failures"`
+}
+
+func (q *Queries) PruneFailingPushSubscriptions(ctx context.Context, arg PruneFailingPushSubscriptionsParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, pruneFailingPushSubscriptions, arg.FailingBefore, arg.MinFailures)
 	if err != nil {
 		return 0, err
 	}

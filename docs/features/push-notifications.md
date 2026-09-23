@@ -134,10 +134,12 @@ the server's key is rotated while it is closed, or the session it was
 registered under ends. The server finds these rows itself. Once at startup and
 then hourly, one sweep removes, in a single transaction:
 
-- a device its push service has refused for seven days straight. A relay
-  outage is shorter than a week, and the daily retry gives the device seven
-  chances. Only a delivery ends the run; registering the device again does
-  not.
+- a device its push service has refused at least twice, with nothing
+  delivered, for seven days. A relay outage is shorter than a week, and the
+  daily retry gives the device seven chances. Retries happen only when there
+  is something to send, so a quiet week can hold a single refusal, and one
+  refusal never removes a device. Only a delivery ends the run; registering
+  the device again does not.
 - a device registered under a key the server no longer signs with that has not
   registered again for thirty days. Opening the app replaces such a
   subscription, so a month without that means nobody is opening it.

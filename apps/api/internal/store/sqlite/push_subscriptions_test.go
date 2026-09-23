@@ -633,6 +633,10 @@ func TestPrunePushSubscriptionsRemovesOnlyDeadDevices(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	memberLive, err := st.CreateSession(ctx, member.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	register := func(userID, name, keyID, sessionToken string) string {
 		t.Helper()
 		input := pushInput(userID, "https://push.example.com/send/"+name, name)
@@ -644,7 +648,7 @@ func TestPrunePushSubscriptionsRemovesOnlyDeadDevices(t *testing.T) {
 		}
 		return input.Endpoint
 	}
-	set := func(endpoint, column, value string) {
+	set := func(endpoint, column string, value any) {
 		t.Helper()
 		if _, err := st.db.ExecContext(ctx, `UPDATE user_push_subscriptions SET `+column+` = ? WHERE endpoint = ?`, value, endpoint); err != nil {
 			t.Fatal(err)
@@ -663,8 +667,15 @@ func TestPrunePushSubscriptionsRemovesOnlyDeadDevices(t *testing.T) {
 	healthy := register(owner.ID, "healthy", "key-now", live.Token)
 	failingWeek := register(owner.ID, "failing-8-days", "key-now", live.Token)
 	set(failingWeek, "failing_since", ago(8*day))
+	set(failingWeek, "failure_count", 2)
 	failingDays := register(owner.ID, "failing-6-days", "key-now", live.Token)
 	set(failingDays, "failing_since", ago(6*day))
+	set(failingDays, "failure_count", 6)
+	// One refusal and then a quiet week: retries ride on messages, so no
+	// second attempt was ever made, and one refusal never removes a device.
+	failedOnce := register(member.ID, "failed-once-8-days-ago", "key-now", memberLive.Token)
+	set(failedOnce, "failing_since", ago(8*day))
+	set(failedOnce, "failure_count", 1)
 	retiredMonth := register(owner.ID, "retired-31-days", "key-before", live.Token)
 	set(retiredMonth, "updated_at", ago(31*day))
 	retiredWeeks := register(owner.ID, "retired-29-days", "key-before", live.Token)
@@ -718,7 +729,7 @@ func TestPrunePushSubscriptionsRemovesOnlyDeadDevices(t *testing.T) {
 		t.Fatal(err)
 	}
 	if result != (store.PushPruneResult{Failing: 1, SessionEnded: 3}) || !remaining()[retiredMonth] {
-		t.Fatalf("an unknown current key retires nothing: %#v", result)
+		t.Fatalf("the first pass removes one device refused through a week and three whose session ended, and retires nothing without a current key: %#v", result)
 	}
 
 	result, err = st.PrunePushSubscriptions(ctx, "key-now", now)
@@ -732,6 +743,7 @@ func TestPrunePushSubscriptionsRemovesOnlyDeadDevices(t *testing.T) {
 	for name, endpoint := range map[string]string{
 		"healthy": healthy, "failing for 6 days": failingDays, "retired key touched 29 days ago": retiredWeeks,
 		"key never recorded": unrecorded, "development row with no session": development,
+		"refused once, then a quiet week": failedOnce,
 	} {
 		if !kept[endpoint] {
 			t.Fatalf("the sweep removed the %s device", name)
@@ -745,8 +757,8 @@ func TestPrunePushSubscriptionsRemovesOnlyDeadDevices(t *testing.T) {
 			t.Fatalf("the sweep kept the %s device", name)
 		}
 	}
-	if len(kept) != 5 {
-		t.Fatalf("expected five devices left, got %v", kept)
+	if len(kept) != 6 {
+		t.Fatalf("expected six devices left, got %v", kept)
 	}
 
 	if result, err = st.PrunePushSubscriptions(ctx, "key-now", now); err != nil || result.Total() != 0 {
