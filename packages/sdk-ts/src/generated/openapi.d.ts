@@ -3123,7 +3123,7 @@ export interface operations {
         };
         content?: never;
       };
-      /** @description Bot tokens cannot register push subscriptions */
+      /** @description A bot token, or a caller with no signed-in session for the device to follow */
       403: {
         headers: {
           [name: string]: unknown;
