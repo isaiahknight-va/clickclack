@@ -615,7 +615,8 @@ CREATE TABLE user_push_subscriptions (
   next_attempt_at TEXT,
   failure_count INTEGER NOT NULL DEFAULT 0,
   vapid_key_id TEXT NOT NULL DEFAULT '',
-  failing_since TEXT
+  failing_since TEXT,
+  last_failure_at TEXT
 );
 
 CREATE INDEX idx_user_push_subscriptions_user ON user_push_subscriptions(user_id, created_at);

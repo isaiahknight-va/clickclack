@@ -1883,7 +1883,9 @@ ON CONFLICT (endpoint) DO UPDATE SET
   session_token_hash = excluded.session_token_hash,
   updated_at = excluded.updated_at,
   next_attempt_at = NULL,
-  failure_count = 0;
+  failure_count = 0,
+  failing_since = NULL,
+  last_failure_at = NULL;
 
 -- name: TrimPushSubscriptions :exec
 DELETE FROM user_push_subscriptions
@@ -1916,14 +1918,16 @@ SET last_success_at = sqlc.arg(last_success_at),
     updated_at = sqlc.arg(updated_at),
     next_attempt_at = NULL,
     failure_count = 0,
-    failing_since = NULL
+    failing_since = NULL,
+    last_failure_at = NULL
 WHERE user_id = sqlc.arg(user_id) AND endpoint = sqlc.arg(endpoint);
 
 -- name: MarkPushSubscriptionFailure :one
 UPDATE user_push_subscriptions
 SET failure_count = failure_count + 1,
     failing_since = COALESCE(failing_since, sqlc.arg(updated_at)),
-    updated_at = sqlc.arg(updated_at)
+    updated_at = sqlc.arg(updated_at),
+    last_failure_at = sqlc.arg(updated_at)
 WHERE user_id = sqlc.arg(user_id) AND endpoint = sqlc.arg(endpoint)
 RETURNING failure_count;
 
@@ -1960,6 +1964,8 @@ ORDER BY ups.user_id, ups.created_at, ups.id;
 DELETE FROM user_push_subscriptions
 WHERE failing_since IS NOT NULL
   AND failing_since < sqlc.arg(failing_before)
+  AND last_failure_at IS NOT NULL
+  AND last_failure_at >= sqlc.arg(last_failure_since)
   AND failure_count >= sqlc.arg(min_failures);
 
 -- name: PruneRetiredKeyPushSubscriptions :execrows

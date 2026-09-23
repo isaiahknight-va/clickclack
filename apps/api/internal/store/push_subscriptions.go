@@ -31,12 +31,15 @@ const (
 	// is gone, or by PrunePushSubscriptions, never for one failure.
 	MaxPushRetryDelay = 24 * time.Hour
 	// PushFailingPruneAfter is how long a push service may refuse a device
-	// before its row is pruned. An outage is shorter than a week, and the
-	// daily retry gives the device seven chances.
+	// before its row is pruned. An outage is shorter than a week.
 	PushFailingPruneAfter = 7 * 24 * time.Hour
-	// PushFailingPruneMinFailures is how many refusals that week must hold.
-	// Retries ride on messages, so a quiet account can go a week on one
-	// refusal, and one refusal never removes a device.
+	// PushFailingPruneRefusedWithin is how recent the latest refusal of that
+	// week must be. Retries ride on messages, so two refusals in one short
+	// outage and then a quiet week are not a week of refusals: the run must
+	// still be refusing at its end.
+	PushFailingPruneRefusedWithin = 24 * time.Hour
+	// PushFailingPruneMinFailures is how many refusals that week must hold,
+	// so one refusal never removes a device.
 	PushFailingPruneMinFailures = 2
 	// PushRetiredKeyPruneAfter is how long a device registered under a
 	// retired key may go without registering again before its row is pruned.
@@ -274,9 +277,15 @@ func CheckPushDelivery(state PushDeliveryState, currentKeyID string, now time.Ti
 // The reverse can fail inside the cutoff's own second, which only leaves a
 // removal to the next pass and never makes one early.
 type PushPruneCutoffs struct {
-	// FailingBefore: a device refused since before this, at least
+	// FailingBefore and LastFailureSince: a device refused since before
+	// FailingBefore, most recently at or after LastFailureSince, at least
 	// PushFailingPruneMinFailures times, is pruned.
 	FailingBefore string
+	// LastFailureSince is compared the other way, a stored time at or after
+	// it, so it is the next whole second after the instant, written with no
+	// fraction: a stored time sorts at or after it only when it is no
+	// earlier than the instant.
+	LastFailureSince string
 	// RetiredKeyUpdatedBefore: a device under a retired key last written
 	// before this is pruned.
 	RetiredKeyUpdatedBefore string
@@ -289,8 +298,10 @@ func NewPushPruneCutoffs(now time.Time) PushPruneCutoffs {
 	format := func(instant time.Time) string {
 		return instant.UTC().Format("2006-01-02T15:04:05.000000000Z07:00")
 	}
+	refusedSince := now.Add(-PushFailingPruneRefusedWithin).UTC().Truncate(time.Second).Add(time.Second)
 	return PushPruneCutoffs{
 		FailingBefore:           format(now.Add(-PushFailingPruneAfter)),
+		LastFailureSince:        refusedSince.Format(time.RFC3339),
 		RetiredKeyUpdatedBefore: format(now.Add(-PushRetiredKeyPruneAfter)),
 		SessionExpiredBy:        format(now),
 	}

@@ -5418,7 +5418,8 @@ const markPushSubscriptionFailure = `-- name: MarkPushSubscriptionFailure :one
 UPDATE user_push_subscriptions
 SET failure_count = failure_count + 1,
     failing_since = COALESCE(failing_since, ?1),
-    updated_at = ?1
+    updated_at = ?1,
+    last_failure_at = ?1
 WHERE user_id = ?2 AND endpoint = ?3
 RETURNING failure_count
 `
@@ -5442,7 +5443,8 @@ SET last_success_at = ?1,
     updated_at = ?2,
     next_attempt_at = NULL,
     failure_count = 0,
-    failing_since = NULL
+    failing_since = NULL,
+    last_failure_at = NULL
 WHERE user_id = ?3 AND endpoint = ?4
 `
 
@@ -5591,16 +5593,19 @@ const pruneFailingPushSubscriptions = `-- name: PruneFailingPushSubscriptions :e
 DELETE FROM user_push_subscriptions
 WHERE failing_since IS NOT NULL
   AND failing_since < ?1
-  AND failure_count >= ?2
+  AND last_failure_at IS NOT NULL
+  AND last_failure_at >= ?2
+  AND failure_count >= ?3
 `
 
 type PruneFailingPushSubscriptionsParams struct {
-	FailingBefore sql.NullString `json:"failing_before"`
-	MinFailures   int64          `json:"min_failures"`
+	FailingBefore    sql.NullString `json:"failing_before"`
+	LastFailureSince sql.NullString `json:"last_failure_since"`
+	MinFailures      int64          `json:"min_failures"`
 }
 
 func (q *Queries) PruneFailingPushSubscriptions(ctx context.Context, arg PruneFailingPushSubscriptionsParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, pruneFailingPushSubscriptions, arg.FailingBefore, arg.MinFailures)
+	result, err := q.db.ExecContext(ctx, pruneFailingPushSubscriptions, arg.FailingBefore, arg.LastFailureSince, arg.MinFailures)
 	if err != nil {
 		return 0, err
 	}
@@ -6789,7 +6794,9 @@ ON CONFLICT (endpoint) DO UPDATE SET
   session_token_hash = excluded.session_token_hash,
   updated_at = excluded.updated_at,
   next_attempt_at = NULL,
-  failure_count = 0
+  failure_count = 0,
+  failing_since = NULL,
+  last_failure_at = NULL
 `
 
 type UpsertPushSubscriptionParams struct {

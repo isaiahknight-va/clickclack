@@ -541,9 +541,10 @@ func TestPushSubscriptionKeepsTheKeyItRegisteredUnder(t *testing.T) {
 	}
 }
 
-// failing_since marks when the current run of refusals began: the first
-// failure stamps it, later ones leave it, a refresh leaves it, and only a
-// success ends the run.
+// failing_since marks when the current run of refusals began and
+// last_failure_at when the latest one happened: the first failure stamps both,
+// a later one moves only the latest, and a success or registering again ends
+// the run.
 func TestPushSubscriptionFailingSinceMarksTheStartOfARun(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -556,15 +557,15 @@ func TestPushSubscriptionFailingSinceMarksTheStartOfARun(t *testing.T) {
 	if _, err := st.UpsertPushSubscription(ctx, input); err != nil {
 		t.Fatal(err)
 	}
-	failingSince := func() sql.NullString {
+	run := func() (sql.NullString, sql.NullString) {
 		t.Helper()
-		var value sql.NullString
-		if err := st.db.QueryRowContext(ctx, `SELECT failing_since FROM user_push_subscriptions WHERE endpoint = $1`, input.Endpoint).Scan(&value); err != nil {
+		var since, last sql.NullString
+		if err := st.db.QueryRowContext(ctx, `SELECT failing_since, last_failure_at FROM user_push_subscriptions WHERE endpoint = $1`, input.Endpoint).Scan(&since, &last); err != nil {
 			t.Fatal(err)
 		}
-		return value
+		return since, last
 	}
-	if failingSince().Valid {
+	if since, last := run(); since.Valid || last.Valid {
 		t.Fatal("a new device is not failing")
 	}
 
@@ -573,10 +574,13 @@ func TestPushSubscriptionFailingSinceMarksTheStartOfARun(t *testing.T) {
 		t.Fatal(err)
 	}
 	after := time.Now().UTC()
-	first := failingSince()
+	first, firstLast := run()
 	stamped, err := time.Parse(time.RFC3339Nano, first.String)
 	if !first.Valid || err != nil || stamped.Before(before) || stamped.After(after) {
 		t.Fatalf("the first failure must stamp the run: %#v %v", first, err)
+	}
+	if firstLast != first {
+		t.Fatalf("the first failure is also the latest: %q, latest %q", first.String, firstLast.String)
 	}
 
 	time.Sleep(2 * time.Millisecond)
@@ -584,30 +588,156 @@ func TestPushSubscriptionFailingSinceMarksTheStartOfARun(t *testing.T) {
 	if err != nil || count != 2 {
 		t.Fatalf("failure count is %d: %v", count, err)
 	}
-	if again := failingSince(); again != first {
+	again, againLast := run()
+	if again != first {
 		t.Fatalf("a second failure must keep the start of the run: %q, then %q", first.String, again.String)
 	}
+	latest, err := time.Parse(time.RFC3339Nano, againLast.String)
+	if !againLast.Valid || err != nil || !latest.After(stamped) {
+		t.Fatalf("a second failure must move the latest refusal: %#v after %q", againLast, first.String)
+	}
+
+	// Registering again is the app opening: proof the device is alive.
 	if _, err := st.UpsertPushSubscription(ctx, input); err != nil {
 		t.Fatal(err)
 	}
-	if refreshed := failingSince(); refreshed != first {
-		t.Fatalf("registering again does not end a run of refusals: %q, then %q", first.String, refreshed.String)
+	if since, last := run(); since.Valid || last.Valid {
+		t.Fatalf("registering again must end the run of refusals: %q, latest %q", since.String, last.String)
 	}
 
+	if _, err := st.MarkPushSubscriptionFailure(ctx, owner.ID, input.Endpoint, 0); err != nil {
+		t.Fatal(err)
+	}
 	if err := st.MarkPushSubscriptionSuccess(ctx, owner.ID, input.Endpoint); err != nil {
 		t.Fatal(err)
 	}
-	if cleared := failingSince(); cleared.Valid {
-		t.Fatalf("a success must end the run: %q", cleared.String)
+	if since, last := run(); since.Valid || last.Valid {
+		t.Fatalf("a success must end the run: %q, latest %q", since.String, last.String)
 	}
 	time.Sleep(2 * time.Millisecond)
 	if _, err := st.MarkPushSubscriptionFailure(ctx, owner.ID, input.Endpoint, 0); err != nil {
 		t.Fatal(err)
 	}
-	next := failingSince()
+	next, _ := run()
 	restarted, err := time.Parse(time.RFC3339Nano, next.String)
-	if !next.Valid || err != nil || !restarted.After(stamped) {
-		t.Fatalf("a failure after a success starts a new run: %#v after %q", next, first.String)
+	if !next.Valid || err != nil || !restarted.After(latest) {
+		t.Fatalf("a failure after a success starts a new run: %#v after %q", next, againLast.String)
+	}
+}
+
+// Two refusals in one short relay outage and then a quiet week are not a week
+// of refusals: retries ride on messages, so nothing was tried in between, and
+// the device may be fine. Only a run still refusing at its end is pruned.
+func TestPrunePushSubscriptionsNeedsRefusalsThroughTheWeek(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := newMigratedPostgresTestStore(t)
+	owner, err := st.EnsureBootstrap(ctx, "Owner", "push-blip@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := pushInput(owner.ID, "https://push.example.com/send/blip", "phone")
+	if _, err := st.UpsertPushSubscription(ctx, input); err != nil {
+		t.Fatal(err)
+	}
+	stored := func() int {
+		t.Helper()
+		subscriptions, err := st.ListPushSubscriptions(ctx, owner.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(subscriptions)
+	}
+	for range 2 {
+		if _, err := st.MarkPushSubscriptionFailure(ctx, owner.ID, input.Endpoint, 0); err != nil {
+			t.Fatal(err)
+		}
+	}
+	now := time.Now().UTC()
+	result, err := st.PrunePushSubscriptions(ctx, "", now.Add(8*24*time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Total() != 0 {
+		t.Fatalf("two refusals in one blip and a quiet week removed the device: %#v", result)
+	}
+	if stored() != 1 {
+		t.Fatal("the device refused in a blip must be kept")
+	}
+
+	// The same run, begun a week ago and refused again now, has refused
+	// through the week.
+	if _, err := st.db.ExecContext(ctx, `UPDATE user_push_subscriptions SET failing_since = $1 WHERE endpoint = $2`, now.Add(-8*24*time.Hour).Format(time.RFC3339Nano), input.Endpoint); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.MarkPushSubscriptionFailure(ctx, owner.ID, input.Endpoint, 0); err != nil {
+		t.Fatal(err)
+	}
+	result, err = st.PrunePushSubscriptions(ctx, "", time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != (store.PushPruneResult{Failing: 1}) {
+		t.Fatalf("a device refused through the week must be removed: %#v", result)
+	}
+	if stored() != 0 {
+		t.Fatal("the device refused through the week is still stored")
+	}
+}
+
+// A device that registers again has been opened: whatever it was refused
+// before, a later run is judged from its own start.
+func TestPrunePushSubscriptionsJudgesARunFromTheLastRegistration(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := newMigratedPostgresTestStore(t)
+	owner, err := st.EnsureBootstrap(ctx, "Owner", "push-refresh@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := pushInput(owner.ID, "https://push.example.com/send/refresh", "phone")
+	if _, err := st.UpsertPushSubscription(ctx, input); err != nil {
+		t.Fatal(err)
+	}
+	stored := func() int {
+		t.Helper()
+		subscriptions, err := st.ListPushSubscriptions(ctx, owner.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(subscriptions)
+	}
+	for range 2 {
+		if _, err := st.MarkPushSubscriptionFailure(ctx, owner.ID, input.Endpoint, 0); err != nil {
+			t.Fatal(err)
+		}
+	}
+	now := time.Now().UTC()
+	// Those two refusals were a week ago.
+	if _, err := st.db.ExecContext(ctx, `UPDATE user_push_subscriptions SET failing_since = $1 WHERE endpoint = $2`, now.Add(-8*24*time.Hour).Format(time.RFC3339Nano), input.Endpoint); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.UpsertPushSubscription(ctx, input); err != nil {
+		t.Fatal(err)
+	}
+	for want := int64(1); want <= 2; want++ {
+		count, err := st.MarkPushSubscriptionFailure(ctx, owner.ID, input.Endpoint, 0)
+		if err != nil || count != want {
+			t.Fatalf("registering again must restart the count: %d, want %d: %v", count, want, err)
+		}
+	}
+
+	for _, at := range []time.Time{time.Now().UTC(), now.Add(8 * 24 * time.Hour)} {
+		result, err := st.PrunePushSubscriptions(ctx, "", at)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.Total() != 0 {
+			t.Fatalf("a device refused twice since it registered again was removed at %s: %#v", at.Format(time.RFC3339), result)
+		}
+	}
+	if stored() != 1 {
+		t.Fatal("the device that registered again must be kept")
 	}
 }
 
@@ -665,16 +795,29 @@ func TestPrunePushSubscriptionsRemovesOnlyDeadDevices(t *testing.T) {
 	}
 
 	healthy := register(owner.ID, "healthy", "key-now", live.Token)
-	failingWeek := register(owner.ID, "failing-8-days", "key-now", live.Token)
+	failingWeek := register(owner.ID, "refused-8-days-through-the-last-hour", "key-now", live.Token)
 	set(failingWeek, "failing_since", ago(8*day))
+	set(failingWeek, "last_failure_at", ago(time.Hour))
 	set(failingWeek, "failure_count", 2)
-	failingDays := register(owner.ID, "failing-6-days", "key-now", live.Token)
+	// Two refusals in one ten-minute relay blip and then a quiet week:
+	// retries ride on messages, so nothing was tried after the blip.
+	blip := register(owner.ID, "refused-twice-in-a-blip-8-days-ago", "key-now", live.Token)
+	set(blip, "failing_since", ago(8*day))
+	set(blip, "last_failure_at", ago(8*day-10*time.Minute))
+	set(blip, "failure_count", 2)
+	lastRefusedDayAgo := register(owner.ID, "refused-8-days-last-25-hours-ago", "key-now", live.Token)
+	set(lastRefusedDayAgo, "failing_since", ago(8*day))
+	set(lastRefusedDayAgo, "last_failure_at", ago(25*time.Hour))
+	set(lastRefusedDayAgo, "failure_count", 5)
+	failingDays := register(owner.ID, "refused-6-days-through-the-last-hour", "key-now", live.Token)
 	set(failingDays, "failing_since", ago(6*day))
+	set(failingDays, "last_failure_at", ago(time.Hour))
 	set(failingDays, "failure_count", 6)
-	// One refusal and then a quiet week: retries ride on messages, so no
-	// second attempt was ever made, and one refusal never removes a device.
+	// One refusal and then a quiet week: no second attempt was ever made,
+	// and one refusal never removes a device.
 	failedOnce := register(member.ID, "failed-once-8-days-ago", "key-now", memberLive.Token)
 	set(failedOnce, "failing_since", ago(8*day))
+	set(failedOnce, "last_failure_at", ago(8*day))
 	set(failedOnce, "failure_count", 1)
 	retiredMonth := register(owner.ID, "retired-31-days", "key-before", live.Token)
 	set(retiredMonth, "updated_at", ago(31*day))
@@ -743,22 +886,23 @@ func TestPrunePushSubscriptionsRemovesOnlyDeadDevices(t *testing.T) {
 	for name, endpoint := range map[string]string{
 		"healthy": healthy, "failing for 6 days": failingDays, "retired key touched 29 days ago": retiredWeeks,
 		"key never recorded": unrecorded, "development row with no session": development,
-		"refused once, then a quiet week": failedOnce,
+		"refused once, then a quiet week": failedOnce, "refused twice in a blip, then a quiet week": blip,
+		"refused for 8 days, last 25 hours ago": lastRefusedDayAgo,
 	} {
 		if !kept[endpoint] {
 			t.Fatalf("the sweep removed the %s device", name)
 		}
 	}
 	for name, endpoint := range map[string]string{
-		"failing for 8 days": failingWeek, "retired key untouched for 31 days": retiredMonth,
+		"refused for 8 days through the last hour": failingWeek, "retired key untouched for 31 days": retiredMonth,
 		"session missing": sessionMissing, "session revoked": sessionRevoked, "session expired": sessionExpired,
 	} {
 		if kept[endpoint] {
 			t.Fatalf("the sweep kept the %s device", name)
 		}
 	}
-	if len(kept) != 6 {
-		t.Fatalf("expected six devices left, got %v", kept)
+	if len(kept) != 8 {
+		t.Fatalf("expected eight devices left, got %v", kept)
 	}
 
 	if result, err = st.PrunePushSubscriptions(ctx, "key-now", now); err != nil || result.Total() != 0 {
