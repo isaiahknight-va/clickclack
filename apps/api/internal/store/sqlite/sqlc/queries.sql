@@ -1833,11 +1833,12 @@ WHERE user_id = sqlc.arg(user_id)
 -- name: UpsertPushSubscription :exec
 INSERT INTO user_push_subscriptions (
   id, user_id, endpoint, p256dh, auth, user_agent, session_token_hash,
-  created_at, updated_at, failure_count
+  created_at, updated_at, failure_count, vapid_key_id
 )
 VALUES (
   sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(endpoint), sqlc.arg(p256dh), sqlc.arg(auth),
-  sqlc.arg(user_agent), sqlc.arg(session_token_hash), sqlc.arg(created_at), sqlc.arg(updated_at), 0
+  sqlc.arg(user_agent), sqlc.arg(session_token_hash), sqlc.arg(created_at), sqlc.arg(updated_at), 0,
+  sqlc.arg(vapid_key_id)
 )
 ON CONFLICT (endpoint) DO UPDATE SET
   user_id = excluded.user_id,
@@ -1864,13 +1865,13 @@ WHERE user_push_subscriptions.user_id = sqlc.arg(user_id)
   );
 
 -- name: ListPushSubscriptions :many
-SELECT id, user_id, endpoint, user_agent, created_at, updated_at, last_success_at, next_attempt_at, failure_count
+SELECT id, user_id, endpoint, user_agent, created_at, updated_at, last_success_at, next_attempt_at, failure_count, vapid_key_id
 FROM user_push_subscriptions
 WHERE user_id = sqlc.arg(user_id)
 ORDER BY created_at, id;
 
 -- name: GetPushSubscription :one
-SELECT id, user_id, endpoint, user_agent, created_at, updated_at, last_success_at, next_attempt_at, failure_count
+SELECT id, user_id, endpoint, user_agent, created_at, updated_at, last_success_at, next_attempt_at, failure_count, vapid_key_id
 FROM user_push_subscriptions
 WHERE user_id = sqlc.arg(user_id) AND endpoint = sqlc.arg(endpoint);
 
@@ -1883,12 +1884,14 @@ UPDATE user_push_subscriptions
 SET last_success_at = sqlc.arg(last_success_at),
     updated_at = sqlc.arg(updated_at),
     next_attempt_at = NULL,
-    failure_count = 0
+    failure_count = 0,
+    failing_since = NULL
 WHERE user_id = sqlc.arg(user_id) AND endpoint = sqlc.arg(endpoint);
 
 -- name: MarkPushSubscriptionFailure :one
 UPDATE user_push_subscriptions
 SET failure_count = failure_count + 1,
+    failing_since = COALESCE(failing_since, sqlc.arg(updated_at)),
     updated_at = sqlc.arg(updated_at)
 WHERE user_id = sqlc.arg(user_id) AND endpoint = sqlc.arg(endpoint)
 RETURNING failure_count;
@@ -1899,7 +1902,7 @@ SET next_attempt_at = sqlc.arg(next_attempt_at)
 WHERE user_id = sqlc.arg(user_id) AND endpoint = sqlc.arg(endpoint);
 
 -- name: GetPushSubscriptionDelivery :one
-SELECT ups.user_id, ups.endpoint, ups.p256dh, ups.auth, ups.next_attempt_at, ups.session_token_hash,
+SELECT ups.user_id, ups.endpoint, ups.p256dh, ups.auth, ups.next_attempt_at, ups.session_token_hash, ups.vapid_key_id,
        s.user_id AS session_user_id, s.expires_at AS session_expires_at, s.revoked_at AS session_revoked_at
 FROM user_push_subscriptions ups
 LEFT JOIN sessions s
@@ -1907,7 +1910,7 @@ LEFT JOIN sessions s
 WHERE ups.user_id = sqlc.arg(user_id) AND ups.endpoint = sqlc.arg(endpoint);
 
 -- name: ListPushSubscriptionsForUsers :many
-SELECT ups.user_id, ups.endpoint, ups.p256dh, ups.auth, ups.next_attempt_at,
+SELECT ups.user_id, ups.endpoint, ups.p256dh, ups.auth, ups.next_attempt_at, ups.vapid_key_id,
        s.expires_at AS session_expires_at
 FROM user_push_subscriptions ups
 LEFT JOIN sessions s
@@ -1921,3 +1924,24 @@ WHERE ups.user_id IN (
     OR (s.id IS NOT NULL AND s.revoked_at IS NULL)
   )
 ORDER BY ups.user_id, ups.created_at, ups.id;
+
+-- name: PruneFailingPushSubscriptions :execrows
+DELETE FROM user_push_subscriptions
+WHERE failing_since IS NOT NULL
+  AND failing_since < sqlc.arg(failing_before);
+
+-- name: PruneRetiredKeyPushSubscriptions :execrows
+DELETE FROM user_push_subscriptions
+WHERE vapid_key_id <> ''
+  AND vapid_key_id <> sqlc.arg(current_key_id)
+  AND updated_at < sqlc.arg(updated_before);
+
+-- name: PruneEndedSessionPushSubscriptions :execrows
+DELETE FROM user_push_subscriptions
+WHERE session_token_hash <> ''
+  AND NOT EXISTS (
+    SELECT 1 FROM sessions s
+    WHERE s.token_hash = user_push_subscriptions.session_token_hash
+      AND s.revoked_at IS NULL
+      AND s.expires_at > sqlc.arg(now)
+  );

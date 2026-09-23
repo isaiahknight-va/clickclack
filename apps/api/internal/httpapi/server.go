@@ -35,6 +35,7 @@ type Server struct {
 	pushNotifier          PushNotifier
 	webPushNotifier       PushNotifier
 	webPushPublicKey      string
+	webPushKeyID          string
 	metrics               *metricsRegistry
 	accessLog             AccessLogMode
 	build                 buildMetadata
@@ -144,6 +145,7 @@ func New(st store.Store, hub *realtime.Hub, options Options) *Server {
 		pushNotifier:          options.PushNotifier,
 		webPushNotifier:       options.WebPushNotifier,
 		webPushPublicKey:      strings.TrimSpace(options.WebPushPublicKey),
+		webPushKeyID:          webPushKeyID(options.WebPushPublicKey),
 		metrics:               metrics,
 		accessLog:             options.AccessLog,
 		setupCodeClaimLimiter: newSlidingWindowLimiter(setupCodeClaimLimit, setupCodeClaimWindow),

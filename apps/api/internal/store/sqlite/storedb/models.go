@@ -438,6 +438,8 @@ type UserPushSubscription struct {
 	LastSuccessAt    sql.NullString `json:"last_success_at"`
 	NextAttemptAt    sql.NullString `json:"next_attempt_at"`
 	FailureCount     int64          `json:"failure_count"`
+	VapidKeyID       string         `json:"vapid_key_id"`
+	FailingSince     sql.NullString `json:"failing_since"`
 }
 
 type Workspace struct {

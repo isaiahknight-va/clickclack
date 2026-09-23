@@ -1690,7 +1690,7 @@ func (q *Queries) GetOAuthTransactionForConsume(ctx context.Context, stateHash s
 }
 
 const getPushSubscription = `-- name: GetPushSubscription :one
-SELECT id, user_id, endpoint, user_agent, created_at, updated_at, last_success_at, next_attempt_at, failure_count
+SELECT id, user_id, endpoint, user_agent, created_at, updated_at, last_success_at, next_attempt_at, failure_count, vapid_key_id
 FROM user_push_subscriptions
 WHERE user_id = ?1 AND endpoint = ?2
 `
@@ -1710,6 +1710,7 @@ type GetPushSubscriptionRow struct {
 	LastSuccessAt sql.NullString `json:"last_success_at"`
 	NextAttemptAt sql.NullString `json:"next_attempt_at"`
 	FailureCount  int64          `json:"failure_count"`
+	VapidKeyID    string         `json:"vapid_key_id"`
 }
 
 func (q *Queries) GetPushSubscription(ctx context.Context, arg GetPushSubscriptionParams) (GetPushSubscriptionRow, error) {
@@ -1725,12 +1726,13 @@ func (q *Queries) GetPushSubscription(ctx context.Context, arg GetPushSubscripti
 		&i.LastSuccessAt,
 		&i.NextAttemptAt,
 		&i.FailureCount,
+		&i.VapidKeyID,
 	)
 	return i, err
 }
 
 const getPushSubscriptionDelivery = `-- name: GetPushSubscriptionDelivery :one
-SELECT ups.user_id, ups.endpoint, ups.p256dh, ups.auth, ups.next_attempt_at, ups.session_token_hash,
+SELECT ups.user_id, ups.endpoint, ups.p256dh, ups.auth, ups.next_attempt_at, ups.session_token_hash, ups.vapid_key_id,
        s.user_id AS session_user_id, s.expires_at AS session_expires_at, s.revoked_at AS session_revoked_at
 FROM user_push_subscriptions ups
 LEFT JOIN sessions s
@@ -1750,6 +1752,7 @@ type GetPushSubscriptionDeliveryRow struct {
 	Auth             string         `json:"auth"`
 	NextAttemptAt    sql.NullString `json:"next_attempt_at"`
 	SessionTokenHash string         `json:"session_token_hash"`
+	VapidKeyID       string         `json:"vapid_key_id"`
 	SessionUserID    sql.NullString `json:"session_user_id"`
 	SessionExpiresAt sql.NullString `json:"session_expires_at"`
 	SessionRevokedAt sql.NullString `json:"session_revoked_at"`
@@ -1765,6 +1768,7 @@ func (q *Queries) GetPushSubscriptionDelivery(ctx context.Context, arg GetPushSu
 		&i.Auth,
 		&i.NextAttemptAt,
 		&i.SessionTokenHash,
+		&i.VapidKeyID,
 		&i.SessionUserID,
 		&i.SessionExpiresAt,
 		&i.SessionRevokedAt,
@@ -4179,7 +4183,7 @@ func (q *Queries) ListPinnedMessages(ctx context.Context, arg ListPinnedMessages
 }
 
 const listPushSubscriptions = `-- name: ListPushSubscriptions :many
-SELECT id, user_id, endpoint, user_agent, created_at, updated_at, last_success_at, next_attempt_at, failure_count
+SELECT id, user_id, endpoint, user_agent, created_at, updated_at, last_success_at, next_attempt_at, failure_count, vapid_key_id
 FROM user_push_subscriptions
 WHERE user_id = ?1
 ORDER BY created_at, id
@@ -4195,6 +4199,7 @@ type ListPushSubscriptionsRow struct {
 	LastSuccessAt sql.NullString `json:"last_success_at"`
 	NextAttemptAt sql.NullString `json:"next_attempt_at"`
 	FailureCount  int64          `json:"failure_count"`
+	VapidKeyID    string         `json:"vapid_key_id"`
 }
 
 func (q *Queries) ListPushSubscriptions(ctx context.Context, userID string) ([]ListPushSubscriptionsRow, error) {
@@ -4216,6 +4221,7 @@ func (q *Queries) ListPushSubscriptions(ctx context.Context, userID string) ([]L
 			&i.LastSuccessAt,
 			&i.NextAttemptAt,
 			&i.FailureCount,
+			&i.VapidKeyID,
 		); err != nil {
 			return nil, err
 		}
@@ -4231,7 +4237,7 @@ func (q *Queries) ListPushSubscriptions(ctx context.Context, userID string) ([]L
 }
 
 const listPushSubscriptionsForUsers = `-- name: ListPushSubscriptionsForUsers :many
-SELECT ups.user_id, ups.endpoint, ups.p256dh, ups.auth, ups.next_attempt_at,
+SELECT ups.user_id, ups.endpoint, ups.p256dh, ups.auth, ups.next_attempt_at, ups.vapid_key_id,
        s.expires_at AS session_expires_at
 FROM user_push_subscriptions ups
 LEFT JOIN sessions s
@@ -4253,6 +4259,7 @@ type ListPushSubscriptionsForUsersRow struct {
 	P256dh           string         `json:"p256dh"`
 	Auth             string         `json:"auth"`
 	NextAttemptAt    sql.NullString `json:"next_attempt_at"`
+	VapidKeyID       string         `json:"vapid_key_id"`
 	SessionExpiresAt sql.NullString `json:"session_expires_at"`
 }
 
@@ -4271,6 +4278,7 @@ func (q *Queries) ListPushSubscriptionsForUsers(ctx context.Context, userIdsJson
 			&i.P256dh,
 			&i.Auth,
 			&i.NextAttemptAt,
+			&i.VapidKeyID,
 			&i.SessionExpiresAt,
 		); err != nil {
 			return nil, err
@@ -5284,6 +5292,7 @@ func (q *Queries) MarkMagicLinkUsed(ctx context.Context, arg MarkMagicLinkUsedPa
 const markPushSubscriptionFailure = `-- name: MarkPushSubscriptionFailure :one
 UPDATE user_push_subscriptions
 SET failure_count = failure_count + 1,
+    failing_since = COALESCE(failing_since, ?1),
     updated_at = ?1
 WHERE user_id = ?2 AND endpoint = ?3
 RETURNING failure_count
@@ -5307,7 +5316,8 @@ UPDATE user_push_subscriptions
 SET last_success_at = ?1,
     updated_at = ?2,
     next_attempt_at = NULL,
-    failure_count = 0
+    failure_count = 0,
+    failing_since = NULL
 WHERE user_id = ?3 AND endpoint = ?4
 `
 
@@ -5406,6 +5416,25 @@ func (q *Queries) PinMessageWithinLimit(ctx context.Context, arg PinMessageWithi
 	return result.RowsAffected()
 }
 
+const pruneEndedSessionPushSubscriptions = `-- name: PruneEndedSessionPushSubscriptions :execrows
+DELETE FROM user_push_subscriptions
+WHERE session_token_hash <> ''
+  AND NOT EXISTS (
+    SELECT 1 FROM sessions s
+    WHERE s.token_hash = user_push_subscriptions.session_token_hash
+      AND s.revoked_at IS NULL
+      AND s.expires_at > ?1
+  )
+`
+
+func (q *Queries) PruneEndedSessionPushSubscriptions(ctx context.Context, now string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, pruneEndedSessionPushSubscriptions, now)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const pruneEvents = `-- name: PruneEvents :execrows
 DELETE FROM events AS e
 WHERE e.workspace_id = ?1
@@ -5427,6 +5456,40 @@ type PruneEventsParams struct {
 
 func (q *Queries) PruneEvents(ctx context.Context, arg PruneEventsParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, pruneEvents, arg.WorkspaceIDArg, arg.Before, arg.KeepLatest)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const pruneFailingPushSubscriptions = `-- name: PruneFailingPushSubscriptions :execrows
+DELETE FROM user_push_subscriptions
+WHERE failing_since IS NOT NULL
+  AND failing_since < ?1
+`
+
+func (q *Queries) PruneFailingPushSubscriptions(ctx context.Context, failingBefore sql.NullString) (int64, error) {
+	result, err := q.db.ExecContext(ctx, pruneFailingPushSubscriptions, failingBefore)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const pruneRetiredKeyPushSubscriptions = `-- name: PruneRetiredKeyPushSubscriptions :execrows
+DELETE FROM user_push_subscriptions
+WHERE vapid_key_id <> ''
+  AND vapid_key_id <> ?1
+  AND updated_at < ?2
+`
+
+type PruneRetiredKeyPushSubscriptionsParams struct {
+	CurrentKeyID  string `json:"current_key_id"`
+	UpdatedBefore string `json:"updated_before"`
+}
+
+func (q *Queries) PruneRetiredKeyPushSubscriptions(ctx context.Context, arg PruneRetiredKeyPushSubscriptionsParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, pruneRetiredKeyPushSubscriptions, arg.CurrentKeyID, arg.UpdatedBefore)
 	if err != nil {
 		return 0, err
 	}
@@ -6576,11 +6639,12 @@ func (q *Queries) UpsertNotificationSettings(ctx context.Context, arg UpsertNoti
 const upsertPushSubscription = `-- name: UpsertPushSubscription :exec
 INSERT INTO user_push_subscriptions (
   id, user_id, endpoint, p256dh, auth, user_agent, session_token_hash,
-  created_at, updated_at, failure_count
+  created_at, updated_at, failure_count, vapid_key_id
 )
 VALUES (
   ?1, ?2, ?3, ?4, ?5,
-  ?6, ?7, ?8, ?9, 0
+  ?6, ?7, ?8, ?9, 0,
+  ?10
 )
 ON CONFLICT (endpoint) DO UPDATE SET
   user_id = excluded.user_id,
@@ -6607,6 +6671,7 @@ type UpsertPushSubscriptionParams struct {
 	SessionTokenHash string `json:"session_token_hash"`
 	CreatedAt        string `json:"created_at"`
 	UpdatedAt        string `json:"updated_at"`
+	VapidKeyID       string `json:"vapid_key_id"`
 }
 
 func (q *Queries) UpsertPushSubscription(ctx context.Context, arg UpsertPushSubscriptionParams) error {
@@ -6620,6 +6685,7 @@ func (q *Queries) UpsertPushSubscription(ctx context.Context, arg UpsertPushSubs
 		arg.SessionTokenHash,
 		arg.CreatedAt,
 		arg.UpdatedAt,
+		arg.VapidKeyID,
 	)
 	return err
 }

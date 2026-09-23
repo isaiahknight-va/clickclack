@@ -368,21 +368,21 @@ func TestPushSubscriptionDeliveryIsRereadBeforeSending(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	target, err := st.GetPushSubscriptionDelivery(ctx, member, input.Endpoint)
+	target, err := st.GetPushSubscriptionDelivery(ctx, member, input.Endpoint, "")
 	if err != nil || target.Endpoint != input.Endpoint || target.P256dh != input.P256dh || target.Auth != input.Auth {
 		t.Fatalf("a live device must be deliverable: %#v %v", target, err)
 	}
-	if _, err := st.GetPushSubscriptionDelivery(ctx, owner.ID, input.Endpoint); !errors.Is(err, sql.ErrNoRows) {
+	if _, err := st.GetPushSubscriptionDelivery(ctx, owner.ID, input.Endpoint, ""); !errors.Is(err, sql.ErrNoRows) {
 		t.Fatalf("another user's device must not be found: %v", err)
 	}
-	if _, err := st.GetPushSubscriptionDelivery(ctx, member, "https://push.example.com/send/unknown"); !errors.Is(err, sql.ErrNoRows) {
+	if _, err := st.GetPushSubscriptionDelivery(ctx, member, "https://push.example.com/send/unknown", ""); !errors.Is(err, sql.ErrNoRows) {
 		t.Fatalf("an unknown device must not be found: %v", err)
 	}
 
 	if _, err := st.MarkPushSubscriptionFailure(ctx, member, input.Endpoint, 0); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.GetPushSubscriptionDelivery(ctx, member, input.Endpoint); !errors.Is(err, store.ErrPushSubscriptionBackingOff) {
+	if _, err := st.GetPushSubscriptionDelivery(ctx, member, input.Endpoint, ""); !errors.Is(err, store.ErrPushSubscriptionBackingOff) {
 		t.Fatalf("a backed-off device must wait: %v", err)
 	}
 	if err := st.MarkPushSubscriptionSuccess(ctx, member, input.Endpoint); err != nil {
@@ -392,7 +392,7 @@ func TestPushSubscriptionDeliveryIsRereadBeforeSending(t *testing.T) {
 	if _, err := st.db.ExecContext(ctx, `UPDATE sessions SET expires_at = '2000-01-01T00:00:00Z' WHERE user_id = $1`, member); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.GetPushSubscriptionDelivery(ctx, member, input.Endpoint); !errors.Is(err, store.ErrPushSessionEnded) {
+	if _, err := st.GetPushSubscriptionDelivery(ctx, member, input.Endpoint, ""); !errors.Is(err, store.ErrPushSessionEnded) {
 		t.Fatalf("an expired session must stop delivery: %v", err)
 	}
 	if _, err := st.db.ExecContext(ctx, `UPDATE sessions SET expires_at = '2999-01-01T00:00:00Z' WHERE user_id = $1`, member); err != nil {
@@ -401,14 +401,14 @@ func TestPushSubscriptionDeliveryIsRereadBeforeSending(t *testing.T) {
 	if err := st.RevokeSession(ctx, session.Token); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.GetPushSubscriptionDelivery(ctx, member, input.Endpoint); !errors.Is(err, store.ErrPushSessionEnded) {
+	if _, err := st.GetPushSubscriptionDelivery(ctx, member, input.Endpoint, ""); !errors.Is(err, store.ErrPushSessionEnded) {
 		t.Fatalf("a revoked session must stop delivery: %v", err)
 	}
 
 	if err := st.DeletePushSubscription(ctx, member, input.Endpoint); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.GetPushSubscriptionDelivery(ctx, member, input.Endpoint); !errors.Is(err, sql.ErrNoRows) {
+	if _, err := st.GetPushSubscriptionDelivery(ctx, member, input.Endpoint, ""); !errors.Is(err, sql.ErrNoRows) {
 		t.Fatalf("a deleted device must not be found: %v", err)
 	}
 
@@ -416,7 +416,7 @@ func TestPushSubscriptionDeliveryIsRereadBeforeSending(t *testing.T) {
 	if _, err := st.UpsertPushSubscription(ctx, development); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.GetPushSubscriptionDelivery(ctx, member, development.Endpoint); err != nil {
+	if _, err := st.GetPushSubscriptionDelivery(ctx, member, development.Endpoint, ""); err != nil {
 		t.Fatalf("a development registration has no session to follow: %v", err)
 	}
 }
@@ -481,6 +481,276 @@ func pushInput(userID, endpoint, label string) store.PushSubscriptionInput {
 		// Most of these tests are about storage, not authority, so they
 		// register the way the local development identity does.
 		DevelopmentActor: true,
+	}
+}
+
+// A device keeps the key it first registered under. Registering the same
+// endpoint again, for the same account or another, is the same browser
+// subscription, made under the key in force when it first arrived.
+func TestPushSubscriptionKeepsTheKeyItRegisteredUnder(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := newMigratedPostgresTestStore(t)
+	first, err := st.EnsureBootstrap(ctx, "Owner", "push-key-first@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := st.CreateUser(ctx, store.CreateUserInput{DisplayName: "Second", Email: "push-key-second@example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const endpoint = "https://push.example.com/send/keyed"
+	registered := pushInput(first.ID, endpoint, "phone")
+	registered.KeyID = "key-before"
+	stored, err := st.UpsertPushSubscription(ctx, registered)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.KeyID != "key-before" {
+		t.Fatalf("a new device records the key in force: %q", stored.KeyID)
+	}
+	refreshed := pushInput(first.ID, endpoint, "phone")
+	refreshed.KeyID = "key-now"
+	if stored, err = st.UpsertPushSubscription(ctx, refreshed); err != nil || stored.KeyID != "key-before" {
+		t.Fatalf("a refresh keeps the key the device registered under: %q %v", stored.KeyID, err)
+	}
+	moved := pushInput(second.ID, endpoint, "phone")
+	moved.KeyID = "key-now"
+	if stored, err = st.UpsertPushSubscription(ctx, moved); err != nil || stored.KeyID != "key-before" {
+		t.Fatalf("a move to another account keeps the key too: %q %v", stored.KeyID, err)
+	}
+	listed, err := st.ListPushSubscriptions(ctx, second.ID)
+	if err != nil || len(listed) != 1 || listed[0].KeyID != "key-before" {
+		t.Fatalf("the listed device carries its key: %#v %v", listed, err)
+	}
+
+	target, err := st.GetPushSubscriptionDelivery(ctx, second.ID, endpoint, "key-before")
+	if err != nil || target.KeyID != "key-before" {
+		t.Fatalf("a device under the current key is deliverable: %#v %v", target, err)
+	}
+	if _, err := st.GetPushSubscriptionDelivery(ctx, second.ID, endpoint, "key-now"); !errors.Is(err, store.ErrPushSubscriptionKeyRetired) {
+		t.Fatalf("a device under a retired key must not be sent to: %v", err)
+	}
+
+	legacy := pushInput(second.ID, "https://push.example.com/send/unrecorded", "laptop")
+	if stored, err = st.UpsertPushSubscription(ctx, legacy); err != nil || stored.KeyID != "" {
+		t.Fatalf("a device registered with no key recorded has none: %q %v", stored.KeyID, err)
+	}
+	if _, err := st.GetPushSubscriptionDelivery(ctx, second.ID, legacy.Endpoint, "key-now"); err != nil {
+		t.Fatalf("an unrecorded key is unknown, not retired: %v", err)
+	}
+}
+
+// failing_since marks when the current run of refusals began: the first
+// failure stamps it, later ones leave it, a refresh leaves it, and only a
+// success ends the run.
+func TestPushSubscriptionFailingSinceMarksTheStartOfARun(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := newMigratedPostgresTestStore(t)
+	owner, err := st.EnsureBootstrap(ctx, "Owner", "push-failing@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := pushInput(owner.ID, "https://push.example.com/send/failing", "phone")
+	if _, err := st.UpsertPushSubscription(ctx, input); err != nil {
+		t.Fatal(err)
+	}
+	failingSince := func() sql.NullString {
+		t.Helper()
+		var value sql.NullString
+		if err := st.db.QueryRowContext(ctx, `SELECT failing_since FROM user_push_subscriptions WHERE endpoint = $1`, input.Endpoint).Scan(&value); err != nil {
+			t.Fatal(err)
+		}
+		return value
+	}
+	if failingSince().Valid {
+		t.Fatal("a new device is not failing")
+	}
+
+	before := time.Now().UTC()
+	if _, err := st.MarkPushSubscriptionFailure(ctx, owner.ID, input.Endpoint, 0); err != nil {
+		t.Fatal(err)
+	}
+	after := time.Now().UTC()
+	first := failingSince()
+	stamped, err := time.Parse(time.RFC3339Nano, first.String)
+	if !first.Valid || err != nil || stamped.Before(before) || stamped.After(after) {
+		t.Fatalf("the first failure must stamp the run: %#v %v", first, err)
+	}
+
+	time.Sleep(2 * time.Millisecond)
+	count, err := st.MarkPushSubscriptionFailure(ctx, owner.ID, input.Endpoint, 0)
+	if err != nil || count != 2 {
+		t.Fatalf("failure count is %d: %v", count, err)
+	}
+	if again := failingSince(); again != first {
+		t.Fatalf("a second failure must keep the start of the run: %q, then %q", first.String, again.String)
+	}
+	if _, err := st.UpsertPushSubscription(ctx, input); err != nil {
+		t.Fatal(err)
+	}
+	if refreshed := failingSince(); refreshed != first {
+		t.Fatalf("registering again does not end a run of refusals: %q, then %q", first.String, refreshed.String)
+	}
+
+	if err := st.MarkPushSubscriptionSuccess(ctx, owner.ID, input.Endpoint); err != nil {
+		t.Fatal(err)
+	}
+	if cleared := failingSince(); cleared.Valid {
+		t.Fatalf("a success must end the run: %q", cleared.String)
+	}
+	time.Sleep(2 * time.Millisecond)
+	if _, err := st.MarkPushSubscriptionFailure(ctx, owner.ID, input.Endpoint, 0); err != nil {
+		t.Fatal(err)
+	}
+	next := failingSince()
+	restarted, err := time.Parse(time.RFC3339Nano, next.String)
+	if !next.Valid || err != nil || !restarted.After(stamped) {
+		t.Fatalf("a failure after a success starts a new run: %#v after %q", next, first.String)
+	}
+}
+
+// TestPrunePushSubscriptionsRemovesOnlyDeadDevices seeds one device of each
+// kind a sweep removes beside one of each kind it must keep, including the
+// neighbor of every threshold.
+func TestPrunePushSubscriptionsRemovesOnlyDeadDevices(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := newMigratedPostgresTestStore(t)
+	owner, err := st.EnsureBootstrap(ctx, "Owner", "prune-owner@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	member, err := st.CreateUser(ctx, store.CreateUserInput{DisplayName: "Member", Email: "prune-member@example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	ago := func(duration time.Duration) string { return now.Add(-duration).Format(time.RFC3339Nano) }
+	const day = 24 * time.Hour
+	live, err := st.CreateSession(ctx, owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	register := func(userID, name, keyID, sessionToken string) string {
+		t.Helper()
+		input := pushInput(userID, "https://push.example.com/send/"+name, name)
+		input.KeyID = keyID
+		input.SessionToken = sessionToken
+		input.DevelopmentActor = sessionToken == ""
+		if _, err := st.UpsertPushSubscription(ctx, input); err != nil {
+			t.Fatal(err)
+		}
+		return input.Endpoint
+	}
+	set := func(endpoint, column, value string) {
+		t.Helper()
+		if _, err := st.db.ExecContext(ctx, `UPDATE user_push_subscriptions SET `+column+` = $1 WHERE endpoint = $2`, value, endpoint); err != nil {
+			t.Fatal(err)
+		}
+	}
+	endedSession := func(end func(store.Session)) string {
+		t.Helper()
+		session, err := st.CreateSession(ctx, member.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		end(session)
+		return session.Token
+	}
+
+	healthy := register(owner.ID, "healthy", "key-now", live.Token)
+	failingWeek := register(owner.ID, "failing-8-days", "key-now", live.Token)
+	set(failingWeek, "failing_since", ago(8*day))
+	failingDays := register(owner.ID, "failing-6-days", "key-now", live.Token)
+	set(failingDays, "failing_since", ago(6*day))
+	retiredMonth := register(owner.ID, "retired-31-days", "key-before", live.Token)
+	set(retiredMonth, "updated_at", ago(31*day))
+	retiredWeeks := register(owner.ID, "retired-29-days", "key-before", live.Token)
+	set(retiredWeeks, "updated_at", ago(29*day))
+	unrecorded := register(owner.ID, "key-unrecorded", "", live.Token)
+	set(unrecorded, "updated_at", ago(400*day))
+	development := register(owner.ID, "development", "key-now", "")
+	set(development, "updated_at", ago(400*day))
+	sessionMissing := register(member.ID, "session-missing", "key-now", endedSession(func(session store.Session) {
+		if _, err := st.db.ExecContext(ctx, `DELETE FROM sessions WHERE id = $1`, session.ID); err != nil {
+			t.Fatal(err)
+		}
+	}))
+	sessionRevoked := register(member.ID, "session-revoked", "key-now", endedSession(func(session store.Session) {
+		if err := st.RevokeSession(ctx, session.Token); err != nil {
+			t.Fatal(err)
+		}
+	}))
+	sessionExpired := register(member.ID, "session-expired", "key-now", endedSession(func(session store.Session) {
+		if _, err := st.db.ExecContext(ctx, `UPDATE sessions SET expires_at = $1 WHERE id = $2`, ago(time.Minute), session.ID); err != nil {
+			t.Fatal(err)
+		}
+	}))
+
+	remaining := func() map[string]bool {
+		t.Helper()
+		out := map[string]bool{}
+		for _, userID := range []string{owner.ID, member.ID} {
+			rows, err := st.db.QueryContext(ctx, `SELECT endpoint FROM user_push_subscriptions WHERE user_id = $1`, userID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for rows.Next() {
+				var endpoint string
+				if err := rows.Scan(&endpoint); err != nil {
+					t.Fatal(err)
+				}
+				out[endpoint] = true
+			}
+			if err := rows.Close(); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return out
+	}
+
+	// With no current key known, nothing counts as retired; the other two
+	// rules do not need one.
+	result, err := st.PrunePushSubscriptions(ctx, "", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != (store.PushPruneResult{Failing: 1, SessionEnded: 3}) || !remaining()[retiredMonth] {
+		t.Fatalf("an unknown current key retires nothing: %#v", result)
+	}
+
+	result, err = st.PrunePushSubscriptions(ctx, "key-now", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != (store.PushPruneResult{RetiredKey: 1}) {
+		t.Fatalf("the second pass removes only the retired device the first could not judge: %#v", result)
+	}
+	kept := remaining()
+	for name, endpoint := range map[string]string{
+		"healthy": healthy, "failing for 6 days": failingDays, "retired key touched 29 days ago": retiredWeeks,
+		"key never recorded": unrecorded, "development row with no session": development,
+	} {
+		if !kept[endpoint] {
+			t.Fatalf("the sweep removed the %s device", name)
+		}
+	}
+	for name, endpoint := range map[string]string{
+		"failing for 8 days": failingWeek, "retired key untouched for 31 days": retiredMonth,
+		"session missing": sessionMissing, "session revoked": sessionRevoked, "session expired": sessionExpired,
+	} {
+		if kept[endpoint] {
+			t.Fatalf("the sweep kept the %s device", name)
+		}
+	}
+	if len(kept) != 5 {
+		t.Fatalf("expected five devices left, got %v", kept)
+	}
+
+	if result, err = st.PrunePushSubscriptions(ctx, "key-now", now); err != nil || result.Total() != 0 {
+		t.Fatalf("a second sweep finds nothing: %#v %v", result, err)
 	}
 }
 

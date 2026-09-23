@@ -52,7 +52,11 @@ func (s *Server) notifyMessageCreated(ctx context.Context, message store.Message
 				log.Printf("push notification failed for user %s: %v", recipient.UserID, err)
 			}
 		}
-		if s.webPushNotifier == nil || len(recipient.Subscriptions) == 0 {
+		if s.webPushNotifier == nil {
+			continue
+		}
+		subscriptions := currentKeySubscriptions(recipient.Subscriptions, s.webPushKeyID)
+		if len(subscriptions) == 0 {
 			continue
 		}
 		notification := PushNotification{
@@ -62,12 +66,25 @@ func (s *Server) notifyMessageCreated(ctx context.Context, message store.Message
 			Message:       webPushBody(message),
 			Tag:           webPushTag(message),
 			URL:           webPushURL(message),
-			Subscriptions: recipient.Subscriptions,
+			Subscriptions: subscriptions,
 		}
 		if err := s.webPushNotifier.Notify(ctx, notification); err != nil {
 			log.Printf("web push notification failed for user %s: %v", recipient.UserID, err)
 		}
 	}
+}
+
+// currentKeySubscriptions drops the devices registered under a key the server
+// no longer signs with. Their push service refuses every push, so a request
+// would only spend a worker; opening the app replaces the subscription.
+func currentKeySubscriptions(targets []store.PushSubscriptionTarget, keyID string) []store.PushSubscriptionTarget {
+	current := make([]store.PushSubscriptionTarget, 0, len(targets))
+	for _, target := range targets {
+		if !store.PushKeyRetired(target.KeyID, keyID) {
+			current = append(current, target)
+		}
+	}
+	return current
 }
 
 // notificationPlace resolves the channel a message was posted in once per
