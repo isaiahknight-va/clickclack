@@ -27,9 +27,18 @@ const (
 	maxPushUserAgentRunes = 200
 	// MaxPushRetryDelay caps the backoff after a push service refuses a
 	// delivery. A device that has been unreachable for a day is retried daily,
-	// not abandoned: only the service saying the subscription is gone removes
-	// a row.
+	// not abandoned: a row is removed when the service says the subscription
+	// is gone, or by PrunePushSubscriptions, never for one failure.
 	MaxPushRetryDelay = 24 * time.Hour
+	// PushFailingPruneAfter is how long a push service may refuse a device
+	// before its row is pruned. An outage is shorter than a week, and the
+	// daily retry gives the device seven chances.
+	PushFailingPruneAfter = 7 * 24 * time.Hour
+	// PushRetiredKeyPruneAfter is how long a device registered under a
+	// retired key may go without registering again before its row is pruned.
+	// Opening the app replaces its subscription; a month without that means
+	// nobody is opening it.
+	PushRetiredKeyPruneAfter = 30 * 24 * time.Hour
 )
 
 // pushRetryLadder is the backoff after consecutive delivery failures. A relay
@@ -53,6 +62,10 @@ var (
 	// ErrPushSubscriptionBackingOff reports that the push service asked for a
 	// pause that the next attempt has not waited out yet.
 	ErrPushSubscriptionBackingOff = errors.New("push subscription is backing off")
+	// ErrPushSubscriptionKeyRetired reports that the device registered under
+	// an application server key the server no longer signs with, so its push
+	// service refuses every push.
+	ErrPushSubscriptionKeyRetired = errors.New("push subscription is under a retired key")
 )
 
 // PushSubscription is the summary of a registered device. It deliberately
@@ -69,6 +82,9 @@ type PushSubscription struct {
 	// EndpointKey identifies the device without the endpoint: see
 	// PushEndpointKey. It is compared on the server and never serialized.
 	EndpointKey string `json:"-"`
+	// KeyID names the application server key the device registered under;
+	// empty for a device registered before the server recorded it.
+	KeyID string `json:"-"`
 }
 
 // PushEndpointKey is the unpadded base64url SHA-256 of a subscription
@@ -84,7 +100,10 @@ func PushEndpointKey(endpoint string) string {
 // SessionToken binds the device to the session that registered it, so signing
 // out stops that device receiving message text. A registration without one is
 // refused unless DevelopmentActor says the caller is the local development
-// fallback, the only way to be signed in without a session.
+// fallback, the only way to be signed in without a session. KeyID names the
+// application server key the server signs with now. A new device records it;
+// the same endpoint registered again keeps the one it was first registered
+// under, because it is the same browser subscription.
 type PushSubscriptionInput struct {
 	UserID           string
 	Endpoint         string
@@ -93,17 +112,20 @@ type PushSubscriptionInput struct {
 	UserAgent        string
 	SessionToken     string
 	DevelopmentActor bool
+	KeyID            string
 }
 
 // ErrPushSubscriptionNeedsSession refuses a device registration that has no
 // session to follow. Such a row could never be stopped by signing out.
 var ErrPushSubscriptionNeedsSession = errors.New("push registration needs a signed-in session")
 
-// PushSubscriptionTarget carries what a delivery needs and nothing else.
+// PushSubscriptionTarget carries what a delivery needs, and the key the
+// device registered under so a sender can skip one it no longer signs with.
 type PushSubscriptionTarget struct {
 	Endpoint string
 	P256dh   string
 	Auth     string
+	KeyID    string
 }
 
 // NormalizePushSubscriptionInput validates a subscription the way both stores
@@ -148,6 +170,7 @@ func NormalizePushSubscriptionInput(input PushSubscriptionInput) (PushSubscripti
 		UserAgent:        userAgent,
 		SessionToken:     input.SessionToken,
 		DevelopmentActor: input.DevelopmentActor,
+		KeyID:            input.KeyID,
 	}, nil
 }
 
@@ -190,24 +213,35 @@ func PushSubscriptionReady(nextAttemptAt, sessionExpiresAt string, now time.Time
 	return err == nil && now.Before(expiresAt)
 }
 
+// PushKeyRetired reports whether a device registered under keyID can no
+// longer receive from a server signing with currentKeyID. An empty id on
+// either side is unknown, never retired: a row from before the key was
+// recorded is not condemned on a guess.
+func PushKeyRetired(keyID, currentKeyID string) bool {
+	return keyID != "" && currentKeyID != "" && keyID != currentKeyID
+}
+
 // PushDeliveryState is a stored subscription as the delivery worker re-reads
 // it immediately before sending: the device's own row, and the session it was
 // registered under, which is absent when that session no longer exists.
 type PushDeliveryState struct {
 	UserID           string
 	NextAttemptAt    string
+	KeyID            string
 	SessionTokenHash string
 	SessionUserID    string
 	SessionExpiresAt string
 	SessionRevokedAt string
 }
 
-// CheckPushDelivery applies the rule recipient selection uses a second time,
+// CheckPushDelivery applies the rules recipient selection uses a second time,
 // at send time, because a push can sit in the delivery queue after the
 // session behind it ends. It answers ErrPushSessionEnded when the registering
-// session is gone, revoked, expired, or belongs to someone else, and
-// ErrPushSubscriptionBackingOff when the backoff has not elapsed.
-func CheckPushDelivery(state PushDeliveryState, now time.Time) error {
+// session is gone, revoked, expired, or belongs to someone else,
+// ErrPushSubscriptionKeyRetired when the device registered under a key other
+// than currentKeyID, and ErrPushSubscriptionBackingOff when the backoff has
+// not elapsed.
+func CheckPushDelivery(state PushDeliveryState, currentKeyID string, now time.Time) error {
 	if state.SessionTokenHash != "" {
 		if state.SessionUserID == "" || state.SessionUserID != state.UserID || state.SessionRevokedAt != "" {
 			return ErrPushSessionEnded
@@ -217,6 +251,9 @@ func CheckPushDelivery(state PushDeliveryState, now time.Time) error {
 			return ErrPushSessionEnded
 		}
 	}
+	if PushKeyRetired(state.KeyID, currentKeyID) {
+		return ErrPushSubscriptionKeyRetired
+	}
 	if state.NextAttemptAt != "" {
 		next, err := time.Parse(time.RFC3339Nano, state.NextAttemptAt)
 		if err != nil || now.Before(next) {
@@ -224,6 +261,48 @@ func CheckPushDelivery(state PushDeliveryState, now time.Time) error {
 		}
 	}
 	return nil
+}
+
+// PushPruneCutoffs are the instants PrunePushSubscriptions compares stored
+// timestamps against, as text. Stored timestamps are RFC 3339 with trailing
+// fraction zeros trimmed, so each cutoff is written with all nine fraction
+// digits: a stored time then sorts before a cutoff only when it is earlier.
+// The reverse can fail inside the cutoff's own second, which only leaves a
+// removal to the next pass and never makes one early.
+type PushPruneCutoffs struct {
+	// FailingBefore: a device refused since before this is pruned.
+	FailingBefore string
+	// RetiredKeyUpdatedBefore: a device under a retired key last written
+	// before this is pruned.
+	RetiredKeyUpdatedBefore string
+	// SessionExpiredBy: a session expiring at or before this has ended.
+	SessionExpiredBy string
+}
+
+// NewPushPruneCutoffs derives the cutoffs from one reading of the clock.
+func NewPushPruneCutoffs(now time.Time) PushPruneCutoffs {
+	format := func(instant time.Time) string {
+		return instant.UTC().Format("2006-01-02T15:04:05.000000000Z07:00")
+	}
+	return PushPruneCutoffs{
+		FailingBefore:           format(now.Add(-PushFailingPruneAfter)),
+		RetiredKeyUpdatedBefore: format(now.Add(-PushRetiredKeyPruneAfter)),
+		SessionExpiredBy:        format(now),
+	}
+}
+
+// PushPruneResult counts the devices one PrunePushSubscriptions pass removed,
+// by the rule that removed each. A device matching more than one is counted
+// once, under the first.
+type PushPruneResult struct {
+	Failing      int64
+	RetiredKey   int64
+	SessionEnded int64
+}
+
+// Total is every device the pass removed.
+func (r PushPruneResult) Total() int64 {
+	return r.Failing + r.RetiredKey + r.SessionEnded
 }
 
 func normalizePushSubscriptionKey(value, name string) (string, error) {

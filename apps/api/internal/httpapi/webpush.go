@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -28,11 +29,17 @@ const (
 	// webPushDropReportInterval throttles the dropped-delivery log so a wedged
 	// relay cannot write a line per message.
 	webPushDropReportInterval = time.Minute
+	// webPushPruneTimeout bounds one pass of the dead-device sweep.
+	webPushPruneTimeout = 30 * time.Second
 )
 
 // webPushSendTimeout bounds the device check and one delivery, including
 // connect and TLS. It is a variable so a test can stand in a hanging relay.
 var webPushSendTimeout = 10 * time.Second
+
+// webPushPruneInterval is how often the notifier sweeps devices that can no
+// longer receive. It is a variable so a test can watch the sweep repeat.
+var webPushPruneInterval = time.Hour
 
 // WebPushConfig is the application server identity used for every push.
 type WebPushConfig struct {
@@ -44,11 +51,12 @@ type WebPushConfig struct {
 // WebPushSubscriptionStore is the slice of the store the delivery worker
 // needs. Keeping it narrow keeps the notifier liftable.
 type WebPushSubscriptionStore interface {
-	GetPushSubscriptionDelivery(ctx context.Context, userID, endpoint string) (store.PushSubscriptionTarget, error)
+	GetPushSubscriptionDelivery(ctx context.Context, userID, endpoint, currentKeyID string) (store.PushSubscriptionTarget, error)
 	GetMessage(ctx context.Context, messageID, userID string) (store.Message, error)
 	DeletePushSubscription(ctx context.Context, userID, endpoint string) error
 	MarkPushSubscriptionSuccess(ctx context.Context, userID, endpoint string) error
 	MarkPushSubscriptionFailure(ctx context.Context, userID, endpoint string, retryAfter time.Duration) (int64, error)
+	PrunePushSubscriptions(ctx context.Context, currentKeyID string, now time.Time) (store.PushPruneResult, error)
 }
 
 type webPushSender interface {
@@ -66,10 +74,12 @@ type webPushDelivery struct {
 }
 
 // WebPushNotifier delivers notifications to browser push services from a
-// bounded worker pool, off the request path.
+// bounded worker pool, off the request path, and sweeps the devices that can
+// no longer receive.
 type WebPushNotifier struct {
 	sender        webPushSender
 	subscriptions WebPushSubscriptionStore
+	keyID         string
 	queue         chan webPushDelivery
 	workers       sync.WaitGroup
 	mu            sync.RWMutex
@@ -77,6 +87,8 @@ type WebPushNotifier struct {
 	dropMu        sync.Mutex
 	dropped       int64
 	droppedLogged time.Time
+	stopPruning   context.CancelFunc
+	pruning       sync.WaitGroup
 }
 
 // NewWebPushNotifier builds a notifier that sends through the same outbound
@@ -90,19 +102,34 @@ func NewWebPushNotifier(config WebPushConfig, subscriptions WebPushSubscriptionS
 		PrivateKey: config.VAPIDPrivateKey,
 		Subject:    config.Subject,
 		Client:     client,
-	}, subscriptions)
+	}, subscriptions, webPushKeyID(config.VAPIDPublicKey))
 }
 
-func newWebPushNotifier(sender webPushSender, subscriptions WebPushSubscriptionStore) *WebPushNotifier {
+// webPushKeyID names the application server key a device registers under:
+// the fingerprint the server logs at startup, so a stored key id and the log
+// line agree. No key names nothing.
+func webPushKeyID(publicKey string) string {
+	if strings.TrimSpace(publicKey) == "" {
+		return ""
+	}
+	return webpush.KeyFingerprint(publicKey)
+}
+
+func newWebPushNotifier(sender webPushSender, subscriptions WebPushSubscriptionStore, keyID string) *WebPushNotifier {
+	pruneCtx, stopPruning := context.WithCancel(context.Background())
 	notifier := &WebPushNotifier{
 		sender:        sender,
 		subscriptions: subscriptions,
+		keyID:         keyID,
 		queue:         make(chan webPushDelivery, webPushQueueSize),
+		stopPruning:   stopPruning,
 	}
 	notifier.workers.Add(webPushWorkers)
 	for range webPushWorkers {
 		go notifier.work()
 	}
+	notifier.pruning.Add(1)
+	go notifier.pruneEvery(pruneCtx, webPushPruneInterval)
 	return notifier
 }
 
@@ -140,8 +167,9 @@ func (n *WebPushNotifier) Notify(_ context.Context, notification PushNotificatio
 	return nil
 }
 
-// Close stops accepting deliveries and gives the queued ones a bounded time to
-// finish, so a deploy in the middle of a burst does not drop the last batch.
+// Close stops the sweep, stops accepting deliveries, and gives the queued ones
+// a bounded time to finish, so a deploy in the middle of a burst does not drop
+// the last batch.
 func (n *WebPushNotifier) Close() {
 	n.mu.Lock()
 	if n.closed {
@@ -151,6 +179,8 @@ func (n *WebPushNotifier) Close() {
 	n.closed = true
 	close(n.queue)
 	n.mu.Unlock()
+	n.stopPruning()
+	n.pruning.Wait()
 	drained := make(chan struct{})
 	go func() {
 		n.workers.Wait()
@@ -160,6 +190,45 @@ func (n *WebPushNotifier) Close() {
 	case <-drained:
 	case <-time.After(webPushDrainTimeout):
 		log.Print("web push delivery drain timed out")
+	}
+}
+
+// pruneEvery sweeps once at start and then on every tick until Close. A pass
+// that runs when Close is called is canceled with it.
+func (n *WebPushNotifier) pruneEvery(ctx context.Context, interval time.Duration) {
+	defer n.pruning.Done()
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		n.prune(ctx)
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+// prune removes the devices that can no longer receive, by the rules in
+// PrunePushSubscriptions. A failure is logged and the next tick tries again.
+func (n *WebPushNotifier) prune(parent context.Context) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			log.Printf("web push prune panicked: %v", recovered)
+		}
+	}()
+	ctx, cancel := context.WithTimeout(parent, webPushPruneTimeout)
+	defer cancel()
+	result, err := n.subscriptions.PrunePushSubscriptions(ctx, n.keyID, time.Now())
+	if err != nil {
+		if parent.Err() == nil {
+			log.Printf("web push prune failed: %v", err)
+		}
+		return
+	}
+	if result.Total() > 0 {
+		log.Printf("web push pruned %d devices: %d refused by their push service for a week, %d under a retired key, %d whose session ended",
+			result.Total(), result.Failing, result.RetiredKey, result.SessionEnded)
 	}
 }
 
@@ -218,18 +287,21 @@ func (n *WebPushNotifier) deliver(delivery webPushDelivery) {
 }
 
 // authorize re-reads everything that allowed a push when it was queued: the
-// device must still be registered to this user under a live session with its
-// backoff elapsed, and the user must still be able to read the message, which
-// must not have been deleted. It answers the device's current keys, or the
-// class of reason it may not be sent. A lookup that fails for any other reason
-// also refuses: without an answer, the message text stays on the server.
+// device must still be registered to this user under a live session and the
+// key the server signs with, with its backoff elapsed, and the user must still
+// be able to read the message, which must not have been deleted. It answers
+// the device's current keys, or the class of reason it may not be sent. A
+// lookup that fails for any other reason also refuses: without an answer, the
+// message text stays on the server.
 func (n *WebPushNotifier) authorize(ctx context.Context, delivery webPushDelivery) (webpush.Subscription, string) {
-	target, err := n.subscriptions.GetPushSubscriptionDelivery(ctx, delivery.userID, delivery.endpoint)
+	target, err := n.subscriptions.GetPushSubscriptionDelivery(ctx, delivery.userID, delivery.endpoint, n.keyID)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		return webpush.Subscription{}, "the device is no longer registered"
 	case errors.Is(err, store.ErrPushSessionEnded):
 		return webpush.Subscription{}, "the session that registered the device has ended"
+	case errors.Is(err, store.ErrPushSubscriptionKeyRetired):
+		return webpush.Subscription{}, "the device was registered under a retired key"
 	case errors.Is(err, store.ErrPushSubscriptionBackingOff):
 		return webpush.Subscription{}, "the device is backing off"
 	case err != nil:

@@ -1766,6 +1766,8 @@ export interface components {
       subscriptions: components["schemas"]["PushSubscription"][];
       /** @description Whether the device named by the device query parameter is registered to the current user. False when no device is named. */
       this_device: boolean;
+      /** @description Whether that device is registered under an application server key the server no longer signs with, so its push service refuses every push and the client must replace the subscription. The server knows this even when the browser does not expose the key a subscription was made under. False when this_device is false or web push is disabled. */
+      this_device_stale: boolean;
     };
     /** @description One registered device. The endpoint and the client keys are delivery secrets and are never returned. */
     PushSubscription: {
@@ -3017,7 +3019,7 @@ export interface operations {
   getMyPush: {
     parameters: {
       query?: {
-        /** @description The unpadded base64url SHA-256 of the push subscription endpoint the calling browser holds. When it matches one of the user's devices, this_device is true. The endpoint itself is never sent. */
+        /** @description The unpadded base64url SHA-256 of the push subscription endpoint the calling browser holds. When it matches one of the user's devices, this_device is true, and this_device_stale says whether that device must replace its subscription. The endpoint itself is never sent. */
         device?: string;
       };
       header?: never;

@@ -1285,9 +1285,10 @@ type Store interface {
 	UpsertPushSubscription(ctx context.Context, input PushSubscriptionInput) (PushSubscription, error)
 	ListPushSubscriptions(ctx context.Context, userID string) ([]PushSubscription, error)
 	DeletePushSubscription(ctx context.Context, userID, endpoint string) error
-	GetPushSubscriptionDelivery(ctx context.Context, userID, endpoint string) (PushSubscriptionTarget, error)
+	GetPushSubscriptionDelivery(ctx context.Context, userID, endpoint, currentKeyID string) (PushSubscriptionTarget, error)
 	MarkPushSubscriptionSuccess(ctx context.Context, userID, endpoint string) error
 	MarkPushSubscriptionFailure(ctx context.Context, userID, endpoint string, retryAfter time.Duration) (int64, error)
+	PrunePushSubscriptions(ctx context.Context, currentKeyID string, now time.Time) (PushPruneResult, error)
 	UpsertChannelNotificationSettings(ctx context.Context, input ChannelNotificationInput) error
 	GetChannelNotificationPreference(ctx context.Context, channelID, userID string) (string, error)
 	AddWorkspaceMember(ctx context.Context, workspaceID, userID, role string) error

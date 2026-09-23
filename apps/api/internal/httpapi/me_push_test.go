@@ -35,6 +35,7 @@ type pushTestServer struct {
 	server *httptest.Server
 	store  *sqlitestore.Store
 	owner  store.User
+	keyID  string
 }
 
 func newPushTestServer(t *testing.T, enabled bool) pushTestServer {
@@ -64,7 +65,7 @@ func newPushTestServer(t *testing.T, enabled bool) pushTestServer {
 	}
 	server := httptest.NewServer(New(st, realtime.NewHub(), options).Handler())
 	t.Cleanup(server.Close)
-	return pushTestServer{server: server, store: st, owner: owner}
+	return pushTestServer{server: server, store: st, owner: owner, keyID: webPushKeyID(options.WebPushPublicKey)}
 }
 
 func TestPushEndpointsRegisterAndRemoveADevice(t *testing.T) {
@@ -181,6 +182,97 @@ func TestPushStateAnswersForThisDevice(t *testing.T) {
 	}
 	if state, _ := read("?device=" + thisEndpoint); state.ThisDevice {
 		t.Fatal("only the digest identifies a device, never the endpoint itself")
+	}
+}
+
+// A device registered under a key the server no longer signs with cannot
+// receive, and a browser that hides its subscription's key cannot tell. The
+// state names such a device stale so the app replaces its subscription; it
+// says so only for the device asking, and never names a key or an endpoint.
+func TestPushStateNamesThisDeviceStaleUnderARetiredKey(t *testing.T) {
+	t.Parallel()
+	fixture := newPushTestServer(t, true)
+	const (
+		currentEndpoint = "https://push.example.com/send/this-device"
+		currentKey      = "roAu0n9u864S8b50dqaahZyGG6xEblpUS-e4wI47j74"
+		retiredEndpoint = "https://push.example.com/send/other-device"
+		retiredKey      = "QRwuTHGa0ab-lUQ-J0DAANtRKTDtZ80bqlhAbRDCtTI"
+		unknownKey      = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+		retiredKeyID    = "0123456789ab"
+	)
+	putPushSubscription(t, fixture.server.URL, fixture.owner.ID, currentEndpoint, "laptop")
+	listed, err := fixture.store.ListPushSubscriptions(context.Background(), fixture.owner.ID)
+	if err != nil || len(listed) != 1 || fixture.keyID == "" || listed[0].KeyID != fixture.keyID {
+		t.Fatalf("a registration records the key the server signs with, %q: %#v %v", fixture.keyID, listed, err)
+	}
+	if _, err := fixture.store.UpsertPushSubscription(context.Background(), store.PushSubscriptionInput{
+		UserID: fixture.owner.ID, Endpoint: retiredEndpoint, P256dh: exampleClientKey, Auth: exampleClientAuth,
+		UserAgent: "phone", DevelopmentActor: true, KeyID: retiredKeyID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	type pushState struct {
+		ThisDevice      bool `json:"this_device"`
+		ThisDeviceStale bool `json:"this_device_stale"`
+	}
+	read := func(baseURL, query string) (pushState, string) {
+		t.Helper()
+		response, err := http.Get(baseURL + "/api/me/push" + query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer response.Body.Close()
+		raw, err := io.ReadAll(response.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if response.StatusCode != http.StatusOK || !strings.Contains(string(raw), `"this_device_stale":`) {
+			t.Fatalf("GET /api/me/push%s: %d %s", query, response.StatusCode, raw)
+		}
+		var state pushState
+		if err := json.Unmarshal(raw, &state); err != nil {
+			t.Fatal(err)
+		}
+		return state, string(raw)
+	}
+	for name, testCase := range map[string]struct {
+		query string
+		want  pushState
+	}{
+		"retired key":    {"?device=" + retiredKey, pushState{ThisDevice: true, ThisDeviceStale: true}},
+		"current key":    {"?device=" + currentKey, pushState{ThisDevice: true}},
+		"unknown device": {"?device=" + unknownKey, pushState{}},
+		"no device":      {"", pushState{}},
+	} {
+		state, raw := read(fixture.server.URL, testCase.query)
+		if state != testCase.want {
+			t.Fatalf("%s: state is %#v, want %#v", name, state, testCase.want)
+		}
+		for _, secret := range []string{currentEndpoint, retiredEndpoint, retiredKeyID, fixture.keyID, "key_id"} {
+			if strings.Contains(raw, secret) {
+				t.Fatalf("%s: the state must not carry %q: %s", name, secret, raw)
+			}
+		}
+	}
+
+	off := newPushTestServer(t, false)
+	if state, _ := read(off.server.URL, "?device="+retiredKey); state != (pushState{}) {
+		t.Fatalf("a server without web push names no device stale: %#v", state)
+	}
+}
+
+func TestWebPushKeyIDIsTheLoggedFingerprint(t *testing.T) {
+	t.Parallel()
+	publicKey, _, err := webpush.GenerateKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := webPushKeyID(" " + publicKey + " "); got != webpush.KeyFingerprint(publicKey) || got == "" {
+		t.Fatalf("key id is %q, fingerprint %q", got, webpush.KeyFingerprint(publicKey))
+	}
+	if got := webPushKeyID(" "); got != "" {
+		t.Fatalf("no key must name no key, got %q", got)
 	}
 }
 
@@ -354,13 +446,13 @@ func TestPushRegistrationFollowsTheCookieSession(t *testing.T) {
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
 	}
-	if _, err := st.GetPushSubscriptionDelivery(ctx, owner.ID, endpoint); err != nil {
+	if _, err := st.GetPushSubscriptionDelivery(ctx, owner.ID, endpoint, ""); err != nil {
 		t.Fatalf("a signed-in device must be deliverable: %v", err)
 	}
 	if err := st.RevokeSession(ctx, session.Token); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.GetPushSubscriptionDelivery(ctx, owner.ID, endpoint); !errors.Is(err, store.ErrPushSessionEnded) {
+	if _, err := st.GetPushSubscriptionDelivery(ctx, owner.ID, endpoint, ""); !errors.Is(err, store.ErrPushSessionEnded) {
 		t.Fatalf("signing out must stop the device: %v", err)
 	}
 
@@ -414,7 +506,7 @@ func TestPushRegistrationRefusesAnAccountChangedUnderneath(t *testing.T) {
 	if current.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", current.Code, current.Body.String())
 	}
-	if _, err := st.GetPushSubscriptionDelivery(ctx, accountB.ID, endpoint); err != nil {
+	if _, err := st.GetPushSubscriptionDelivery(ctx, accountB.ID, endpoint, ""); err != nil {
 		t.Fatalf("the signed-in account naming itself must register: %v", err)
 	}
 }
@@ -467,7 +559,7 @@ func TestPushRemovalRefusesAnAccountChangedUnderneath(t *testing.T) {
 	if err != nil || len(subscriptions) != 1 {
 		t.Fatalf("a refused removal must leave the device listed: %#v %v", subscriptions, err)
 	}
-	if _, err := st.GetPushSubscriptionDelivery(ctx, accountA.ID, endpoint); err != nil {
+	if _, err := st.GetPushSubscriptionDelivery(ctx, accountA.ID, endpoint, ""); err != nil {
 		t.Fatalf("a refused removal must leave the device deliverable: %v", err)
 	}
 
@@ -526,13 +618,13 @@ func TestPushRegistrationThroughAccessBindsTheMintedSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.GetPushSubscriptionDelivery(ctx, user.ID, endpoint); err != nil {
+	if _, err := st.GetPushSubscriptionDelivery(ctx, user.ID, endpoint, ""); err != nil {
 		t.Fatalf("the device must follow the minted session: %v", err)
 	}
 	if err := st.RevokeSession(ctx, cookies[0].Value); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.GetPushSubscriptionDelivery(ctx, user.ID, endpoint); !errors.Is(err, store.ErrPushSessionEnded) {
+	if _, err := st.GetPushSubscriptionDelivery(ctx, user.ID, endpoint, ""); !errors.Is(err, store.ErrPushSessionEnded) {
 		t.Fatalf("signing out of the minted session must stop the device: %v", err)
 	}
 }
@@ -545,7 +637,7 @@ func TestPushRegistrationByTheDevelopmentIdentity(t *testing.T) {
 	fixture := newPushTestServer(t, true)
 	endpoint := "https://push.example.com/send/development"
 	putPushSubscription(t, fixture.server.URL, fixture.owner.ID, endpoint, "laptop")
-	if _, err := fixture.store.GetPushSubscriptionDelivery(context.Background(), fixture.owner.ID, endpoint); err != nil {
+	if _, err := fixture.store.GetPushSubscriptionDelivery(context.Background(), fixture.owner.ID, endpoint, ""); err != nil {
 		t.Fatalf("a development registration must be deliverable: %v", err)
 	}
 }

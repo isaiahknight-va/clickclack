@@ -30,10 +30,11 @@ func (s *Server) getMyPush(w http.ResponseWriter, r *http.Request) {
 	}
 	if !s.webPushEnabled() {
 		writeJSON(w, http.StatusOK, map[string]any{
-			"enabled":          false,
-			"vapid_public_key": "",
-			"subscriptions":    []store.PushSubscription{},
-			"this_device":      false,
+			"enabled":           false,
+			"vapid_public_key":  "",
+			"subscriptions":     []store.PushSubscription{},
+			"this_device":       false,
+			"this_device_stale": false,
 		})
 		return
 	}
@@ -42,28 +43,30 @@ func (s *Server) getMyPush(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, err)
 		return
 	}
+	device, listed := pushDeviceListed(subscriptions, r.URL.Query().Get("device"))
 	writeJSON(w, http.StatusOK, map[string]any{
-		"enabled":          true,
-		"vapid_public_key": s.webPushPublicKey,
-		"subscriptions":    subscriptions,
-		"this_device":      pushDeviceListed(subscriptions, r.URL.Query().Get("device")),
+		"enabled":           true,
+		"vapid_public_key":  s.webPushPublicKey,
+		"subscriptions":     subscriptions,
+		"this_device":       listed,
+		"this_device_stale": listed && store.PushKeyRetired(device.KeyID, s.webPushKeyID),
 	})
 }
 
-// pushDeviceListed reports whether the browser asking, named by the digest of
-// the subscription it holds, is one of these devices. One subscription serves
-// every account on a browser, so this, not the account's device count, is
-// what decides whether this device rings for this account.
-func pushDeviceListed(subscriptions []store.PushSubscription, deviceKey string) bool {
+// pushDeviceListed finds the browser asking, named by the digest of the
+// subscription it holds, among these devices. One subscription serves every
+// account on a browser, so this, not the account's device count, is what
+// decides whether this device rings for this account.
+func pushDeviceListed(subscriptions []store.PushSubscription, deviceKey string) (store.PushSubscription, bool) {
 	if deviceKey == "" {
-		return false
+		return store.PushSubscription{}, false
 	}
 	for _, subscription := range subscriptions {
 		if subscription.EndpointKey == deviceKey {
-			return true
+			return subscription, true
 		}
 	}
-	return false
+	return store.PushSubscription{}, false
 }
 
 var (
@@ -117,6 +120,7 @@ func (s *Server) putMyPushSubscription(w http.ResponseWriter, r *http.Request) {
 		UserAgent:        body.UserAgent,
 		SessionToken:     pushSessionToken(act),
 		DevelopmentActor: act.developmentFallback,
+		KeyID:            s.webPushKeyID,
 	})
 	if err == nil {
 		log.Printf("web push device %s for user %s via %s", pushRegistrationKind(subscription), act.user.ID, webpush.RelayHost(body.Endpoint))

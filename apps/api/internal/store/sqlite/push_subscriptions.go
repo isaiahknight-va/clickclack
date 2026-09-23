@@ -40,6 +40,7 @@ func (s *Store) UpsertPushSubscription(ctx context.Context, input store.PushSubs
 		SessionTokenHash: sessionTokenHash,
 		CreatedAt:        timestamp,
 		UpdatedAt:        timestamp,
+		VapidKeyID:       normalized.KeyID,
 	}); err != nil {
 		return store.PushSubscription{}, err
 	}
@@ -59,7 +60,7 @@ func (s *Store) UpsertPushSubscription(ctx context.Context, input store.PushSubs
 	if err := tx.Commit(); err != nil {
 		return store.PushSubscription{}, err
 	}
-	return storePushSubscription(row.ID, row.UserID, row.Endpoint, row.UserAgent, row.CreatedAt, row.UpdatedAt, row.LastSuccessAt, row.FailureCount), nil
+	return storePushSubscription(row.ID, row.UserID, row.Endpoint, row.UserAgent, row.CreatedAt, row.UpdatedAt, row.LastSuccessAt, row.FailureCount, row.VapidKeyID), nil
 }
 
 func (s *Store) ListPushSubscriptions(ctx context.Context, userID string) ([]store.PushSubscription, error) {
@@ -69,7 +70,7 @@ func (s *Store) ListPushSubscriptions(ctx context.Context, userID string) ([]sto
 	}
 	out := make([]store.PushSubscription, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, storePushSubscription(row.ID, row.UserID, row.Endpoint, row.UserAgent, row.CreatedAt, row.UpdatedAt, row.LastSuccessAt, row.FailureCount))
+		out = append(out, storePushSubscription(row.ID, row.UserID, row.Endpoint, row.UserAgent, row.CreatedAt, row.UpdatedAt, row.LastSuccessAt, row.FailureCount, row.VapidKeyID))
 	}
 	return out, nil
 }
@@ -83,8 +84,8 @@ func (s *Store) DeletePushSubscription(ctx context.Context, userID, endpoint str
 
 // GetPushSubscriptionDelivery re-reads one device immediately before a
 // queued push is sent. A missing row answers sql.ErrNoRows; a row whose
-// session or backoff forbids sending answers the matching store error.
-func (s *Store) GetPushSubscriptionDelivery(ctx context.Context, userID, endpoint string) (store.PushSubscriptionTarget, error) {
+// session, key, or backoff forbids sending answers the matching store error.
+func (s *Store) GetPushSubscriptionDelivery(ctx context.Context, userID, endpoint, currentKeyID string) (store.PushSubscriptionTarget, error) {
 	row, err := s.q.GetPushSubscriptionDelivery(ctx, storedb.GetPushSubscriptionDeliveryParams{
 		UserID:   userID,
 		Endpoint: endpoint,
@@ -95,17 +96,19 @@ func (s *Store) GetPushSubscriptionDelivery(ctx context.Context, userID, endpoin
 	if err := store.CheckPushDelivery(store.PushDeliveryState{
 		UserID:           row.UserID,
 		NextAttemptAt:    row.NextAttemptAt.String,
+		KeyID:            row.VapidKeyID,
 		SessionTokenHash: row.SessionTokenHash,
 		SessionUserID:    row.SessionUserID.String,
 		SessionExpiresAt: row.SessionExpiresAt.String,
 		SessionRevokedAt: row.SessionRevokedAt.String,
-	}, time.Now()); err != nil {
+	}, currentKeyID, time.Now()); err != nil {
 		return store.PushSubscriptionTarget{}, err
 	}
 	return store.PushSubscriptionTarget{
 		Endpoint: row.Endpoint,
 		P256dh:   row.P256dh,
 		Auth:     row.Auth,
+		KeyID:    row.VapidKeyID,
 	}, nil
 }
 
@@ -121,8 +124,10 @@ func (s *Store) MarkPushSubscriptionSuccess(ctx context.Context, userID, endpoin
 
 // MarkPushSubscriptionFailure counts one failed delivery and pushes the next
 // attempt out. The count is incremented in SQL so concurrent workers cannot
-// lose one, and the row is never removed: only the push service reporting the
-// subscription gone does that.
+// lose one, and the same statement stamps when the run of failures began if
+// none was running. The row is never removed here: the push service reporting
+// the subscription gone does that, or PrunePushSubscriptions once the run has
+// lasted a week.
 func (s *Store) MarkPushSubscriptionFailure(ctx context.Context, userID, endpoint string, retryAfter time.Duration) (int64, error) {
 	count, err := s.q.MarkPushSubscriptionFailure(ctx, storedb.MarkPushSubscriptionFailureParams{
 		UpdatedAt: now(),
@@ -165,12 +170,48 @@ func (s *Store) listPushSubscriptionTargets(ctx context.Context, userIDs []strin
 			Endpoint: row.Endpoint,
 			P256dh:   row.P256dh,
 			Auth:     row.Auth,
+			KeyID:    row.VapidKeyID,
 		})
 	}
 	return targets, nil
 }
 
-func storePushSubscription(id, userID, endpoint, userAgent, createdAt, updatedAt string, lastSuccessAt sql.NullString, failureCount int64) store.PushSubscription {
+// PrunePushSubscriptions removes, in one transaction, the devices that can
+// no longer receive: refused by their push service for a week, registered
+// under a retired key and not registered again for a month, or bound to a
+// session that is gone, revoked, or expired. A development row, with no
+// session, and a row whose key was never recorded are each outside the rule
+// that would need what they lack.
+func (s *Store) PrunePushSubscriptions(ctx context.Context, currentKeyID string, now time.Time) (store.PushPruneResult, error) {
+	cutoffs := store.NewPushPruneCutoffs(now)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return store.PushPruneResult{}, err
+	}
+	defer tx.Rollback()
+	qtx := s.q.WithTx(tx)
+	var result store.PushPruneResult
+	if result.Failing, err = qtx.PruneFailingPushSubscriptions(ctx, sql.NullString{String: cutoffs.FailingBefore, Valid: true}); err != nil {
+		return store.PushPruneResult{}, err
+	}
+	if currentKeyID != "" {
+		if result.RetiredKey, err = qtx.PruneRetiredKeyPushSubscriptions(ctx, storedb.PruneRetiredKeyPushSubscriptionsParams{
+			CurrentKeyID:  currentKeyID,
+			UpdatedBefore: cutoffs.RetiredKeyUpdatedBefore,
+		}); err != nil {
+			return store.PushPruneResult{}, err
+		}
+	}
+	if result.SessionEnded, err = qtx.PruneEndedSessionPushSubscriptions(ctx, cutoffs.SessionExpiredBy); err != nil {
+		return store.PushPruneResult{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return store.PushPruneResult{}, err
+	}
+	return result, nil
+}
+
+func storePushSubscription(id, userID, endpoint, userAgent, createdAt, updatedAt string, lastSuccessAt sql.NullString, failureCount int64, keyID string) store.PushSubscription {
 	subscription := store.PushSubscription{
 		ID:           id,
 		UserID:       userID,
@@ -179,6 +220,7 @@ func storePushSubscription(id, userID, endpoint, userAgent, createdAt, updatedAt
 		UpdatedAt:    updatedAt,
 		FailureCount: failureCount,
 		EndpointKey:  store.PushEndpointKey(endpoint),
+		KeyID:        keyID,
 	}
 	if lastSuccessAt.Valid {
 		value := lastSuccessAt.String

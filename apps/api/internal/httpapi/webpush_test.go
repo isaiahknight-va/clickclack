@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,11 +34,14 @@ type fakeSubscriptionStore struct {
 	err        error
 	lookupErr  error
 	messageErr error
+	prunes     int
+	prunePanic bool
+	pruneErr   error
 }
 
 // GetPushSubscriptionDelivery answers the device the notification named, with
 // the RFC 8291 example keys, unless the test says the store refuses it.
-func (f *fakeSubscriptionStore) GetPushSubscriptionDelivery(_ context.Context, _, endpoint string) (store.PushSubscriptionTarget, error) {
+func (f *fakeSubscriptionStore) GetPushSubscriptionDelivery(_ context.Context, _, endpoint, _ string) (store.PushSubscriptionTarget, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.lookupErr != nil {
@@ -62,6 +66,24 @@ func (f *fakeSubscriptionStore) MarkPushSubscriptionSuccess(_ context.Context, u
 
 func (f *fakeSubscriptionStore) MarkPushSubscriptionFailure(_ context.Context, userID, endpoint string, retryAfter time.Duration) (int64, error) {
 	return 1, f.record("failure", userID, endpoint, retryAfter)
+}
+
+// PrunePushSubscriptions counts each sweep, and fails or panics when the test
+// says the store does.
+func (f *fakeSubscriptionStore) PrunePushSubscriptions(context.Context, string, time.Time) (store.PushPruneResult, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.prunes++
+	if f.prunePanic {
+		panic("prune exploded")
+	}
+	return store.PushPruneResult{}, f.pruneErr
+}
+
+func (f *fakeSubscriptionStore) pruneCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.prunes
 }
 
 func (f *fakeSubscriptionStore) record(kind, userID, endpoint string, retryAfter time.Duration) error {
@@ -141,7 +163,7 @@ func TestWebPushNotifierRecordsWhatTheRelaySaid(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			subscriptions := &fakeSubscriptionStore{}
-			notifier := newWebPushNotifier(&fakeSender{err: testCase.err}, subscriptions)
+			notifier := newWebPushNotifier(&fakeSender{err: testCase.err}, subscriptions, "")
 			if err := notifier.Notify(context.Background(), pushNotificationFor("usr_1", "https://push.example.com/send/device")); err != nil {
 				t.Fatal(err)
 			}
@@ -163,7 +185,7 @@ func TestWebPushNotifierRecordsWhatTheRelaySaid(t *testing.T) {
 func TestWebPushNotifierToleratesBookkeepingFailures(t *testing.T) {
 	t.Parallel()
 	subscriptions := &fakeSubscriptionStore{err: errors.New("database is away")}
-	notifier := newWebPushNotifier(&fakeSender{}, subscriptions)
+	notifier := newWebPushNotifier(&fakeSender{}, subscriptions, "")
 	if err := notifier.Notify(context.Background(), pushNotificationFor("usr_1", "https://push.example.com/send/device")); err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +202,7 @@ func TestWebPushNotifierSurvivesAPanickingDelivery(t *testing.T) {
 	t.Parallel()
 	sender := &fakeSender{panc: true}
 	subscriptions := &fakeSubscriptionStore{}
-	notifier := newWebPushNotifier(sender, subscriptions)
+	notifier := newWebPushNotifier(sender, subscriptions, "")
 	for range 8 {
 		if err := notifier.Notify(context.Background(), pushNotificationFor("usr_1", "https://push.example.com/send/device")); err != nil {
 			t.Fatal(err)
@@ -199,7 +221,7 @@ func TestWebPushNotifierDropsWhenTheQueueIsFull(t *testing.T) {
 	t.Parallel()
 	hold := make(chan struct{})
 	sender := &fakeSender{hold: hold}
-	notifier := newWebPushNotifier(sender, &fakeSubscriptionStore{})
+	notifier := newWebPushNotifier(sender, &fakeSubscriptionStore{}, "")
 	notification := pushNotificationFor("usr_1", "https://push.example.com/send/device")
 	for range webPushQueueSize + webPushWorkers + 50 {
 		if err := notifier.Notify(context.Background(), notification); err != nil {
@@ -218,7 +240,7 @@ func TestWebPushNotifierDropsWhenTheQueueIsFull(t *testing.T) {
 
 func TestWebPushNotifierRefusesAfterClose(t *testing.T) {
 	t.Parallel()
-	notifier := newWebPushNotifier(&fakeSender{}, &fakeSubscriptionStore{})
+	notifier := newWebPushNotifier(&fakeSender{}, &fakeSubscriptionStore{}, "")
 	notifier.Close()
 	notifier.Close()
 	if err := notifier.Notify(context.Background(), pushNotificationFor("usr_1", "https://push.example.com/send/device")); err == nil {
@@ -247,7 +269,7 @@ func TestWebPushNotifierKeepsEndpointsOutOfTheLog(t *testing.T) {
 		PrivateKey: privateKey,
 		Subject:    "https://chat.example.com",
 		Client:     client,
-	}, &fakeSubscriptionStore{})
+	}, &fakeSubscriptionStore{}, "")
 
 	var captured strings.Builder
 	previousOutput := log.Writer()
@@ -333,7 +355,7 @@ func TestWebPushNotifierBacksOffATimedOutRelay(t *testing.T) {
 		PrivateKey: privateKey,
 		Subject:    "https://chat.example.com",
 		Client:     relay.Client(),
-	}, st)
+	}, st, "")
 	if err := notifier.Notify(ctx, PushNotification{
 		UserID:        owner.ID,
 		MessageID:     message.ID,
@@ -635,6 +657,7 @@ func TestWebPushNotifierRevalidatesBeforeSending(t *testing.T) {
 		"device removed":       {lookupErr: sql.ErrNoRows, messageID: "msg_1", reason: "the device is no longer registered"},
 		"session ended":        {lookupErr: store.ErrPushSessionEnded, messageID: "msg_1", reason: "the session that registered the device has ended"},
 		"backing off":          {lookupErr: store.ErrPushSubscriptionBackingOff, messageID: "msg_1", reason: "the device is backing off"},
+		"key retired":          {lookupErr: store.ErrPushSubscriptionKeyRetired, messageID: "msg_1", reason: "the device was registered under a retired key"},
 		"device lookup failed": {lookupErr: errors.New("database is away"), messageID: "msg_1", reason: "the device could not be verified"},
 		"message unreadable":   {messageErr: sql.ErrNoRows, messageID: "msg_1", reason: "the user can no longer read the message"},
 		"message lookup failed": {
@@ -650,7 +673,7 @@ func TestWebPushNotifierRevalidatesBeforeSending(t *testing.T) {
 
 			sender := &fakeSender{}
 			subscriptions := &fakeSubscriptionStore{lookupErr: testCase.lookupErr, messageErr: testCase.messageErr}
-			notifier := newWebPushNotifier(sender, subscriptions)
+			notifier := newWebPushNotifier(sender, subscriptions, "")
 			notification := pushNotificationFor("usr_1", "https://push.example.com/send/device")
 			notification.MessageID = testCase.messageID
 			if err := notifier.Notify(context.Background(), notification); err != nil {
@@ -680,7 +703,7 @@ func TestWebPushNotifierRevalidatesBeforeSending(t *testing.T) {
 func TestWebPushNotifierSendsTheKeysOnFileNow(t *testing.T) {
 	t.Parallel()
 	sender := &fakeSender{}
-	notifier := newWebPushNotifier(sender, &fakeSubscriptionStore{})
+	notifier := newWebPushNotifier(sender, &fakeSubscriptionStore{}, "")
 	notification := pushNotificationFor("usr_1", "https://push.example.com/send/device")
 	notification.Subscriptions[0].Auth = "queued-auth-is-not-used"
 	if err := notifier.Notify(context.Background(), notification); err != nil {
@@ -858,7 +881,7 @@ func newQueuedPushFixture(t *testing.T) queuedPushFixture {
 	recipientSession := register(recipient, recipientEndpoint)
 
 	sender := &gatedSender{gate: make(chan struct{}), inFlight: make(chan struct{}, 4*webPushWorkers)}
-	notifier := newWebPushNotifier(sender, st)
+	notifier := newWebPushNotifier(sender, st, "")
 	t.Cleanup(notifier.Close)
 	publicKey, _, err := webpush.GenerateKeys()
 	if err != nil {
@@ -896,5 +919,288 @@ func newQueuedPushFixture(t *testing.T) queuedPushFixture {
 		recipient:         recipient,
 		recipientSession:  recipientSession,
 		recipientEndpoint: recipientEndpoint,
+	}
+}
+
+// newWebPushTestStore opens a migrated SQLite store with a bootstrapped owner
+// and the default workspace's first channel, and returns the database file.
+func newWebPushTestStore(t *testing.T) (*sqlitestore.Store, store.User, store.Channel, string) {
+	t.Helper()
+	ctx := context.Background()
+	databasePath := filepath.Join(t.TempDir(), "clickclack.db")
+	st, err := sqlitestore.Open("sqlite://" + databasePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	if err := st.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	owner, err := st.EnsureBootstrap(ctx, "Owner", "keyed-owner@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspaces, err := st.ListWorkspaces(ctx, owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	channels, err := st.ListChannels(ctx, workspaces[0].ID, owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return st, owner, channels[0], databasePath
+}
+
+func registerKeyedDevice(t *testing.T, st *sqlitestore.Store, userID, endpoint, keyID string) {
+	t.Helper()
+	session, err := st.CreateSession(context.Background(), userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.UpsertPushSubscription(context.Background(), store.PushSubscriptionInput{
+		UserID: userID, Endpoint: endpoint, P256dh: exampleClientKey, Auth: exampleClientAuth,
+		SessionToken: session.Token, KeyID: keyID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// capturedLog is the standard logger's output, safe to read while a
+// background goroutine is still writing to it.
+type capturedLog struct {
+	mu   sync.Mutex
+	text strings.Builder
+}
+
+func (c *capturedLog) Write(p []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.text.Write(p)
+}
+
+func (c *capturedLog) String() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.text.String()
+}
+
+// captureLog sends the standard logger to a buffer for the rest of the test.
+// Tests that use it are not parallel: the logger is process wide.
+func captureLog(t *testing.T) *capturedLog {
+	t.Helper()
+	captured := &capturedLog{}
+	previousOutput := log.Writer()
+	log.SetOutput(captured)
+	t.Cleanup(func() { log.SetOutput(previousOutput) })
+	return captured
+}
+
+// TestWebPushSkipsADeviceUnderARetiredKey is a push already queued for a
+// device when the server's key changes: the worker's re-read refuses it, the
+// push service is never called, and the row is left for the sweep.
+func TestWebPushSkipsADeviceUnderARetiredKey(t *testing.T) {
+	st, owner, channel, _ := newWebPushTestStore(t)
+	ctx := context.Background()
+	message, _, err := st.CreateMessage(ctx, store.CreateMessageInput{ChannelID: channel.ID, AuthorID: owner.ID, Body: "for the old key"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const retired, current = "https://push.example.com/send/retired", "https://push.example.com/send/current"
+	registerKeyedDevice(t, st, owner.ID, retired, "key-before")
+	registerKeyedDevice(t, st, owner.ID, current, "key-now")
+	captured := captureLog(t)
+
+	sender := &fakeSender{}
+	notifier := newWebPushNotifier(sender, st, "key-now")
+	for _, endpoint := range []string{retired, current} {
+		if err := notifier.Notify(ctx, PushNotification{
+			UserID: owner.ID, MessageID: message.ID, Subscriptions: []store.PushSubscriptionTarget{{Endpoint: endpoint}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	notifier.Close()
+	sender.mu.Lock()
+	sent := append([]webpush.Subscription(nil), sender.subscriptions...)
+	sender.mu.Unlock()
+	if len(sent) != 1 || sent[0].Endpoint != current {
+		t.Fatalf("only the device under the current key may be sent to, sent %d", len(sent))
+	}
+	want := "web push delivery skipped for user " + owner.ID + ": the device was registered under a retired key"
+	if !strings.Contains(captured.String(), want) {
+		t.Fatalf("expected %q in the log, got %q", want, captured.String())
+	}
+	if strings.Contains(captured.String(), "push.example.com/send") {
+		t.Fatalf("the log leaked an endpoint: %s", captured.String())
+	}
+	subscriptions, err := st.ListPushSubscriptions(ctx, owner.ID)
+	if err != nil || len(subscriptions) != 2 {
+		t.Fatalf("a skip removes nothing: %#v %v", subscriptions, err)
+	}
+}
+
+// TestWebPushRecipientSelectionSkipsRetiredKeys posts a real message to a
+// member with three devices: one under the server's key, one under a key it
+// retired, and one registered before keys were recorded. Only the retired one
+// is left out of the notification.
+func TestWebPushRecipientSelectionSkipsRetiredKeys(t *testing.T) {
+	t.Parallel()
+	st, _, channel, _ := newWebPushTestStore(t)
+	ctx := context.Background()
+	member, err := st.CreateUser(ctx, store.CreateUserInput{DisplayName: "Member", Email: "keyed-member@example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.AddWorkspaceMember(ctx, channel.WorkspaceID, member.ID, store.WorkspaceRoleMember); err != nil {
+		t.Fatal(err)
+	}
+	publicKey, _, err := webpush.GenerateKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	const current, retired, unrecorded = "https://push.example.com/send/current", "https://push.example.com/send/retired", "https://push.example.com/send/unrecorded"
+	registerKeyedDevice(t, st, member.ID, current, webPushKeyID(publicKey))
+	registerKeyedDevice(t, st, member.ID, retired, "0123456789ab")
+	registerKeyedDevice(t, st, member.ID, unrecorded, "")
+	web := &recordingNotifier{}
+	server := httptest.NewServer(New(st, realtime.NewHub(), Options{WebPushNotifier: web, WebPushPublicKey: publicKey}).Handler())
+	t.Cleanup(server.Close)
+
+	postJSON[struct {
+		Message store.Message `json:"message"`
+	}](t, server.URL+"/api/channels/"+channel.ID+"/messages", map[string]any{"body": "which devices ring"})
+	if len(web.notifications) != 1 {
+		t.Fatalf("expected one web push call, got %d", len(web.notifications))
+	}
+	var endpoints []string
+	for _, target := range web.notifications[0].Subscriptions {
+		endpoints = append(endpoints, target.Endpoint)
+	}
+	sort.Strings(endpoints)
+	if strings.Join(endpoints, " ") != current+" "+unrecorded {
+		t.Fatalf("selected %v, want the current and the unrecorded device", endpoints)
+	}
+
+	for _, endpoint := range []string{current, unrecorded} {
+		if err := st.DeletePushSubscription(ctx, member.ID, endpoint); err != nil {
+			t.Fatal(err)
+		}
+	}
+	postJSON[struct {
+		Message store.Message `json:"message"`
+	}](t, server.URL+"/api/channels/"+channel.ID+"/messages", map[string]any{"body": "only a retired device left"})
+	if len(web.notifications) != 1 {
+		t.Fatalf("a member with only a retired device gets no web push call, got %d", len(web.notifications))
+	}
+}
+
+// TestWebPushNotifierSweepsDeadDevicesAtStart seeds a device whose session was
+// revoked and one under a key retired a month ago beside a live device. The
+// sweep runs as the notifier starts, long before its first tick.
+func TestWebPushNotifierSweepsDeadDevicesAtStart(t *testing.T) {
+	st, owner, _, databasePath := newWebPushTestStore(t)
+	ctx := context.Background()
+	const live, revoked, retired = "https://push.example.com/send/live", "https://push.example.com/send/revoked", "https://push.example.com/send/retired"
+	registerKeyedDevice(t, st, owner.ID, live, "key-now")
+	session, err := st.CreateSession(ctx, owner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.UpsertPushSubscription(ctx, store.PushSubscriptionInput{
+		UserID: owner.ID, Endpoint: revoked, P256dh: exampleClientKey, Auth: exampleClientAuth, SessionToken: session.Token, KeyID: "key-now",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.RevokeSession(ctx, session.Token); err != nil {
+		t.Fatal(err)
+	}
+	registerKeyedDevice(t, st, owner.ID, retired, "key-before")
+	db, err := sql.Open("sqlite", "file:"+databasePath+"?_pragma=busy_timeout(5000)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	monthAgo := time.Now().UTC().Add(-31 * 24 * time.Hour).Format(time.RFC3339Nano)
+	if _, err := db.Exec(`UPDATE user_push_subscriptions SET updated_at = ? WHERE endpoint = ?`, monthAgo, retired); err != nil {
+		t.Fatal(err)
+	}
+	captured := captureLog(t)
+
+	notifier := newWebPushNotifier(&fakeSender{}, st, "key-now")
+	defer notifier.Close()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		subscriptions, err := st.ListPushSubscriptions(ctx, owner.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(subscriptions) == 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the sweep did not run at start: %d devices left", len(subscriptions))
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if _, err := st.GetPushSubscriptionDelivery(ctx, owner.ID, live, "key-now"); err != nil {
+		t.Fatalf("the live device must survive the sweep: %v", err)
+	}
+	want := "web push pruned 2 devices: 0 refused by their push service for a week, 1 under a retired key, 1 whose session ended"
+	for !strings.Contains(captured.String(), want) {
+		if time.Now().After(deadline) {
+			t.Fatalf("expected %q in the log, got %q", want, captured.String())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// TestWebPushNotifierSweepStopsOnClose watches the sweep repeat on a short
+// tick, closes the notifier, and checks no pass runs after Close returns: the
+// sweep's goroutine has exited. Not parallel: it shortens the package tick.
+func TestWebPushNotifierSweepStopsOnClose(t *testing.T) {
+	previousInterval := webPushPruneInterval
+	webPushPruneInterval = 5 * time.Millisecond
+	defer func() { webPushPruneInterval = previousInterval }()
+
+	subscriptions := &fakeSubscriptionStore{}
+	notifier := newWebPushNotifier(&fakeSender{}, subscriptions, "key-now")
+	deadline := time.Now().Add(5 * time.Second)
+	for subscriptions.pruneCount() < 3 {
+		if time.Now().After(deadline) {
+			t.Fatalf("the sweep did not repeat: %d passes", subscriptions.pruneCount())
+		}
+		time.Sleep(time.Millisecond)
+	}
+	notifier.Close()
+	passes := subscriptions.pruneCount()
+	time.Sleep(50 * time.Millisecond)
+	if got := subscriptions.pruneCount(); got != passes {
+		t.Fatalf("the sweep ran %d more times after Close", got-passes)
+	}
+}
+
+// TestWebPushNotifierSurvivesAFailingSweep guards the detached sweep the way
+// the delivery pool is guarded: a store error is logged, and a panic is
+// recovered with one line instead of taking the server down.
+func TestWebPushNotifierSurvivesAFailingSweep(t *testing.T) {
+	for name, testCase := range map[string]struct {
+		subscriptions *fakeSubscriptionStore
+		want          string
+	}{
+		"error": {&fakeSubscriptionStore{pruneErr: errors.New("database is away")}, "web push prune failed: database is away"},
+		"panic": {&fakeSubscriptionStore{prunePanic: true}, "web push prune panicked: prune exploded"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			captured := captureLog(t)
+			notifier := newWebPushNotifier(&fakeSender{}, testCase.subscriptions, "key-now")
+			deadline := time.Now().Add(5 * time.Second)
+			for !strings.Contains(captured.String(), testCase.want) {
+				if time.Now().After(deadline) {
+					t.Fatalf("expected %q in the log, got %q", testCase.want, captured.String())
+				}
+				time.Sleep(time.Millisecond)
+			}
+			notifier.Close()
+		})
 	}
 }
