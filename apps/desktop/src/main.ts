@@ -768,7 +768,8 @@ function createTray() {
     assetPath(process.platform === "darwin" ? "trayTemplate.png" : "icon.png"),
   );
   if (process.platform === "darwin") image.setTemplateImage(true);
-  tray = new Tray(image.resize({ height: process.platform === "darwin" ? 18 : 20 }));
+  // resize() drops the template flag; macOS loads trayTemplate@2x.png beside the 18px image.
+  tray = new Tray(process.platform === "darwin" ? image : image.resize({ height: 20 }));
   tray.setToolTip(APP_NAME);
   tray.on("click", showMainWindow);
   updateTrayMenu();

@@ -13,6 +13,7 @@ files:
   - assets/icon.ico
   - assets/icon.icns
   - assets/trayTemplate.png
+  - assets/trayTemplate@2x.png
   - assets/unread-badge.png
 protocols:
   - name: ClickClack link
