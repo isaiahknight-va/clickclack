@@ -53,8 +53,17 @@
     try {
       const subscription = supported ? await currentPushSubscription() : null;
       const state = await fetchPushState(subscription);
+      // Asked after the state, not beside it: a sign-in that landed before the
+      // state was read shows up here, and that state is the new account's.
+      const accountMoved = state.enabled && (await signedInUserID()) !== userID;
       available = state.enabled;
       if (!state.enabled) return;
+      if (accountMoved) {
+        enabled = false;
+        status = accountChanged;
+        statusError = true;
+        return;
+      }
       // One browser subscription serves every account on this device, and the
       // server keeps it for whichever account registered it last. The switch
       // is on only while the server says this browser's subscription is one
