@@ -34,3 +34,5 @@ Revision 3 final (head 4fdae122): e1r5-* is the built-server authorization run a
 Revision 4 (2026-09-22, dead-row handling): a real iPad whose subscription was made under the rotated-away key and whose browser hides the key, with no key remembered. On open the server answered this_device_stale, the app removed the old row and registered fresh under the current key (22:15:55 ET), and push eight was delivered to it and the iPhone (22:17:26 ET). ipad-after-self-heal-banner.png is that push on the iPad lock screen.
 
 Revision 4 final (head e8668106): e1r7-* is the built-server authorization run at the pushed head, including the key-retired skip (zero sends, the retired-key skip line).
+
+Revision 4 upgrade evidence (head 1fe45150, apps tree identical to e8668106): e2r2-upgrade/ covers SQLite and PostgreSQL from v0.5.1 through 0043 and 0044 (0036 and 0037), and from the PR's previous head 4fdae122 through 0044 (0037) with seven seeded devices, then boots head's server on the upgraded copy and records the start sweep. RESULT: PASS. A negative control (0044 defaulting the key id to a non-empty value) made the same run fail with seven failed checks.
