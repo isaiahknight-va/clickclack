@@ -8,6 +8,10 @@
 // message so the recipient's push waits in the queue, withdraws one piece of
 // the recipient's authority, and releases the workers. The recipient's device
 // must receive nothing, except in the control case, where it receives one push.
+// In the key-retired case the device's row is moved to a key the server does
+// not sign with, the way a rotation leaves it; afterwards the push state must
+// name the device stale, and a message posted with the workers free must not
+// be queued for it at all.
 //
 // A last case is one browser shared by two accounts. Signed in by cookie as A,
 // the device registers for A; the same cookie jar then signs in as B, and a
@@ -22,7 +26,7 @@
 // run fails if a token or an endpoint path appears in the server's output.
 
 import { execFileSync, spawn } from "node:child_process";
-import { generateKeyPairSync, randomUUID } from "node:crypto";
+import { createHash, generateKeyPairSync, randomUUID } from "node:crypto";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
@@ -30,11 +34,18 @@ import { join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const WORKERS = 4;
-const CASES = ["control", "session-revoked", "subscription-deleted", "membership-removed"];
+const CASES = [
+  "control",
+  "session-revoked",
+  "subscription-deleted",
+  "membership-removed",
+  "key-retired",
+];
 const SKIP_REASON = {
   "session-revoked": "the session that registered the device has ended",
   "subscription-deleted": "the device is no longer registered",
   "membership-removed": "the user can no longer read the message",
+  "key-retired": "the device was registered under a retired key",
 };
 
 const outIndex = process.argv.indexOf("--out");
@@ -254,6 +265,7 @@ for (let index = 0; index < WORKERS; index += 1) {
 }
 
 const results = [];
+let retired;
 for (const name of CASES) {
   const place = await workspaceWithChannel(`Case ${name}`);
   const recipient = await member(place.workspace, "recipient");
@@ -288,6 +300,17 @@ for (const name of CASES) {
       join(dataDir, "clickclack.db"),
       `DELETE FROM workspace_members WHERE workspace_id = '${place.workspace}' AND user_id = '${recipient.id}';`,
     ]);
+  } else if (name === "key-retired") {
+    // A rotation needs a restart under a new key pair, so the harness moves
+    // the device's row to another key instead, which is what a rotation
+    // leaves behind. The delivery check reads the same row.
+    if (!/^[A-Za-z0-9_]+$/.test(recipient.id)) fail(`unexpected id shape ${recipient.id}`);
+    execFileSync("sqlite3", [
+      "-cmd",
+      ".timeout 5000",
+      join(dataDir, "clickclack.db"),
+      `UPDATE user_push_subscriptions SET vapid_key_id = '000000000000' WHERE user_id = '${recipient.id}';`,
+    ]);
   }
 
   openGate();
@@ -308,6 +331,25 @@ for (const name of CASES) {
     delivered: delivered.get(name) ?? 0,
     line: line.replace(/^\S+ \S+ /, ""),
   });
+  if (name === "key-retired") {
+    const device = createHash("sha256").update(endpoint).digest("base64url");
+    const state = await api(recipient.session, "GET", `/api/me/push?device=${device}`);
+    const lines = () => logLines.filter((entry) => entry.includes(outcome)).length;
+    const before = lines();
+    await api(ownerSession, "POST", `/api/channels/${place.channel}/messages`, {
+      body: "posted after the key was retired",
+    });
+    // Nothing is queued for a device under a retired key, so there is no
+    // line to wait for; this settle only gives a push that was going to
+    // leave the time one takes.
+    await sleep(1_000);
+    retired = {
+      thisDevice: state.this_device,
+      stale: state.this_device_stale,
+      pushesAfter: (delivered.get(name) ?? 0) - results.at(-1).delivered,
+      linesAfter: lines() - before,
+    };
+  }
 }
 
 // One browser, one cookie jar, two accounts. The workers are free now.
@@ -404,6 +446,10 @@ for (const result of results) {
     problems.push(`control: logged "${result.line}"`);
 }
 
+if (!retired?.thisDevice || !retired?.stale)
+  problems.push(`key-retired: the push state read ${JSON.stringify(retired)}`);
+if (retired?.pushesAfter !== 0 || retired?.linesAfter !== 0)
+  problems.push(`key-retired: a later message reached the device: ${JSON.stringify(retired)}`);
 if (shared.cookieOwner !== "B") problems.push(`shared: the jar was ${shared.cookieOwner}`);
 if (shared.staleStatus !== 409)
   problems.push(`shared: a registration naming A under B's cookie answered ${shared.staleStatus}`);
@@ -423,6 +469,10 @@ const summary = [
   ...results.map(
     (result) => `${result.name.padEnd(22)} ${String(result.delivered).padEnd(34)} ${result.line}`,
   ),
+  "",
+  "Key retired: after the case above, with the workers free",
+  `GET /api/me/push naming the device, this_device / this_device_stale: ${retired?.thisDevice} / ${retired?.stale}`,
+  `a message posted after the retirement, pushes / log lines for the recipient: ${retired?.pushesAfter} / ${retired?.linesAfter}`,
   "",
   "Shared browser: one cookie jar, signed in as A, then as B",
   `A registers its device by cookie, naming A:              200`,
