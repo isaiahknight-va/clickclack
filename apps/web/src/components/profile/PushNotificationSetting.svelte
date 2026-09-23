@@ -27,6 +27,10 @@
 
   let { user, isDesktop = false }: Props = $props();
 
+  // Another tab may have signed this browser in to a different account.
+  // Whoever is signed in now did not flip this switch.
+  const accountChanged = "This browser is now signed in to a different account. Reload to continue.";
+
   let available = $state(false);
   let supported = $state(false);
   let enabled = $state(false);
@@ -64,7 +68,8 @@
     }
   }
 
-  async function setEnabled(next: boolean) {
+  async function setEnabled(control: HTMLInputElement) {
+    const next = control.checked;
     status = "";
     statusError = false;
     busy = true;
@@ -72,11 +77,20 @@
       if (next) await turnOn();
       else await turnOff();
     } catch (error) {
-      enabled = false;
-      status = readableAPIError(error, "Push notifications could not be turned on");
+      // A failed turn-off reads on until the server has removed the device,
+      // as when it refuses because another account signed in after the check.
+      if (next) enabled = false;
+      status = readableAPIError(
+        error,
+        next ? "Push notifications could not be turned on" : "Push notifications could not be turned off",
+      );
       statusError = true;
     } finally {
       busy = false;
+      // The click has already moved the box, and `checked` rewrites it only
+      // when `enabled` changes. A refusal that leaves `enabled` as it was
+      // puts the box back here.
+      control.checked = enabled;
     }
   }
 
@@ -86,11 +100,9 @@
       available = false;
       return;
     }
-    // Another tab may have signed this browser in to a different account.
-    // Whoever is signed in now did not flip this switch.
     if (signedIn !== user.id) {
       enabled = false;
-      status = "This browser is now signed in to a different account. Reload to continue.";
+      status = accountChanged;
       statusError = true;
       return;
     }
@@ -115,14 +127,23 @@
   }
 
   async function turnOff() {
+    // The subscription is the device of the account this row shows. The
+    // signed-in account cannot remove it, and dropping it from the browser
+    // would leave that account's row pointing at nothing.
+    if ((await signedInUserID()) !== user.id) {
+      status = accountChanged;
+      statusError = true;
+      return;
+    }
     const subscription = await currentPushSubscription();
+    // The server goes first: a sign-in landing after the check above is
+    // refused there, and the browser keeps its subscription.
+    if (subscription) await forgetSubscription(subscription.endpoint, user.id);
     writePushEnabled(user.id, false);
     writeSubscribedKey(user.id, "");
     enabled = false;
     if (!subscription) return;
-    const endpoint = subscription.endpoint;
     await subscription.unsubscribe();
-    await forgetSubscription(endpoint);
     status = "Off for this device";
   }
 
@@ -155,7 +176,7 @@
         aria-label="Push notifications on this device"
         disabled={!supported || busy}
         checked={enabled}
-        onchange={(event) => void setEnabled(event.currentTarget.checked)}
+        onchange={(event) => void setEnabled(event.currentTarget)}
       />
     </div>
   </div>

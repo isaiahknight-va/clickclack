@@ -609,6 +609,9 @@ test("a notification tap with no app window open lands at the newest message", a
 
 test.describe("a device registered under a signed-in session", () => {
   const csrf = { "X-ClickClack-CSRF": "1" };
+  // What the settings row says when the browser is signed in to someone else.
+  const accountChangedStatus =
+    "This browser is now signed in to a different account. Reload to continue.";
 
   // signInByMagicLink signs the page's browser context in as a new account.
   // The cookie it sets is shared by every tab in the context, the way one
@@ -879,6 +882,93 @@ test.describe("a device registered under a signed-in session", () => {
       delivered = (await relayDeliveries(page)).length;
       await roomA.post("to the first account, after the switch");
       await expectDeliveries(page, delivered + 1);
+    } finally {
+      await asA.dispose();
+    }
+  });
+
+  // Opening the settings reads the signed-in account, so a row can only still
+  // be A's if it was open before a second tab signed the browser in as B.
+  // Switching it on there refuses before asking the browser for anything.
+  test("the switch in a tab another tab's sign-in replaced turns nothing on and says why", async ({
+    page,
+    context,
+  }) => {
+    const endpoint = `${relayOrigin}/push/${randomUUID()}`;
+    await stubPushManager(page, endpoint);
+    const accountA = await signInByMagicLink(page, "Push switch on first");
+    const roomA = await sessionRoom(page, "Push switch on first");
+    await page.goto(roomA.route);
+    await waitForAppReady(page);
+    const modal = await openNotificationSettings(page);
+    const control = modal.getByLabel("Push notifications on this device");
+    await expect(control).toBeEnabled();
+    await expect(control).not.toBeChecked();
+
+    const second = await context.newPage();
+    const accountB = await signInByMagicLink(second, "Push switch on second");
+    expect(accountB).not.toBe(accountA);
+    const registrations: number[] = [];
+    context.on("response", (response) => {
+      if (isPushRegistration(response.request())) registrations.push(response.status());
+    });
+
+    await control.click();
+    await expect(modal.getByText(accountChangedStatus)).toBeVisible();
+    await expect(control).toBeEnabled();
+    await expect(control).not.toBeChecked();
+    expect(registrations).toEqual([]);
+    expect(await stubCalls(page)).toEqual([]);
+    expect(await devicesOf(second.request)).toBe(0);
+  });
+
+  // The switch off in a tab whose row was open before another tab signed in
+  // as B. B's cookie would remove nothing of A's, so turning off refuses
+  // outright: the browser keeps its subscription and A keeps its device.
+  test("turning push off in a tab another tab's sign-in replaced removes nothing and says why", async ({
+    page,
+    context,
+    playwright,
+    baseURL,
+  }) => {
+    const endpoint = `${relayOrigin}/push/${randomUUID()}`;
+    await stubPushManager(page, endpoint);
+    const accountA = await signInByMagicLink(page, "Push switch off first");
+    const roomA = await sessionRoom(page, "Push switch off first");
+    await page.goto(roomA.route);
+    await waitForAppReady(page);
+    await turnPushOn(page);
+    const asA = await playwright.request.newContext({
+      baseURL,
+      storageState: await context.storageState(),
+    });
+    try {
+      // A's row opens while A is signed in, so it reads on, and stays open.
+      const modal = await openNotificationSettings(page);
+      const control = modal.getByLabel("Push notifications on this device");
+      await expect(control).toBeChecked();
+
+      const second = await context.newPage();
+      const accountB = await signInByMagicLink(second, "Push switch off second");
+      expect(accountB).not.toBe(accountA);
+      const removals: number[] = [];
+      context.on("response", (response) => {
+        if (
+          response.url().includes("/api/me/push/subscriptions") &&
+          response.request().method() === "DELETE"
+        ) {
+          removals.push(response.status());
+        }
+      });
+
+      await control.click();
+      await expect(modal.getByText(accountChangedStatus)).toBeVisible();
+      await expect(control).toBeEnabled();
+      await expect(control).toBeChecked();
+      expect(await stubCalls(page)).not.toContain(`unsubscribe:${endpoint}`);
+      expect(removals).toEqual([]);
+      expect(await devicesOf(asA)).toBe(1);
+      expect(await devicesOf(second.request)).toBe(0);
     } finally {
       await asA.dispose();
     }
