@@ -973,6 +973,66 @@ test.describe("a device registered under a signed-in session", () => {
       await asA.dispose();
     }
   });
+
+  // Opening the settings reads the signed-in account, so a row can only open
+  // for A under B's cookie when B signs in after that read and before the row
+  // reads the push state. B has turned push on here by then, so the state says
+  // this browser's subscription is one of the signed-in account's devices,
+  // and none of it is A's.
+  test("a row that reads the push state after another tab's sign-in shows why instead of on", async ({
+    page,
+    context,
+  }) => {
+    const endpoint = `${relayOrigin}/push/${randomUUID()}`;
+    await stubPushManager(page, endpoint);
+    const accountA = await signInByMagicLink(page, "Push row read first");
+    const roomA = await sessionRoom(page, "Push row read first");
+    await page.goto(roomA.route);
+    await waitForAppReady(page);
+    await turnPushOn(page);
+
+    // Hold the row's read of the push state until the other tab is done.
+    let reached!: () => void;
+    const rowReached = new Promise<void>((resolve) => (reached = resolve));
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => (release = resolve));
+    await page.route(
+      (url) => url.pathname === "/api/me/push",
+      async (route) => {
+        if (route.request().method() === "GET") {
+          reached();
+          await released;
+        }
+        await route.continue();
+      },
+    );
+    const modal = await openNotificationSettings(page);
+    await rowReached;
+
+    const second = await context.newPage();
+    await stubPushManager(second, endpoint);
+    const accountB = await signInByMagicLink(second, "Push row read second");
+    const roomB = await sessionRoom(second, "Push row read second");
+    expect(accountB).not.toBe(accountA);
+    await second.goto(roomB.route);
+    await waitForAppReady(second);
+    await turnPushOn(second);
+    expect(await devicesOf(second.request)).toBe(1);
+    release();
+
+    const control = modal.getByLabel("Push notifications on this device");
+    await expect(modal.getByText(accountChangedStatus)).toBeVisible();
+    await expect(control).toBeEnabled();
+    await expect(control).not.toBeChecked();
+    await expect(modal.getByText(/^On for /)).toHaveCount(0);
+    // The row is still A's: the tab never took B's account.
+    await expect(
+      page.getByRole("button", { name: /Account settings for Push row read first/ }),
+    ).toBeAttached();
+    await page.unroute((url) => url.pathname === "/api/me/push");
+    expect(await stubCalls(page)).toEqual([`subscribe:${endpoint}`]);
+    expect(await devicesOf(second.request)).toBe(1);
+  });
 });
 
 // fireSubscriptionChange raises the event a browser raises when it replaces a
