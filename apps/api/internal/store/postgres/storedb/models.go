@@ -441,6 +441,7 @@ type UserPushSubscription struct {
 	FailureCount     int64          `json:"failure_count"`
 	VapidKeyID       string         `json:"vapid_key_id"`
 	FailingSince     sql.NullString `json:"failing_since"`
+	LastFailureAt    sql.NullString `json:"last_failure_at"`
 }
 
 type Workspace struct {

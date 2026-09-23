@@ -94,9 +94,9 @@ func TestPushKeyRetiredNeedsBothKeysToDiffer(t *testing.T) {
 }
 
 // Stored timestamps drop trailing fraction zeros, so text order and time order
-// part inside one second. Each cutoff carries all nine digits, and a stored
-// time in the cutoff's own second must never sort before it unless it is
-// earlier, or a sweep would remove a device a moment early.
+// part inside one second. Each "before" cutoff carries all nine digits, and a
+// stored time in the cutoff's own second must never sort before it unless it
+// is earlier, or a sweep would remove a device a moment early.
 func TestPushPruneCutoffsNeverSortALaterTimeFirst(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 9, 22, 12, 0, 0, 300_000_000, time.UTC)
@@ -109,6 +109,25 @@ func TestPushPruneCutoffsNeverSortALaterTimeFirst(t *testing.T) {
 	}
 	if cutoffs.RetiredKeyUpdatedBefore != "2026-08-23T12:00:00.300000000Z" {
 		t.Fatalf("retired key cutoff is %q", cutoffs.RetiredKeyUpdatedBefore)
+	}
+	if cutoffs.LastFailureSince != "2026-09-21T12:00:01Z" {
+		t.Fatalf("latest refusal cutoff is %q", cutoffs.LastFailureSince)
+	}
+	// The latest refusal is compared the other way: a stored time must never
+	// sort at or after that cutoff unless it is no earlier than a day ago.
+	dayAgo := now.Add(-PushFailingPruneRefusedWithin)
+	for _, offset := range []time.Duration{
+		-time.Second, -time.Nanosecond, 0, time.Nanosecond, 699 * time.Millisecond, 700 * time.Millisecond,
+		time.Second, 1700 * time.Millisecond, 2 * time.Second, time.Hour,
+	} {
+		refused := dayAgo.Add(offset)
+		stored := refused.Format(time.RFC3339Nano)
+		if stored >= cutoffs.LastFailureSince && refused.Before(dayAgo) {
+			t.Fatalf("%q sorts at or after the cutoff %q but is earlier than a day ago", stored, cutoffs.LastFailureSince)
+		}
+		if offset >= 2*time.Second && stored < cutoffs.LastFailureSince {
+			t.Fatalf("%q is two seconds or more inside the day but sorts before %q", stored, cutoffs.LastFailureSince)
+		}
 	}
 	for _, offset := range []time.Duration{
 		-2 * time.Second, -time.Second, -300 * time.Millisecond, -time.Millisecond, -time.Nanosecond,

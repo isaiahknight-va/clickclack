@@ -123,10 +123,10 @@ func (s *Store) MarkPushSubscriptionSuccess(ctx context.Context, userID, endpoin
 
 // MarkPushSubscriptionFailure counts one failed delivery and pushes the next
 // attempt out. The count is incremented in SQL so concurrent workers cannot
-// lose one, and the same statement stamps when the run of failures began if
-// none was running. The row is never removed here: the push service reporting
-// the subscription gone does that, or PrunePushSubscriptions once the run has
-// lasted a week.
+// lose one, and the same statement stamps this refusal and, if no run of
+// failures was running, when the run began. The row is never removed here: the
+// push service reporting the subscription gone does that, or
+// PrunePushSubscriptions once the run has refused through a week.
 func (s *Store) MarkPushSubscriptionFailure(ctx context.Context, userID, endpoint string, retryAfter time.Duration) (int64, error) {
 	count, err := s.q.MarkPushSubscriptionFailure(ctx, storedb.MarkPushSubscriptionFailureParams{
 		UpdatedAt: now(),
@@ -173,7 +173,8 @@ func (s *Store) listPushSubscriptionTargets(ctx context.Context, userIDs []strin
 
 // PrunePushSubscriptions removes, in one transaction, the devices that can
 // no longer receive: refused by their push service in a run of failures that
-// began a week ago and holds more than one, registered under a retired key
+// began a week ago, refused again within the last day, and holds more than
+// one, registered under a retired key
 // and not registered again for a month, or bound to a session that is gone,
 // revoked, or expired. A development row, with no session, and a row whose
 // key was never recorded are each outside the rule that would need what they
@@ -188,8 +189,9 @@ func (s *Store) PrunePushSubscriptions(ctx context.Context, currentKeyID string,
 	qtx := s.q.WithTx(tx)
 	var result store.PushPruneResult
 	if result.Failing, err = qtx.PruneFailingPushSubscriptions(ctx, storedb.PruneFailingPushSubscriptionsParams{
-		FailingBefore: sql.NullString{String: cutoffs.FailingBefore, Valid: true},
-		MinFailures:   store.PushFailingPruneMinFailures,
+		FailingBefore:    sql.NullString{String: cutoffs.FailingBefore, Valid: true},
+		LastFailureSince: sql.NullString{String: cutoffs.LastFailureSince, Valid: true},
+		MinFailures:      store.PushFailingPruneMinFailures,
 	}); err != nil {
 		return store.PushPruneResult{}, err
 	}

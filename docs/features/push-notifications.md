@@ -117,8 +117,9 @@ Failures are handled by what the push service says:
 - Anything else, including 429, a 5xx, and a timeout, sets a backoff (one
   minute, then five, thirty, two hours, six, and a day at most, honoring a
   longer `Retry-After`). No single failure deletes the row: a relay outage
-  must not cost users their devices. The first failure of a run records when
-  the run began, and a success clears the backoff and ends the run. The
+  must not cost users their devices. Every failure records when it happened,
+  and the first of a run also records when the run began. A success, or the
+  device registering again, clears the backoff and ends the run. The
   failure is recorded on its own deadline, so a push service that used the
   whole send timeout still gets its backoff.
 
@@ -134,12 +135,14 @@ the server's key is rotated while it is closed, or the session it was
 registered under ends. The server finds these rows itself. Once at startup and
 then hourly, one sweep removes, in a single transaction:
 
-- a device its push service has refused at least twice, with nothing
-  delivered, for seven days. A relay outage is shorter than a week, and the
-  daily retry gives the device seven chances. Retries happen only when there
-  is something to send, so a quiet week can hold a single refusal, and one
-  refusal never removes a device. Only a delivery ends the run; registering
-  the device again does not.
+- a device its push service has refused through a whole week, with nothing
+  delivered: the run of refusals began more than seven days ago, the latest
+  refusal is less than a day old, and the run holds at least two. A relay
+  outage is shorter than a week. Retries happen only when there is something
+  to send, so two refusals in one short outage and then a quiet week are not a
+  week of refusals, and the device is kept; one refusal never removes a
+  device. A delivery ends the run, and so does the device registering again,
+  which only an app that opened can do.
 - a device registered under a key the server no longer signs with that has not
   registered again for thirty days. Opening the app replaces such a
   subscription, so a month without that means nobody is opening it.
@@ -253,7 +256,11 @@ depending on the browser.
   nothing until then.
 - A device registered before the server recorded keys has none on file. If
   its subscription was made under a key since rotated away, and its browser
-  hides the key (Safari) and remembers none, neither side can tell: the
-  device is removed after a week of refusals, and the next open registers the
-  same subscription again, now recorded under the current key. Turning the
+  hides the key (Safari) and remembers none, neither side can tell, and its
+  push service refuses every push. Each open of the app registers the device
+  again and ends the run of refusals, so while the app opens more often than
+  once a week the device is kept and receives nothing. It is removed only once
+  pushes to it have been refused through a week with the app unopened, and
+  the next open then registers the same subscription again, recorded under
+  the current key it was not made under, so it is still refused. Turning the
   switch off and back on replaces the subscription.
