@@ -6,7 +6,7 @@ import {
   type Request,
   type Worker,
 } from "@playwright/test";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { createGeneralChannel } from "./channel-fixture";
 import { waitForAppReady } from "./app-ready";
 
@@ -35,7 +35,9 @@ type Delivery = {
 // on first activation, and a subscription reports the application server key
 // it was made under. A test can also start the page holding an older
 // subscription, or drop the current one the way a browser rotating it would.
-type StubOptions = { stale?: { endpoint: string; key: string } };
+// An older subscription with no key stands in for Safari, which never reports
+// the key a subscription was made under.
+type StubOptions = { stale?: { endpoint: string; key: string | null } };
 
 // The RFC 8291 example subscription keys: a real point on P-256 and a 16 byte
 // auth secret, so the server can encrypt for them.
@@ -70,10 +72,13 @@ async function stubPushManager(page: Page, endpoint: string, options: StubOption
         return subscription;
       };
       if (stale) {
-        const padded = stale.key.replace(/-/g, "+").replace(/_/g, "/");
-        const binary = atob(padded + "=".repeat((4 - (padded.length % 4)) % 4));
-        const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-        current = makeSubscription(stale.endpoint, bytes.buffer);
+        let key: ArrayBuffer | null = null;
+        if (stale.key) {
+          const padded = stale.key.replace(/-/g, "+").replace(/_/g, "/");
+          const binary = atob(padded + "=".repeat((4 - (padded.length % 4)) % 4));
+          key = Uint8Array.from(binary, (character) => character.charCodeAt(0)).buffer;
+        }
+        current = makeSubscription(stale.endpoint, key);
       }
       const managers = new WeakMap<ServiceWorkerRegistration, unknown>();
       const managerFor = (registration: ServiceWorkerRegistration) => {
@@ -283,6 +288,101 @@ test("a device holding a subscription under an old key replaces it when the app 
     .toEqual([`unsubscribe:${staleEndpoint}`, `subscribe:${endpoint}`]);
   await expect.poll(async () => (await pushState(page)).subscriptions.length).toBe(1);
 });
+
+// Safari hides the key a subscription was made under, and a device that
+// subscribed before the app remembered keys, or lost its storage, remembers
+// none, so only the server can say the device is under a retired key. The
+// server's answer is set here for this browser's device alone: a headless run
+// has one server key, and the Go tests cover how the server decides.
+for (const serverSaysStale of [true, false]) {
+  test(`a device that cannot report its key ${serverSaysStale ? "replaces its subscription when the server names it stale" : "keeps its subscription when the server does not"}`, async ({
+    page,
+  }) => {
+    const endpoint = `${relayOrigin}/push/${randomUUID()}`;
+    const heldEndpoint = `${relayOrigin}/push/held-${randomUUID()}`;
+    await stubPushManager(page, endpoint, { stale: { endpoint: heldEndpoint, key: null } });
+    const { route } = await createGeneralChannel(page, `Push hidden key ${serverSaysStale}`, true);
+    await page.goto(route);
+    await waitForAppReady(page);
+    const userID = await page.evaluate(async () => {
+      const response = await fetch("/api/me");
+      return ((await response.json()) as { user: { id: string } }).user.id;
+    });
+    await rememberPushEnabled(page);
+    // Push was on here before, so the worker is installed and holds the
+    // subscription, and the server holds the device for this account.
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.register("/service-worker.js", { scope: "/" });
+      await navigator.serviceWorker.ready;
+    });
+    const registered = await page.evaluate(
+      async ({ endpoint, userID, keys }) =>
+        (
+          await fetch("/api/me/push/subscriptions", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", "X-ClickClack-CSRF": "1" },
+            body: JSON.stringify({ user_id: userID, endpoint, keys, user_agent: "held" }),
+          })
+        ).status,
+      { endpoint: heldEndpoint, userID, keys: exampleSubscriptionKeys },
+    );
+    expect(registered).toBe(200);
+
+    const heldDevice = createHash("sha256").update(heldEndpoint).digest("base64url");
+    const reads: { device: string; thisDevice: boolean; stale: boolean }[] = [];
+    await page.route(
+      (url) => url.pathname === "/api/me/push",
+      async (route) => {
+        if (route.request().method() !== "GET") return route.continue();
+        const device = new URL(route.request().url()).searchParams.get("device") ?? "";
+        const response = await route.fetch();
+        const state = (await response.json()) as {
+          this_device: boolean;
+          this_device_stale: boolean;
+        };
+        reads.push({ device, thisDevice: state.this_device, stale: state.this_device_stale });
+        if (serverSaysStale && device === heldDevice && state.this_device) {
+          state.this_device_stale = true;
+        }
+        await route.fulfill({ response, json: state });
+      },
+    );
+    const removals: string[] = [];
+    page.on("request", (request) => {
+      if (request.url().includes("/api/me/push/subscriptions") && request.method() === "DELETE") {
+        removals.push(request.postData() ?? "");
+      }
+    });
+    const next = serverSaysStale ? endpoint : heldEndpoint;
+    const stored = page.waitForResponse(
+      (response) =>
+        isPushRegistration(response.request()) &&
+        (JSON.parse(response.request().postData() ?? "{}") as { endpoint?: string }).endpoint ===
+          next &&
+        response.status() === 200,
+    );
+    await page.reload();
+    await waitForAppReady(page);
+    await stored;
+    await page.unroute((url) => url.pathname === "/api/me/push");
+
+    // The heal named this browser's device when it read the state, and the
+    // server, holding it under its own key, did not call it stale.
+    expect(reads).toContainEqual({ device: heldDevice, thisDevice: true, stale: false });
+    if (serverSaysStale) {
+      await expect
+        .poll(() => stubCalls(page))
+        .toEqual([`unsubscribe:${heldEndpoint}`, `subscribe:${endpoint}`]);
+      expect(removals).toHaveLength(1);
+      expect(JSON.parse(removals[0])).toEqual({ user_id: userID, endpoint: heldEndpoint });
+    } else {
+      expect(await stubCalls(page)).toEqual([]);
+      expect(removals).toEqual([]);
+    }
+    const state = await pushState(page);
+    expect(state.subscriptions).toHaveLength(1);
+  });
+}
 
 test("a renewed subscription registers only for the account that turned push on", async ({
   page,

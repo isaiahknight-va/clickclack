@@ -126,12 +126,24 @@ test("subscriptionIsStale uses the browser's key when it has one, else the remem
   const other =
     "BCTr9HsDUFcPuwSZkBv5t_nnrv-XyDnOr5UXvKZ8Enjex7GADo0ZeCgz7gT5n3UQ5oLjFmT2j03pmBpSSttwq_Y";
   const bytes = applicationServerKey(current);
-  assert.equal(subscriptionIsStale(bytes, "", current), false);
-  assert.equal(subscriptionIsStale(bytes, other, current), false);
-  assert.equal(subscriptionIsStale(applicationServerKey(other), "", current), true);
-  assert.equal(subscriptionIsStale(null, current, current), false);
-  assert.equal(subscriptionIsStale(null, other, current), true);
-  assert.equal(subscriptionIsStale(null, "", current), false);
+  assert.equal(subscriptionIsStale(bytes, "", current, false), false);
+  assert.equal(subscriptionIsStale(bytes, other, current, false), false);
+  assert.equal(subscriptionIsStale(applicationServerKey(other), "", current, false), true);
+  assert.equal(subscriptionIsStale(null, current, current, false), false);
+  assert.equal(subscriptionIsStale(null, other, current, false), true);
+  assert.equal(subscriptionIsStale(null, "", current, false), false);
+});
+
+test("subscriptionIsStale takes the server's word when the browser hides the key and none is remembered", () => {
+  const current =
+    "BNbxGYNMhEIi9zrneh7mqV4oUanjLUK3m-mYZBc62frMKrEoiPJ-pVPSPSFy0WcyTuzTjGjuj_VO5bqYwstlGtE";
+  // Safari reports no key, and a device that subscribed before the key was
+  // remembered, or lost its storage, remembers none: only the server can tell.
+  assert.equal(subscriptionIsStale(null, "", current, true), true);
+  assert.equal(subscriptionIsStale(undefined, "", current, true), true);
+  // The server's word wins over a browser or a memory that reads current.
+  assert.equal(subscriptionIsStale(applicationServerKey(current), current, current, true), true);
+  assert.equal(subscriptionIsStale(null, current, current, true), true);
 });
 
 test("pushDeviceKey is the unpadded base64url SHA-256 the server computes", async () => {

@@ -104,7 +104,10 @@
   }
 
   async function turnOn() {
-    const [state, signedIn] = await Promise.all([fetchPushState(), signedInUserID()]);
+    const [state, signedIn] = await Promise.all([
+      currentPushSubscription().then(fetchPushState),
+      signedInUserID(),
+    ]);
     if (!state.enabled) {
       available = false;
       return;
@@ -128,7 +131,7 @@
       return;
     }
     const registration = await registerPushWorker();
-    const subscription = await ensurePushSubscription(registration, state.vapid_public_key, user.id);
+    const subscription = await ensurePushSubscription(registration, state, user.id);
     await storeSubscription(subscription, user.id);
     writePushEnabled(user.id, true);
     enabled = true;

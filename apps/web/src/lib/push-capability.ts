@@ -92,15 +92,19 @@ export function applicationServerKey(value: string): Uint8Array<ArrayBuffer> {
 }
 
 // subscriptionIsStale decides whether an existing subscription was made under
-// a key the server no longer signs with. The browser's own report wins when
-// it gives one; otherwise the key this device remembers subscribing under
-// decides, because Safari does not expose applicationServerKey. With neither,
-// the subscription is kept.
+// a key the server no longer signs with. The server's word wins: it names this
+// device stale when it holds the device under a retired key, which it knows
+// even when the browser hides the key and the device remembers none.
+// Otherwise the browser's own report decides when it gives one, and then the
+// key this device remembers subscribing under, because Safari does not expose
+// applicationServerKey. With none of the three, the subscription is kept.
 export function subscriptionIsStale(
   existing: ArrayBuffer | ArrayBufferView | null | undefined,
   rememberedKey: string,
   configuredKey: string,
+  serverSaysStale: boolean,
 ): boolean {
+  if (serverSaysStale) return true;
   const configured = applicationServerKey(configuredKey);
   if (existing) return !sameApplicationServerKey(existing, configured);
   return rememberedKey !== "" && rememberedKey.trim() !== configuredKey.trim();
