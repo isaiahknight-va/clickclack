@@ -1033,6 +1033,63 @@ test.describe("a device registered under a signed-in session", () => {
     expect(await stubCalls(page)).toEqual([`subscribe:${endpoint}`]);
     expect(await devicesOf(second.request)).toBe(1);
   });
+
+  // On a shared browser the account that does not hold the device reads off
+  // and cannot turn it off. Turning it on moves the device to that account,
+  // and turning it off then removes it, so the first account's pushes stop
+  // arriving there.
+  test("the other account on a shared browser stops the first account's pushes by turning on then off", async ({
+    page,
+    context,
+    playwright,
+    baseURL,
+  }) => {
+    const endpoint = `${relayOrigin}/push/${randomUUID()}`;
+    await stubPushManager(page, endpoint);
+    const accountA = await signInByMagicLink(page, "Push handover first");
+    const roomA = await sessionRoom(page, "Push handover first");
+    await page.goto(roomA.route);
+    await waitForAppReady(page);
+    await turnPushOn(page);
+    const asA = await playwright.request.newContext({
+      baseURL,
+      storageState: await context.storageState(),
+    });
+    try {
+      const second = await context.newPage();
+      await stubPushManager(second, endpoint);
+      const accountB = await signInByMagicLink(second, "Push handover second");
+      const roomB = await sessionRoom(second, "Push handover second");
+      expect(accountB).not.toBe(accountA);
+      await second.goto(roomB.route);
+      await waitForAppReady(second);
+      await turnPushOn(second);
+      expect(await devicesOf(asA)).toBe(0);
+      expect(await devicesOf(second.request)).toBe(1);
+
+      const modal = await openNotificationSettings(second);
+      const control = modal.getByLabel("Push notifications on this device");
+      await expect(control).toBeChecked();
+      const removed = second.waitForResponse(
+        (response) =>
+          response.url().includes("/api/me/push/subscriptions") &&
+          response.request().method() === "DELETE" &&
+          response.status() === 204,
+      );
+      await control.uncheck();
+      await removed;
+      await expect(modal.getByText("Off for this device")).toBeVisible();
+
+      expect(await stubCalls(second)).toContain(`unsubscribe:${endpoint}`);
+      expect(await devicesOf(asA)).toBe(0);
+      expect(await devicesOf(second.request)).toBe(0);
+      await expectNoDeliveryAfter(page, () =>
+        roomA.post("to the first account, after the handover"),
+      );
+    } finally {
+      await asA.dispose();
+    }
+  });
 });
 
 // fireSubscriptionChange raises the event a browser raises when it replaces a
