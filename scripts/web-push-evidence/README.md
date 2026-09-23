@@ -41,36 +41,64 @@ and `server.log` hold what the server printed. The run fails if a session
 token, a sign-in token, or an endpoint appears in the server's output.
 Requires `go`, `node`, and `sqlite3`.
 
-## Upgrade from a release
+## Upgrade from a release and from the previous head
 
 ```sh
 scripts/web-push-evidence/upgrade.sh \
   --sqlite-snapshot <existing.db> \
   --postgres-admin-dsn "$PGADMIN_DSN" \
-  --out <dir> [--base v0.5.1]
+  --out <dir> [--base v0.5.1] [--previous 4fdae122]
 ```
 
 `PGADMIN_DSN` holds a PostgreSQL connection URL for a role that may create
 and drop databases, naming any existing database on the server. The run
-creates and drops its throwaway database through it, and reaches that
-database by swapping the database name in the URL.
+creates and drops its throwaway databases through it, and reaches each by
+swapping the database name in the URL.
 
-Exports the release tag and `HEAD` with `git archive`, builds both, and copies
-`upgradeevidence/evidence_test.go` into each tree so the same code questions
-both versions. The snapshot is only read; the run upgrades a copy with the
-head binary's `migrate`, then upgrades a second copy after the release has
-turned Pushover on for every user, so a database whose users never set up
-Pushover still exercises recipient selection. On PostgreSQL it creates a
-throwaway database, migrates and seeds it with the release, upgrades it with
-head, and drops it.
+Exports the release tag, the pull request's previous head (the last one
+published before the dead-device sweep, with the first push migration and not
+the second), and `HEAD` with `git archive`, and builds all three. It copies
+`upgradeevidence/evidence_test.go` into each tree, and
+`upgradeevidence/push_test.go` into the two that have push subscriptions, so
+the same code questions every version. The snapshot is only read; every pass
+works on a copy.
 
-Each pass must show `user_notification_settings` and
+From the release, the run upgrades a copy of the snapshot with the head
+binary's `migrate`, then a second copy after the release has turned Pushover
+on for every user, so a database whose users never set up Pushover still
+exercises recipient selection. On PostgreSQL it creates a throwaway database,
+migrates and seeds it with the release, and upgrades it with head. Each pass
+must show head applying every migration the database lacked and nothing else
+(the two push migrations on each engine); `user_notification_settings` and
 `channel_notification_settings` unchanged in row count, contents hash, and
-schema; `user_push_subscriptions` created and empty; and the same digest of
+schema; `user_push_subscriptions` created, empty, and holding
+`vapid_key_id`, `failing_since`, and `last_failure_at`; and the same digest of
 Pushover recipient selection (every message, with no mentions and with every
 user mentioned, filtered by message access the way the dispatcher does) from
 the release before the upgrade and from head after it, with web push off.
-Requires `git`, `go`, `sqlite3`, `psql`, and `shasum`.
+
+From the previous head, the run migrates another copy of the snapshot, and a
+second PostgreSQL database seeded by the release, with the previous head, and
+registers through that head's store one device of each kind the sweep must
+judge: one on a live session that has delivered, one whose session was
+revoked, one whose session expired, one whose session row is gone, a
+development device with no session, one refused three times and backing off,
+and one refused nine times and quiet for forty days. Upgraded by head, only
+the second push migration may apply, every device must keep its old columns
+byte for byte and read `vapid_key_id = ''`, `failing_since` NULL, and
+`last_failure_at` NULL, and both notification settings tables must be
+unchanged. Head's server then starts on that database with a fresh VAPID key.
+Its start sweep must log removing exactly the three devices whose session
+ended, and the four others must remain unchanged: a device with no recorded
+key is never under a retired key, and one with no recorded refusal time is
+never refused for a week. Web push recipient selection replayed by head after
+the sweep must match the previous head's before the upgrade, with the healthy,
+development, and long-quiet devices selected and the backing-off one held.
+
+`summary.txt` states the three commits and every check, `ok` or `FAIL`, and
+ends `RESULT: PASS` or `RESULT: FAIL`. The server's output for each sweep is
+kept as `<engine>-server-sweep.log` when it names no endpoint and no VAPID
+key. Requires `git`, `go`, `sqlite3`, `psql`, and `shasum`.
 
 ## First activation and key rotation on a real device
 

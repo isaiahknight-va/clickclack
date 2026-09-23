@@ -13,7 +13,9 @@
 // selection, the way the server's dispatcher does with web push off, for every
 // message in the database and writes counts and a SHA-256 digest to
 // CLICKCLACK_EVIDENCE_OUT. Message text, emails, and Pushover keys never leave
-// the process: keys are hashed, and only counts and digests are written.
+// the process: keys are hashed, and only counts and digests are written. The
+// modes about registered devices live in push_test.go, which is copied only
+// into trees that have push subscriptions.
 package upgradeevidence
 
 import (
@@ -38,6 +40,9 @@ type evidenceStore interface {
 	Close() error
 }
 
+// pushModes holds the modes push_test.go registers, when it is present.
+var pushModes = map[string]func(t *testing.T, ctx context.Context, st evidenceStore, raw *sql.DB, dbURL string){}
+
 func TestUpgradeEvidence(t *testing.T) {
 	dbURL := os.Getenv("CLICKCLACK_EVIDENCE_DB")
 	if dbURL == "" {
@@ -55,7 +60,11 @@ func TestUpgradeEvidence(t *testing.T) {
 	case "digest":
 		digest(t, ctx, st, raw, os.Getenv("CLICKCLACK_EVIDENCE_OUT"))
 	default:
-		t.Fatalf("unknown CLICKCLACK_EVIDENCE_MODE %q", mode)
+		run, ok := pushModes[mode]
+		if !ok {
+			t.Fatalf("unknown CLICKCLACK_EVIDENCE_MODE %q", mode)
+		}
+		run(t, ctx, st, raw, dbURL)
 	}
 }
 
@@ -261,9 +270,9 @@ func digest(t *testing.T, ctx context.Context, st evidenceStore, raw *sql.DB, ou
 	}
 }
 
-func column(t *testing.T, raw *sql.DB, query string) []string {
+func column(t *testing.T, raw *sql.DB, query string, args ...any) []string {
 	t.Helper()
-	rows, err := raw.Query(query)
+	rows, err := raw.Query(query, args...)
 	if err != nil {
 		t.Fatal(err)
 	}
