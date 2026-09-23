@@ -32,3 +32,5 @@ Revision 3 final (2026-09-22, head 0aad022b): e1r4-* is the built-server authori
 Revision 3 final (head 4fdae122): e1r5-* is the built-server authorization run at the pushed head; e1r3 and e1r4 are the same run at earlier heads of this revision.
 
 Revision 4 (2026-09-22, dead-row handling): a real iPad whose subscription was made under the rotated-away key and whose browser hides the key, with no key remembered. On open the server answered this_device_stale, the app removed the old row and registered fresh under the current key (22:15:55 ET), and push eight was delivered to it and the iPhone (22:17:26 ET). ipad-after-self-heal-banner.png is that push on the iPad lock screen.
+
+Revision 4 final (head e8668106): e1r7-* is the built-server authorization run at the pushed head, including the key-retired skip (zero sends, the retired-key skip line).

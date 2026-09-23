@@ -1,0 +1,38 @@
+2026/09/22 22:44:04 web push enabled: application server key a5862a8527f7
+2026/09/22 22:44:04 web push device registered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push device registered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push device registered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push device registered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push device registered for user usr_01m362c6f0mh5dffs7caa0z3ys via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivered for user usr_01m362c6f0mh5dffs7caa0z3ys via 127.0.0.1:51539
+2026/09/22 22:44:04 web push device registered for user usr_01m362c6k5bmf3td3jkt0ky3a7 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivery skipped for user usr_01m362c6k5bmf3td3jkt0ky3a7: the session that registered the device has ended
+2026/09/22 22:44:04 web push device registered for user usr_01m362c6qgnx4v3drtd7q8bva8 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push device removed by user usr_01m362c6qgnx4v3drtd7q8bva8
+2026/09/22 22:44:04 web push delivered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivery skipped for user usr_01m362c6qgnx4v3drtd7q8bva8: the device is no longer registered
+2026/09/22 22:44:04 web push device registered for user usr_01m362c6vwkkyk8f0ade850dc4 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivery skipped for user usr_01m362c6vwkkyk8f0ade850dc4: the user can no longer read the message
+2026/09/22 22:44:04 web push device registered for user usr_01m362c70e82m8gfa4gfgm7sfg via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivered for user usr_01m362c6e6nwpjr4g464aepjy3 via 127.0.0.1:51539
+2026/09/22 22:44:04 web push delivery skipped for user usr_01m362c70e82m8gfa4gfgm7sfg: the device was registered under a retired key
+2026/09/22 22:44:05 web push device registered for user usr_01m362c84evdac4jas9v61jpyg via 127.0.0.1:51539
+2026/09/22 22:44:05 web push delivered for user usr_01m362c84evdac4jas9v61jpyg via 127.0.0.1:51539
