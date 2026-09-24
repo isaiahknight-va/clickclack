@@ -112,6 +112,12 @@ func mentionedUserIDs(ctx context.Context, queries *storedb.Queries, workspaceID
 	return ids, nil
 }
 
+// ListMentionedUserIDs resolves the members a message body mentions the way
+// posting a message does.
+func (s *Store) ListMentionedUserIDs(ctx context.Context, workspaceID, body string) ([]string, error) {
+	return mentionedUserIDs(ctx, s.q, workspaceID, body)
+}
+
 func (s *Store) ListPushNotificationRecipients(ctx context.Context, messageID string, mentionedUserIDs []string) ([]store.PushNotificationRecipient, error) {
 	message, err := getMessage(ctx, s.db, messageID)
 	if err != nil {
@@ -139,13 +145,9 @@ func (s *Store) listWorkspacePushNotificationRecipients(ctx context.Context, mes
 	out := make([]store.PushNotificationRecipient, 0, len(rows))
 	subscribed := make([]string, 0, len(rows))
 	for _, row := range rows {
-		if row.NotificationPreference == store.ChannelNotifyMuted {
+		_, isMentioned := mentioned[row.UserID]
+		if store.ChannelPushAllowed(row.NotificationPreference, isMentioned) != nil {
 			continue
-		}
-		if row.NotificationPreference == store.ChannelNotifyMentions {
-			if _, ok := mentioned[row.UserID]; !ok {
-				continue
-			}
 		}
 		out = append(out, storePushRecipient(row.UserID, row.DisplayName, row.PushoverUserKey))
 		if row.HasPushSubscription {
