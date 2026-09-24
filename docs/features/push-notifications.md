@@ -101,7 +101,13 @@ or not the app is open:
   still starting can arrive before the app is listening.
 
 Delivery happens off the request path in a small worker pool, so posting a
-message never waits on a push service. A push can wait in that queue behind a
+message never waits on a push service. The queue in front of that pool holds
+1,024 pending pushes and lives in memory. When a push service stalls or a
+burst of messages outgrows it, further pushes are dropped and counted, with
+one log line a minute giving the count; the messages themselves are
+unaffected and are read in the app as usual. Phone alerts are best effort by
+design: a dropped push is not retried, and a restart empties the queue after
+giving in-flight pushes five seconds to finish. A push can wait in that queue behind a
 slow push service, so it is checked again immediately before it is sent: the
 device must still be registered to the recipient, under a session that is
 still live and the key the server signs with now, with any backoff elapsed,
@@ -223,6 +229,12 @@ existence and timing of a notification is visible to Apple, Google, or Mozilla,
 depending on the browser.
 
 ## Known limits
+
+- Phone alerts are best effort. The in-memory queue holds 1,024 pending
+  pushes; a relay stall or a larger burst drops the overflow, counted in the
+  log, and a restart drops whatever is still queued after five seconds. A
+  deployment that needs every alert delivered needs a durable queue, which
+  this feature does not provide.
 
 - The server does not know what the phone is looking at, so a message in a
   channel the user is currently reading in the installed app still raises a
