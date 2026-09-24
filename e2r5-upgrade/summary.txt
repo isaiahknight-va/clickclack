@@ -1,0 +1,132 @@
+Web push upgrade evidence
+head:     f93e77bab29f73fc2f39bbedd0bd0f4ffa007b2e
+previous: 4fdae122a6d87a8a840def1d1cd52607bb9bb561 (the pull request's previous head)
+base:     v0.5.1 (483a27a9407307dea83ac4e7e791edebd06b2416)
+evidence scripts: as committed at head
+
+From v0.5.1, SQLite: copy of pre-webpush-2026-09-22.db
+  users: 16, messages: 642, channels: 15
+  migrations recorded that v0.5.1 does not ship: 0043_user_sidebar_channel_order.sql
+  migrations applied by head: 0043_user_push_subscriptions.sql 0044_user_push_subscriptions_key_and_failing_since.sql
+  ok    head applied every migration the database lacked, and nothing else
+  user_notification_settings: 1 rows, contents sha256 e4815ce7e862939e, schema c39795c66d31aabe
+  ok    user_notification_settings row count unchanged
+  ok    user_notification_settings contents unchanged
+  ok    user_notification_settings schema unchanged
+  channel_notification_settings: 2 rows, contents sha256 00ae805a93dd1e0b, schema 7f6d63e8bf0f6baa
+  ok    channel_notification_settings row count unchanged
+  ok    channel_notification_settings contents unchanged
+  ok    channel_notification_settings schema unchanged
+  ok    user_push_subscriptions exists and is empty
+  ok    user_push_subscriptions has vapid_key_id, failing_since, and last_failure_at
+  v0.5.1 recipient selection before upgrade: {"digest":"0787287701ea9920a4252551cd41191c6c593c2d0d237afdf6d4067b86c08d14","lookup_errors":0,"messages":642,"pushover_deliveries":0,"pushover_recipients":0,"selections":1284}
+  head recipient selection after upgrade:   {"digest":"0787287701ea9920a4252551cd41191c6c593c2d0d237afdf6d4067b86c08d14","lookup_errors":0,"messages":642,"pushover_deliveries":0,"pushover_recipients":0,"selections":1284}
+  ok    Pushover recipients identical before and after, web push off
+
+From v0.5.1, SQLite: a second copy with Pushover turned on for every user by v0.5.1 before the upgrade
+  (the snapshot's own users never set Pushover up, so the first pass selects nobody)
+  migrations applied by head: 0043_user_push_subscriptions.sql 0044_user_push_subscriptions_key_and_failing_since.sql
+  ok    head applied every migration the database lacked, and nothing else
+  user_notification_settings: 16 rows, contents sha256 8292b4c127339502, schema c39795c66d31aabe
+  ok    user_notification_settings row count unchanged
+  ok    user_notification_settings contents unchanged
+  ok    user_notification_settings schema unchanged
+  channel_notification_settings: 133 rows, contents sha256 e92cf8c34af8eaf0, schema 7f6d63e8bf0f6baa
+  ok    channel_notification_settings row count unchanged
+  ok    channel_notification_settings contents unchanged
+  ok    channel_notification_settings schema unchanged
+  ok    user_push_subscriptions exists and is empty
+  ok    user_push_subscriptions has vapid_key_id, failing_since, and last_failure_at
+  v0.5.1 recipient selection before upgrade: {"digest":"b410fcb6d94bbf3a8447cc075ed38ef2049583dc563ac1d645952ec0d6153829","lookup_errors":0,"messages":642,"pushover_deliveries":7856,"pushover_recipients":15,"selections":1284}
+  head recipient selection after upgrade:   {"digest":"b410fcb6d94bbf3a8447cc075ed38ef2049583dc563ac1d645952ec0d6153829","lookup_errors":0,"messages":642,"pushover_deliveries":7856,"pushover_recipients":15,"selections":1284}
+  ok    Pushover recipients identical before and after, web push off
+
+From v0.5.1, PostgreSQL: fresh database migrated and seeded by v0.5.1
+  users: 7, messages: 34, channels: 2
+  migrations applied by head: 0036_user_push_subscriptions.sql 0037_user_push_subscriptions_key_and_failing_since.sql
+  ok    head applied every migration the database lacked, and nothing else
+  user_notification_settings: 5 rows, contents sha256 8dff009437f3faab, schema 4e64c04f3db65777
+  ok    user_notification_settings row count unchanged
+  ok    user_notification_settings contents unchanged
+  ok    user_notification_settings schema unchanged
+  channel_notification_settings: 4 rows, contents sha256 fd875d1428013eb8, schema 518fb7fa990e15d3
+  ok    channel_notification_settings row count unchanged
+  ok    channel_notification_settings contents unchanged
+  ok    channel_notification_settings schema unchanged
+  ok    user_push_subscriptions exists and is empty
+  ok    user_push_subscriptions has vapid_key_id, failing_since, and last_failure_at
+  v0.5.1 recipient selection before upgrade: {"digest":"dc3943143730d269089b7a836d1e40b7d34828156751a6376a28ec19e3977aaa","lookup_errors":0,"messages":34,"pushover_deliveries":152,"pushover_recipients":4,"selections":68}
+  head recipient selection after upgrade:   {"digest":"dc3943143730d269089b7a836d1e40b7d34828156751a6376a28ec19e3977aaa","lookup_errors":0,"messages":34,"pushover_deliveries":152,"pushover_recipients":4,"selections":68}
+  ok    Pushover recipients identical before and after, web push off
+
+From 4fdae122, SQLite: another copy of pre-webpush-2026-09-22.db, migrated by 4fdae122
+  migrations applied by 4fdae122: 0043_user_push_subscriptions.sql
+  devices registered through 4fdae122's store: 7 (development expired failing-old failing-recent healthy revoked session-deleted)
+  old columns of every device: sha256 107f2245b5041c95
+  migrations applied by head: 0044_user_push_subscriptions_key_and_failing_since.sql
+  ok    head applied every migration the database lacked, and nothing else
+  user_notification_settings: 1 rows, contents sha256 e4815ce7e862939e, schema c39795c66d31aabe
+  ok    user_notification_settings row count unchanged
+  ok    user_notification_settings contents unchanged
+  ok    user_notification_settings schema unchanged
+  channel_notification_settings: 2 rows, contents sha256 00ae805a93dd1e0b, schema 7f6d63e8bf0f6baa
+  ok    channel_notification_settings row count unchanged
+  ok    channel_notification_settings contents unchanged
+  ok    channel_notification_settings schema unchanged
+  ok    user_push_subscriptions has vapid_key_id, failing_since, and last_failure_at
+  ok    every device kept
+  ok    every device's old columns unchanged, byte for byte
+  ok    every device reads vapid_key_id '', failing_since NULL, last_failure_at NULL
+  head's server started on the upgraded database with a VAPID key:
+  ok    the server log names no endpoint and no VAPID key
+    web push enabled: application server key b30f776d0cbb
+    web push pruned 3 devices: 0 refused by their push service for a week, 0 under a retired key, 3 whose session ended
+  ok    the start sweep removed the three devices whose session ended, and nothing else
+  devices after the sweep: development failing-old failing-recent healthy
+  ok    the devices kept are the healthy, development, and previously failing ones
+  ok    the devices kept are unchanged in their old columns
+  ok    the devices kept still read an empty key id and no failure times
+  4fdae122 web push recipient selection before the upgrade: {"digest":"0b1136efe37f0abd857f466433383fceba94d306434b9a8eaf79d0225d2343e2","lookup_errors":0,"messages":642,"selected_by_kind":{"development":1094,"expired":0,"failing-old":1054,"failing-recent":0,"healthy":1054,"revoked":0,"session-deleted":0},"selections":1284,"webpush_deliveries":3202}
+  head web push recipient selection after the sweep:        {"digest":"0b1136efe37f0abd857f466433383fceba94d306434b9a8eaf79d0225d2343e2","lookup_errors":0,"messages":642,"selected_by_kind":{"development":1094,"expired":0,"failing-old":1054,"failing-recent":0,"healthy":1054,"revoked":0,"session-deleted":0},"selections":1284,"webpush_deliveries":3202}
+  ok    web push recipients identical before the upgrade and after the sweep
+  ok    a message selects the healthy device
+  ok    a message selects the development device
+  ok    a message selects the failing-old device
+  ok    the failing-recent device is held by its backoff, as before the upgrade
+
+From 4fdae122, PostgreSQL: fresh database migrated and seeded by v0.5.1, then migrated by 4fdae122
+  migrations applied by 4fdae122: 0036_user_push_subscriptions.sql
+  devices registered through 4fdae122's store: 7 (development expired failing-old failing-recent healthy revoked session-deleted)
+  old columns of every device: sha256 1339ea0f589f3c59
+  migrations applied by head: 0037_user_push_subscriptions_key_and_failing_since.sql
+  ok    head applied every migration the database lacked, and nothing else
+  user_notification_settings: 5 rows, contents sha256 c869c5cf356e827e, schema 4e64c04f3db65777
+  ok    user_notification_settings row count unchanged
+  ok    user_notification_settings contents unchanged
+  ok    user_notification_settings schema unchanged
+  channel_notification_settings: 4 rows, contents sha256 e6aca939c398a68e, schema 518fb7fa990e15d3
+  ok    channel_notification_settings row count unchanged
+  ok    channel_notification_settings contents unchanged
+  ok    channel_notification_settings schema unchanged
+  ok    user_push_subscriptions has vapid_key_id, failing_since, and last_failure_at
+  ok    every device kept
+  ok    every device's old columns unchanged, byte for byte
+  ok    every device reads vapid_key_id '', failing_since NULL, last_failure_at NULL
+  head's server started on the upgraded database with a VAPID key:
+  ok    the server log names no endpoint and no VAPID key
+    web push enabled: application server key 9876f989d210
+    web push pruned 3 devices: 0 refused by their push service for a week, 0 under a retired key, 3 whose session ended
+  ok    the start sweep removed the three devices whose session ended, and nothing else
+  devices after the sweep: development failing-old failing-recent healthy
+  ok    the devices kept are the healthy, development, and previously failing ones
+  ok    the devices kept are unchanged in their old columns
+  ok    the devices kept still read an empty key id and no failure times
+  4fdae122 web push recipient selection before the upgrade: {"digest":"cca4247e86472bd4f5b94984f63af3b888afb907d6faa78805e18e19c8ff08b3","lookup_errors":0,"messages":34,"selected_by_kind":{"development":60,"expired":0,"failing-old":48,"failing-recent":0,"healthy":48,"revoked":0,"session-deleted":0},"selections":68,"webpush_deliveries":156}
+  head web push recipient selection after the sweep:        {"digest":"cca4247e86472bd4f5b94984f63af3b888afb907d6faa78805e18e19c8ff08b3","lookup_errors":0,"messages":34,"selected_by_kind":{"development":60,"expired":0,"failing-old":48,"failing-recent":0,"healthy":48,"revoked":0,"session-deleted":0},"selections":68,"webpush_deliveries":156}
+  ok    web push recipients identical before the upgrade and after the sweep
+  ok    a message selects the healthy device
+  ok    a message selects the development device
+  ok    a message selects the failing-old device
+  ok    the failing-recent device is held by its backoff, as before the upgrade
+
+RESULT: PASS
