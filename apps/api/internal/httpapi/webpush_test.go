@@ -1179,6 +1179,9 @@ func TestQueuedWebPushCarriesTheTextAtSendTime(t *testing.T) {
 				t.Fatalf("the recipient's device received %d pushes, want 1", len(bodies))
 			}
 			shown := openExamplePushPayload(t, bodies[0])
+			if shown.UserID != fixture.recipient {
+				t.Fatal("encrypted push did not identify its recipient")
+			}
 			if shown.Body != testCase.want {
 				t.Fatalf("the phone shows %q, want %q", shown.Body, testCase.want)
 			}

@@ -144,6 +144,15 @@ func serve(args []string) error {
 	if cfg.PushoverAPIToken != "" {
 		pushNotifier = httpapi.NewPushoverNotifier(cfg.PushoverAPIToken)
 	}
+	openclawID, err := httpapi.OpenClawIDConfig{
+		ClientID:     cfg.OpenClawIDClientID,
+		ClientSecret: cfg.OpenClawIDClientSecret,
+		Issuer:       cfg.OpenClawIDIssuer,
+		PublicURL:    cfg.PublicURL,
+	}.ApplyDiscovery(ctx)
+	if err != nil {
+		return err
+	}
 	var webPushNotifier httpapi.PushNotifier
 	if cfg.WebPushEnabled() {
 		notifier := httpapi.NewWebPushNotifier(httpapi.WebPushConfig{
@@ -172,12 +181,7 @@ func serve(args []string) error {
 			AllowedOrg:   cfg.GitHubAllowedOrg,
 			ModeratorOrg: cfg.GitHubModeratorOrg,
 		},
-		OpenClawID: httpapi.OpenClawIDConfig{
-			ClientID:     cfg.OpenClawIDClientID,
-			ClientSecret: cfg.OpenClawIDClientSecret,
-			Issuer:       cfg.OpenClawIDIssuer,
-			PublicURL:    cfg.PublicURL,
-		},
+		OpenClawID: openclawID,
 		Access: httpapi.AccessConfig{
 			TeamDomain: cfg.AccessTeamDomain,
 			Audience:   cfg.AccessAUD,

@@ -1926,6 +1926,9 @@ WHERE user_id = sqlc.arg(user_id)
 FOR UPDATE;
 
 
+-- name: LockUserPushSubscriptions :one
+SELECT id FROM users WHERE id = sqlc.arg(user_id) FOR NO KEY UPDATE;
+
 -- name: UpsertPushSubscription :exec
 INSERT INTO user_push_subscriptions (
   id, user_id, endpoint, p256dh, auth, user_agent, session_token_hash,

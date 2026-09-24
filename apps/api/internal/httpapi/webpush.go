@@ -147,9 +147,10 @@ func (n *WebPushNotifier) Notify(_ context.Context, notification PushNotificatio
 		return errors.New("web push notifier is closed")
 	}
 	message := webpush.Message{
-		Title: notification.Title,
-		Tag:   notification.Tag,
-		URL:   notification.URL,
+		UserID: notification.UserID,
+		Title:  notification.Title,
+		Tag:    notification.Tag,
+		URL:    notification.URL,
 	}
 	dropped := 0
 	for _, subscription := range notification.Subscriptions {

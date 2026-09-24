@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/openclaw/clickclack/apps/api/internal/authpolicy"
+	"github.com/openclaw/clickclack/apps/api/internal/webpush"
 )
 
 type Config struct {
@@ -278,6 +279,9 @@ func normalizeWebPush(c *Config, publicURL string) error {
 		subject = publicURL
 	}
 	if c.WebPushEnabled() {
+		if err := webpush.ValidateKeys(c.WebPushVAPIDPublicKey, c.WebPushVAPIDPrivateKey); err != nil {
+			return fmt.Errorf("web push configuration: %w", err)
+		}
 		if subject == "" {
 			return errors.New("web push requires CLICKCLACK_WEBPUSH_SUBJECT or CLICKCLACK_PUBLIC_URL")
 		}

@@ -1,6 +1,7 @@
 package webpush
 
 import (
+	"bytes"
 	"crypto/ecdh"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -31,6 +32,29 @@ func GenerateKeys() (publicKey, privateKey string, err error) {
 	}
 	encoding := base64.RawURLEncoding
 	return encoding.EncodeToString(key.PublicKey().Bytes()), encoding.EncodeToString(key.Bytes()), nil
+}
+
+// ValidateKeys rejects malformed or mismatched VAPID identities before devices register.
+func ValidateKeys(publicKey, privateKey string) error {
+	public, err := DecodeKey(publicKey)
+	if err != nil {
+		return errors.New("vapid public key must be base64url")
+	}
+	if _, err := ecdh.P256().NewPublicKey(public); err != nil {
+		return errors.New("vapid public key must be an uncompressed P-256 point")
+	}
+	private, err := DecodeKey(privateKey)
+	if err != nil {
+		return errors.New("vapid private key must be base64url")
+	}
+	key, err := ecdh.P256().NewPrivateKey(private)
+	if err != nil {
+		return errors.New("vapid private key must be a valid P-256 scalar")
+	}
+	if !bytes.Equal(public, key.PublicKey().Bytes()) {
+		return errors.New("vapid public and private keys do not match")
+	}
+	return nil
 }
 
 // authorizationHeader signs the RFC 8292 token that identifies this

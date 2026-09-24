@@ -46,10 +46,11 @@ type Subscription struct {
 
 // Message is the payload a service worker receives.
 type Message struct {
-	Title string `json:"title"`
-	Body  string `json:"body"`
-	Tag   string `json:"tag"`
-	URL   string `json:"url"`
+	UserID string `json:"user_id"`
+	Title  string `json:"title"`
+	Body   string `json:"body"`
+	Tag    string `json:"tag"`
+	URL    string `json:"url"`
 }
 
 // Sender holds the application server identity shared by every push.

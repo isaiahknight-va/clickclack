@@ -786,6 +786,90 @@ test.describe("a device registered under a signed-in session", () => {
     expect((await relayDeliveries(page)).length).toBe(before);
   }
 
+  test("a service worker hides a previous account's private preview", async ({ page, context }) => {
+    const accountA = await signInByMagicLink(page, "Preview owner");
+    const room = await sessionRoom(page, "Preview owner");
+    await page.goto(room.route);
+    await waitForAppReady(page);
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.register("/service-worker.js", { scope: "/" });
+      await navigator.serviceWorker.ready;
+    });
+    const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+    const preview = () =>
+      worker.evaluate(async (userID) => {
+        const scope = self as unknown as {
+          registration: {
+            showNotification: (title: string, options: NotificationOptions) => Promise<void>;
+          };
+          dispatchEvent: (event: Event) => boolean;
+        };
+        let notice: { title: string; body?: string; url?: string } | undefined;
+        const original = scope.registration.showNotification;
+        scope.registration.showNotification = async (title, options) => {
+          notice = { title, body: options.body, url: options.data?.url };
+        };
+        const payload = {
+          user_id: userID,
+          title: "Private sender",
+          body: "Private account A message",
+          url: "/app/private",
+          tag: "private-message",
+        };
+        const event = new Event("push");
+        let pending: Promise<unknown> = Promise.resolve();
+        Object.defineProperty(event, "data", { value: { json: () => payload } });
+        Object.defineProperty(event, "waitUntil", {
+          value: (promise: Promise<unknown>) => {
+            pending = promise;
+          },
+        });
+        try {
+          scope.dispatchEvent(event);
+          await pending;
+          return notice;
+        } finally {
+          scope.registration.showNotification = original;
+        }
+      }, accountA);
+    expect(await preview()).toMatchObject({
+      title: "Private sender",
+      body: "Private account A message",
+    });
+    await signInByMagicLink(page, "Other account");
+    const hidden = await preview();
+    expect(hidden?.title).toBe("ClickClack");
+    expect(hidden?.body).not.toContain("Private account A");
+    expect(hidden?.url).toBe("/app");
+  });
+
+  test("first opt-in requests permission before account network checks", async ({ page }) => {
+    await stubPushManager(page, relayOrigin + "/push/" + randomUUID());
+    await signInByMagicLink(page, "Permission owner");
+    const room = await sessionRoom(page, "Permission owner");
+    await page.goto(room.route);
+    await waitForAppReady(page);
+    const modal = await openNotificationSettings(page);
+    const control = modal.getByLabel("Push notifications on this device");
+    await expect(control).toBeEnabled();
+    await page.evaluate(() => {
+      Object.defineProperty(Notification, "permission", { configurable: true, value: "default" });
+      let networkStarted = false;
+      const fetch = window.fetch.bind(window);
+      window.fetch = (...args) => {
+        networkStarted = true;
+        return fetch(...args);
+      };
+      Notification.requestPermission = async () => {
+        document.documentElement.dataset.permissionBeforeFetch = String(!networkStarted);
+        return networkStarted ? "denied" : "granted";
+      };
+    });
+    await control.check();
+    await expect(page.locator("html")).toHaveAttribute("data-permission-before-fetch", "true");
+    await expect(modal.getByText("On for this device")).toBeVisible();
+  });
+
   test("stops receiving pushes when that session signs out", async ({ page }) => {
     const endpoint = `${relayOrigin}/push/${randomUUID()}`;
     await stubPushManager(page, endpoint);

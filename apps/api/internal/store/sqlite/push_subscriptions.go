@@ -129,7 +129,13 @@ func (s *Store) MarkPushSubscriptionSuccess(ctx context.Context, userID, endpoin
 // push service reporting the subscription gone does that, or
 // PrunePushSubscriptions once the run has refused through a week.
 func (s *Store) MarkPushSubscriptionFailure(ctx context.Context, userID, endpoint string, retryAfter time.Duration) (int64, error) {
-	count, err := s.q.MarkPushSubscriptionFailure(ctx, storedb.MarkPushSubscriptionFailureParams{
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	qtx := s.q.WithTx(tx)
+	count, err := qtx.MarkPushSubscriptionFailure(ctx, storedb.MarkPushSubscriptionFailureParams{
 		UpdatedAt: now(),
 		UserID:    userID,
 		Endpoint:  endpoint,
@@ -141,11 +147,14 @@ func (s *Store) MarkPushSubscriptionFailure(ctx context.Context, userID, endpoin
 		return 0, err
 	}
 	nextAttempt := time.Now().UTC().Add(store.PushRetryDelay(count, retryAfter)).Format(time.RFC3339Nano)
-	return count, s.q.SetPushSubscriptionNextAttempt(ctx, storedb.SetPushSubscriptionNextAttemptParams{
+	if err := qtx.SetPushSubscriptionNextAttempt(ctx, storedb.SetPushSubscriptionNextAttemptParams{
 		NextAttemptAt: sql.NullString{String: nextAttempt, Valid: true},
 		UserID:        userID,
 		Endpoint:      endpoint,
-	})
+	}); err != nil {
+		return 0, err
+	}
+	return count, tx.Commit()
 }
 
 func (s *Store) listPushSubscriptionTargets(ctx context.Context, userIDs []string) (map[string][]store.PushSubscriptionTarget, error) {

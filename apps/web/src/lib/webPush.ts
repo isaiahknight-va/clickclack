@@ -194,13 +194,23 @@ export async function forgetSubscription(endpoint: string, userID: string): Prom
 // same account; otherwise the opt-in is not the signed-in account's to use,
 // and both accounts' notes are left as they are.
 export async function healPushSubscription(userID: string): Promise<void> {
-  if (!userID || !pushSupported() || !readPushEnabled(userID)) return;
+  if (!userID || !pushSupported()) return;
   try {
+    const current = await currentPushSubscription();
+    const optedIn = readPushEnabled(userID);
+    if (!optedIn && !current) return;
     if ((await signedInUserID()) !== userID) return;
-    // Named by the subscription this browser holds, the state also says
-    // whether the server holds it under a retired key.
-    const state = await fetchPushState(await currentPushSubscription());
+    const state = await fetchPushState(current);
     if (!state.enabled) return;
+    if (!optedIn) {
+      if (current && !state.this_device) {
+        await current.unsubscribe();
+        const registration = await navigator.serviceWorker.getRegistration("/");
+        for (const notification of (await registration?.getNotifications()) ?? [])
+          notification.close();
+      }
+      return;
+    }
     const registration = await registerPushWorker();
     const subscription = await ensurePushSubscription(registration, state, userID);
     await storeSubscription(subscription, userID);

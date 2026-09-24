@@ -53,6 +53,7 @@ interface WorkerScope {
 }
 
 type PushPayload = {
+  user_id?: string;
   title?: string;
   body?: string;
   tag?: string;
@@ -62,7 +63,6 @@ type PushPayload = {
 const worker = self as unknown as WorkerScope;
 
 const FALLBACK_TITLE = "ClickClack";
-const FALLBACK_BODY = "New message";
 const FALLBACK_URL = "/app";
 
 worker.addEventListener("install", () => {
@@ -74,23 +74,44 @@ worker.addEventListener("activate", (event) => {
 });
 
 worker.addEventListener("push", (event) => {
-  // Safari revokes push permission from an app that receives a push without
-  // showing something, so every push shows a notification even when the
-  // payload is missing or unreadable.
-  const payload = readPayload(event.data);
-  const url = payload.url?.startsWith("/") ? payload.url : FALLBACK_URL;
-  event.waitUntil(
-    worker.registration.showNotification(payload.title || FALLBACK_TITLE, {
-      body: payload.body || FALLBACK_BODY,
-      // The tag matches the one the in-page notification uses, so a device
-      // showing both collapses them into a single alert.
-      tag: payload.tag || "clickclack",
-      icon: "/icon-192.png",
-      badge: "/icon-192.png",
-      data: { url },
-    }),
-  );
+  event.waitUntil(showPushNotification(readPayload(event.data)));
 });
+
+async function showPushNotification(payload: PushPayload): Promise<void> {
+  // A relay can deliver after this browser switches accounts. Verify before
+  // showing any preview; Safari still requires a visible alert on failure.
+  let authorized = false;
+  if (typeof payload.user_id === "string" && payload.user_id) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch("/api/me", {
+        credentials: "same-origin",
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      if (response.ok) {
+        const me = (await response.json()) as { user?: { id?: string } };
+        authorized = me.user?.id === payload.user_id;
+      }
+    } catch {
+      // Offline or unverifiable accounts receive no private preview.
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  const url =
+    authorized && typeof payload.url === "string" && payload.url.startsWith("/app")
+      ? payload.url
+      : FALLBACK_URL;
+  await worker.registration.showNotification((authorized && payload.title) || FALLBACK_TITLE, {
+    body: (authorized && payload.body) || "Open ClickClack to check your messages.",
+    tag: (authorized && payload.tag) || "clickclack",
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
+    data: { url },
+  });
+}
 
 worker.addEventListener("notificationclick", (event) => {
   event.notification.close();

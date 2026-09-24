@@ -5457,6 +5457,17 @@ func (q *Queries) LockMessageForReaction(ctx context.Context, messageID string) 
 	return id, err
 }
 
+const lockUserPushSubscriptions = `-- name: LockUserPushSubscriptions :one
+SELECT id FROM users WHERE id = $1 FOR NO KEY UPDATE
+`
+
+func (q *Queries) LockUserPushSubscriptions(ctx context.Context, userID string) (string, error) {
+	row := q.db.QueryRowContext(ctx, lockUserPushSubscriptions, userID)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
 const lockWorkspaceEventLog = `-- name: LockWorkspaceEventLog :exec
 SELECT pg_advisory_xact_lock(hashtext('clickclack.events'), hashtext($1::text))
 `

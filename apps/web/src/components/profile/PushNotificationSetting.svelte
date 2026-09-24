@@ -104,6 +104,18 @@
   }
 
   async function turnOn() {
+    // The switch click is the user gesture the permission prompt needs.
+    const permission = Notification.permission === "default"
+      ? await Notification.requestPermission()
+      : Notification.permission;
+    if (permission !== "granted") {
+      enabled = false;
+      status = permission === "denied"
+        ? "Notifications are blocked for this site. Allow them in your browser settings, then try again."
+        : "Notifications were not enabled.";
+      statusError = true;
+      return;
+    }
     const [state, signedIn] = await Promise.all([
       currentPushSubscription().then(fetchPushState),
       signedInUserID(),
@@ -115,18 +127,6 @@
     if (signedIn !== user.id) {
       enabled = false;
       status = accountChanged;
-      statusError = true;
-      return;
-    }
-    // The switch click is the user gesture the permission prompt needs.
-    const permission = Notification.permission === "default"
-      ? await Notification.requestPermission()
-      : Notification.permission;
-    if (permission !== "granted") {
-      enabled = false;
-      status = permission === "denied"
-        ? "Notifications are blocked for this site. Allow them in your browser settings, then try again."
-        : "Notifications were not enabled.";
       statusError = true;
       return;
     }

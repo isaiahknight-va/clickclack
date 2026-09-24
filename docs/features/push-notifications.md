@@ -18,7 +18,7 @@ This is the third notification path, beside the in-page alerts a tab shows and
 
 ## Turning it on as an operator
 
-Web push takes three settings. They are documented on this page, not in the
+Web push takes three settings, also listed in the
 [configuration reference](../configuration.md):
 
 - `CLICKCLACK_WEBPUSH_VAPID_PUBLIC_KEY` (config file key `webpush_vapid_public_key`)
@@ -34,7 +34,8 @@ clickclack admin webpush keygen
 ```
 
 It prints the two key variables once. Put them in the server's configuration,
-along with the subject, and restart.
+along with the subject, and restart. Startup rejects malformed keys or a public
+and private key that do not form the same P-256 pair.
 
 Keep the private key like any other server secret. Rotating it invalidates
 every registered device; each one re-registers the next time its owner opens
@@ -80,13 +81,20 @@ standard and work where the browser supports it.
 Each notification is a JSON payload under 3 KB, encrypted for one subscription:
 
 ```json
-{ "title": "Ari in #general", "body": "the build is green", "tag": "clickclack:msg_...", "url": "/app/wsp_.../chn_..." }
+{ "user_id": "usr_...", "title": "Ari in #general", "body": "the build is green", "tag": "clickclack:msg_...", "url": "/app/wsp_.../chn_..." }
 ```
 
 The title matches the one an open tab shows, including "ClickClack" in place of
 an author with no name, and the tag matches too, so a
 device that both has the app open and receives a push shows one notification
 rather than two. The body is truncated to 240 characters.
+
+Before displaying a preview, the service worker checks the recipient against the
+account currently signed in on that browser. If the account changed, the session
+ended, or the server cannot be reached within five seconds, it shows only a
+generic alert opening the app. The sender, message text, and conversation path
+are withheld. Preview verification uses the same-origin API; separately hosted
+frontends without that API also receive generic alerts.
 
 Tapping the notification lands at the conversation's newest message whether
 or not the app is open:
@@ -259,12 +267,10 @@ depending on the browser.
   the switch reads on only for the account the server delivers to on this
   device, even when another account has devices elsewhere, and opening the
   app as an account that turned push on there moves the device back to it.
-  Turning the switch off on a shared device unsubscribes the browser, so every
-  account on that device stops receiving until one turns it on again. Only the
-  account holding the device can turn it off; for another account the switch
-  reads off, and to stop the first account's pushes arriving on this browser it
-  turns its own switch on, which moves the device to it, and then off. A
-  registration is refused when the signed-in account changed underneath it: a
+  Opening the app as an account that has not opted in unsubscribes a device
+  belonging to another account and clears its displayed notifications. Turning
+  the switch off also unsubscribes the browser; alerts resume only after opt-in.
+  A registration is refused when the signed-in account changed underneath it: a
   tab still showing one account after another tab signed the browser in to a
   different account registers nothing, for either account. Turning the switch
   off in that tab is refused the same way: the browser keeps its subscription
