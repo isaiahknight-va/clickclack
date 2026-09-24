@@ -37,14 +37,18 @@ type recordedPushResult struct {
 }
 
 type fakeSubscriptionStore struct {
-	mu         sync.Mutex
-	results    []recordedPushResult
-	err        error
-	lookupErr  error
-	messageErr error
-	prunes     int
-	prunePanic bool
-	pruneErr   error
+	mu            sync.Mutex
+	results       []recordedPushResult
+	err           error
+	lookupErr     error
+	message       store.Message
+	messageErr    error
+	preference    string
+	preferenceErr error
+	mentionErr    error
+	prunes        int
+	prunePanic    bool
+	pruneErr      error
 }
 
 // GetPushSubscriptionDelivery answers the device the notification named, with
@@ -61,7 +65,25 @@ func (f *fakeSubscriptionStore) GetPushSubscriptionDelivery(_ context.Context, _
 func (f *fakeSubscriptionStore) GetMessage(context.Context, string, string) (store.Message, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return store.Message{}, f.messageErr
+	return f.message, f.messageErr
+}
+
+// GetChannelNotificationPreference answers the preference the test set, or
+// the default a user with no setting has.
+func (f *fakeSubscriptionStore) GetChannelNotificationPreference(context.Context, string, string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.preference == "" {
+		return store.ChannelNotifyAll, f.preferenceErr
+	}
+	return f.preference, f.preferenceErr
+}
+
+// ListMentionedUserIDs mentions nobody, unless the test says the lookup fails.
+func (f *fakeSubscriptionStore) ListMentionedUserIDs(context.Context, string, string) ([]string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return nil, f.mentionErr
 }
 
 func (f *fakeSubscriptionStore) DeletePushSubscription(_ context.Context, userID, endpoint string) error {
@@ -763,10 +785,13 @@ func TestWebPushBodyAndRouteDescribeTheMessage(t *testing.T) {
 // names its reason in one log line.
 func TestWebPushNotifierRevalidatesBeforeSending(t *testing.T) {
 	for name, testCase := range map[string]struct {
-		lookupErr  error
-		messageErr error
-		messageID  string
-		reason     string
+		lookupErr     error
+		messageErr    error
+		messageID     string
+		preference    string
+		preferenceErr error
+		mentionErr    error
+		reason        string
 	}{
 		"device removed":       {lookupErr: sql.ErrNoRows, messageID: "msg_1", reason: "the device is no longer registered"},
 		"session ended":        {lookupErr: store.ErrPushSessionEnded, messageID: "msg_1", reason: "the session that registered the device has ended"},
@@ -777,7 +802,15 @@ func TestWebPushNotifierRevalidatesBeforeSending(t *testing.T) {
 		"message lookup failed": {
 			messageErr: errors.New("database is away"), messageID: "msg_1", reason: "the message could not be verified",
 		},
-		"no message": {reason: "the message could not be verified"},
+		"no message":    {reason: "the message could not be verified"},
+		"channel muted": {messageID: "msg_1", preference: store.ChannelNotifyMuted, reason: "the recipient muted the channel"},
+		"not mentioned": {messageID: "msg_1", preference: store.ChannelNotifyMentions, reason: "the message does not mention the recipient"},
+		"preference lookup failed": {
+			messageID: "msg_1", preferenceErr: errors.New("database is away"), reason: "the recipient's notification preference could not be verified",
+		},
+		"mention lookup failed": {
+			messageID: "msg_1", mentionErr: errors.New("database is away"), reason: "the message's mentions could not be verified",
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			var captured strings.Builder
@@ -786,7 +819,13 @@ func TestWebPushNotifierRevalidatesBeforeSending(t *testing.T) {
 			defer log.SetOutput(previousOutput)
 
 			sender := &fakeSender{}
-			subscriptions := &fakeSubscriptionStore{lookupErr: testCase.lookupErr, messageErr: testCase.messageErr}
+			subscriptions := &fakeSubscriptionStore{
+				lookupErr:     testCase.lookupErr,
+				messageErr:    testCase.messageErr,
+				preference:    testCase.preference,
+				preferenceErr: testCase.preferenceErr,
+				mentionErr:    testCase.mentionErr,
+			}
 			notifier := newWebPushNotifier(sender, subscriptions, "")
 			notification := pushNotificationFor("usr_1", "https://push.example.com/send/device")
 			notification.MessageID = testCase.messageID
@@ -808,6 +847,26 @@ func TestWebPushNotifierRevalidatesBeforeSending(t *testing.T) {
 				t.Fatalf("the log leaked the endpoint: %s", captured.String())
 			}
 		})
+	}
+}
+
+// TestWebPushNotifierIgnoresChannelPreferenceForADirectMessage matches the
+// recipient selection: a direct message reaches its members whatever they set
+// for channels, so a muted preference must not stop it at send time either.
+func TestWebPushNotifierIgnoresChannelPreferenceForADirectMessage(t *testing.T) {
+	t.Parallel()
+	sender := &fakeSender{}
+	subscriptions := &fakeSubscriptionStore{
+		message:    store.Message{DirectConversationID: "dm_1"},
+		preference: store.ChannelNotifyMuted,
+	}
+	notifier := newWebPushNotifier(sender, subscriptions, "")
+	if err := notifier.Notify(context.Background(), pushNotificationFor("usr_1", "https://push.example.com/send/device")); err != nil {
+		t.Fatal(err)
+	}
+	notifier.Close()
+	if sender.count() != 1 {
+		t.Fatalf("a direct message was sent %d times, want 1", sender.count())
 	}
 }
 
@@ -925,8 +984,10 @@ type queuedPushFixture struct {
 	sender            *gatedSender
 	notifier          *WebPushNotifier
 	owner             string
+	channelID         string
 	messageID         string
 	recipient         string
+	recipientHandle   string
 	recipientSession  string
 	recipientEndpoint string
 }
@@ -936,16 +997,27 @@ type queuedPushFixture struct {
 func newQueuedPushFixture(t *testing.T) queuedPushFixture {
 	t.Helper()
 	sender := &gatedSender{gate: make(chan struct{}), inFlight: make(chan struct{}, 4*webPushWorkers)}
-	fixture := queuePushBehindHeldWorkers(t, "https://push.example.com", sender, sender.inFlight, sender.sentTo)
+	fixture := queuePushBehindHeldWorkers(t, "https://push.example.com", sender, sender.inFlight, sender.sentTo, queuedPost{})
 	fixture.sender = sender
 	return fixture
 }
+
+// queuedPost is what the owner posts and how the recipient is set to hear
+// about it. The zero value posts queuedPushText to a recipient who hears
+// about everything.
+type queuedPost struct {
+	// body builds the posted text from the recipient's handle.
+	body       func(recipientHandle string) string
+	preference string
+}
+
+const queuedPushText = "queued behind a slow relay"
 
 // queuePushBehindHeldWorkers posts a message whose push for the recipient
 // waits in the queue while every worker is held on a /hold/ endpoint under
 // base. The sender decides what holding means; sent counts what reached an
 // endpoint.
-func queuePushBehindHeldWorkers(t *testing.T, base string, sender webPushSender, inFlight <-chan struct{}, sent func(endpoint string) int) queuedPushFixture {
+func queuePushBehindHeldWorkers(t *testing.T, base string, sender webPushSender, inFlight <-chan struct{}, sent func(endpoint string) int, post queuedPost) queuedPushFixture {
 	t.Helper()
 	ctx := context.Background()
 	databasePath := filepath.Join(t.TempDir(), "clickclack.db")
@@ -1029,11 +1101,36 @@ func queuePushBehindHeldWorkers(t *testing.T, base string, sender webPushSender,
 			t.Fatal("the workers never reached the held relay")
 		}
 	}
+	// A created user has no handle, and a mention resolves only to a handle.
+	handle := "recipient"
+	if _, err := st.UpdateCurrentUser(ctx, store.UpdateCurrentUserInput{UserID: recipient, Handle: &handle}); err != nil {
+		t.Fatal(err)
+	}
+	recipientUser, err := st.GetUser(ctx, recipient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if post.preference != "" {
+		if err := st.UpsertChannelNotificationSettings(ctx, store.ChannelNotificationInput{
+			ChannelID: channels[0].ID, UserID: recipient, Preference: post.preference,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	text := queuedPushText
+	if post.body != nil {
+		text = post.body(recipientUser.Handle)
+	}
 	posted := postJSON[struct {
 		Message store.Message `json:"message"`
-	}](t, server.URL+"/api/channels/"+channels[0].ID+"/messages", map[string]any{"body": "queued behind a slow relay"})
+	}](t, server.URL+"/api/channels/"+channels[0].ID+"/messages", map[string]any{"body": text})
 	if got := sent(recipientEndpoint); got != 0 {
 		t.Fatalf("the recipient's push left before the workers were free: %d", got)
+	}
+	// A case that expects no push means something only if one was queued. The
+	// blocker is a member too, so the post also queues one per held device.
+	if waiting := len(notifier.queue); waiting != 1+webPushWorkers {
+		t.Fatalf("%d pushes wait in the queue, want the recipient's and the blocker's %d", waiting, webPushWorkers)
 	}
 	return queuedPushFixture{
 		store:             st,
@@ -1041,8 +1138,10 @@ func queuePushBehindHeldWorkers(t *testing.T, base string, sender webPushSender,
 		server:            server,
 		notifier:          notifier,
 		owner:             owner.ID,
+		channelID:         channels[0].ID,
 		messageID:         posted.Message.ID,
 		recipient:         recipient,
+		recipientHandle:   recipientUser.Handle,
 		recipientSession:  recipientSession,
 		recipientEndpoint: recipientEndpoint,
 	}
@@ -1054,28 +1153,17 @@ func queuePushBehindHeldWorkers(t *testing.T, base string, sender webPushSender,
 // message as it reads when the push is sent, not as it read when it queued.
 func TestQueuedWebPushCarriesTheTextAtSendTime(t *testing.T) {
 	t.Parallel()
-	const posted = "queued behind a slow relay"
 	for name, testCase := range map[string]struct {
 		edit string
 		want string
 	}{
 		"edited while queued": {edit: "edited while it waited", want: "edited while it waited"},
-		"unedited control":    {want: posted},
+		"unedited control":    {want: queuedPushText},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			relay := newHeldRelay(t)
-			publicKey, privateKey, err := webpush.GenerateKeys()
-			if err != nil {
-				t.Fatal(err)
-			}
-			sender := &webpush.Sender{
-				PublicKey:  publicKey,
-				PrivateKey: privateKey,
-				Subject:    "https://chat.example.com",
-				Client:     relay.server.Client(),
-			}
-			fixture := queuePushBehindHeldWorkers(t, relay.server.URL, sender, relay.inFlight, relay.received)
+			fixture := queuePushBehindHeldWorkers(t, relay.server.URL, relay.sender(t), relay.inFlight, relay.received, queuedPost{})
 			if testCase.edit != "" {
 				patchJSON[struct {
 					Message store.Message `json:"message"`
@@ -1094,6 +1182,83 @@ func TestQueuedWebPushCarriesTheTextAtSendTime(t *testing.T) {
 			}
 			if shown.Title != "Owner in #general" || shown.Tag != "clickclack:"+fixture.messageID {
 				t.Fatalf("unexpected title or tag: %#v", shown)
+			}
+		})
+	}
+}
+
+// TestQueuedWebPushRechecksTheRecipient queues a push behind held workers and
+// then changes what chose its recipient: the author edits out the mention a
+// mentions-only recipient was chosen for, or the recipient mutes the channel.
+// The recipient must be chosen again, by the same rules, when the push is
+// sent; one who would not be chosen now gets nothing, and the skip names why.
+// Not parallel: it reads the process-wide log.
+func TestQueuedWebPushRechecksTheRecipient(t *testing.T) {
+	mention := func(handle string) string { return "@" + handle + " can you look at this" }
+	for name, testCase := range map[string]struct {
+		post   queuedPost
+		change func(t *testing.T, fixture queuedPushFixture)
+		want   string
+		reason string
+	}{
+		"mention edited out": {
+			post: queuedPost{body: mention, preference: store.ChannelNotifyMentions},
+			change: func(t *testing.T, fixture queuedPushFixture) {
+				patchJSON[struct {
+					Message store.Message `json:"message"`
+				}](t, fixture.server.URL+"/api/messages/"+fixture.messageID, map[string]any{"body": "never mind, sorted"})
+			},
+			reason: "the message does not mention the recipient",
+		},
+		"mention kept": {
+			post: queuedPost{body: mention, preference: store.ChannelNotifyMentions},
+			change: func(t *testing.T, fixture queuedPushFixture) {
+				patchJSON[struct {
+					Message store.Message `json:"message"`
+				}](t, fixture.server.URL+"/api/messages/"+fixture.messageID, map[string]any{"body": "@" + fixture.recipientHandle + " still you"})
+			},
+			want: "@RECIPIENT still you",
+		},
+		"muted while queued": {
+			change: func(t *testing.T, fixture queuedPushFixture) {
+				request, err := http.NewRequest(http.MethodPatch,
+					fixture.server.URL+"/api/channels/"+fixture.channelID+"/notification-settings",
+					strings.NewReader(`{"preference":"muted"}`))
+				if err != nil {
+					t.Fatal(err)
+				}
+				request.Header.Set("Content-Type", "application/json")
+				request.Header.Set("X-ClickClack-User", fixture.recipient)
+				doJSON[map[string]any](t, request)
+			},
+			reason: "the recipient muted the channel",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			captured := captureLog(t)
+			relay := newHeldRelay(t)
+			fixture := queuePushBehindHeldWorkers(t, relay.server.URL, relay.sender(t), relay.inFlight, relay.received, testCase.post)
+			testCase.change(t, fixture)
+			relay.releaseHeld()
+			fixture.notifier.Close()
+
+			bodies := relay.bodies(fixture.recipientEndpoint)
+			if testCase.reason != "" {
+				if len(bodies) != 0 {
+					t.Fatalf("a recipient the rules no longer choose received %d pushes: %q", len(bodies), openExamplePushPayload(t, bodies[0]).Body)
+				}
+				want := "web push delivery skipped for user " + fixture.recipient + ": " + testCase.reason
+				if !strings.Contains(captured.String(), want) {
+					t.Fatalf("expected %q in the log, got %q", want, captured.String())
+				}
+				return
+			}
+			if len(bodies) != 1 {
+				t.Fatalf("the recipient's device received %d pushes, want 1", len(bodies))
+			}
+			want := strings.ReplaceAll(testCase.want, "RECIPIENT", fixture.recipientHandle)
+			if shown := openExamplePushPayload(t, bodies[0]); shown.Body != want {
+				t.Fatalf("the phone shows %q, want %q", shown.Body, want)
 			}
 		})
 	}
@@ -1139,6 +1304,21 @@ func newHeldRelay(t *testing.T) *heldRelay {
 		relay.server.Close()
 	})
 	return relay
+}
+
+// sender is the real push sender, pointed at this relay.
+func (h *heldRelay) sender(t *testing.T) *webpush.Sender {
+	t.Helper()
+	publicKey, privateKey, err := webpush.GenerateKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &webpush.Sender{
+		PublicKey:  publicKey,
+		PrivateKey: privateKey,
+		Subject:    "https://chat.example.com",
+		Client:     h.server.Client(),
+	}
 }
 
 func (h *heldRelay) releaseHeld() {

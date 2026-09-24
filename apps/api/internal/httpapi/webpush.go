@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"log"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -53,6 +54,8 @@ type WebPushConfig struct {
 type WebPushSubscriptionStore interface {
 	GetPushSubscriptionDelivery(ctx context.Context, userID, endpoint, currentKeyID string) (store.PushSubscriptionTarget, error)
 	GetMessage(ctx context.Context, messageID, userID string) (store.Message, error)
+	GetChannelNotificationPreference(ctx context.Context, channelID, userID string) (string, error)
+	ListMentionedUserIDs(ctx context.Context, workspaceID, body string) ([]string, error)
 	DeletePushSubscription(ctx context.Context, userID, endpoint string) error
 	MarkPushSubscriptionSuccess(ctx context.Context, userID, endpoint string) error
 	MarkPushSubscriptionFailure(ctx context.Context, userID, endpoint string, retryAfter time.Duration) (int64, error)
@@ -292,11 +295,12 @@ func (n *WebPushNotifier) deliver(delivery webPushDelivery) {
 
 // authorize re-reads everything that allowed a push when it was queued: the
 // device must still be registered to this user under a live session and the
-// key the server signs with, with its backoff elapsed, and the user must still
-// be able to read the message, which must not have been deleted. It answers
-// the device's current keys and the message as it reads now, or the class of
-// reason it may not be sent. A lookup that fails for any other reason also
-// refuses: without an answer, the message text stays on the server.
+// key the server signs with, with its backoff elapsed; the user must still be
+// able to read the message, which must not have been deleted; and the rules
+// that chose the user when the message was posted must still choose them. It
+// answers the device's current keys and the message as it reads now, or the
+// class of reason it may not be sent. A lookup that fails for any other reason
+// also refuses: without an answer, the message text stays on the server.
 func (n *WebPushNotifier) authorize(ctx context.Context, delivery webPushDelivery) (webpush.Subscription, store.Message, string) {
 	target, err := n.subscriptions.GetPushSubscriptionDelivery(ctx, delivery.userID, delivery.endpoint, n.keyID)
 	switch {
@@ -323,7 +327,33 @@ func (n *WebPushNotifier) authorize(ctx context.Context, delivery webPushDeliver
 	case message.DeletedAt != nil:
 		return webpush.Subscription{}, store.Message{}, "the message was deleted"
 	}
+	if reason := n.recipientRefusal(ctx, delivery.userID, message); reason != "" {
+		return webpush.Subscription{}, store.Message{}, reason
+	}
 	return webpush.Subscription{Endpoint: target.Endpoint, P256dh: target.P256dh, Auth: target.Auth}, message, ""
+}
+
+// recipientRefusal applies the recipient policy again, to the message as it
+// reads now and the preference the recipient holds now: a mention the author
+// edited out, or a channel muted while the push waited, stops it. A direct
+// message has no preference; its readers are its members, which the message
+// lookup already settled.
+func (n *WebPushNotifier) recipientRefusal(ctx context.Context, userID string, message store.Message) string {
+	if message.DirectConversationID != "" {
+		return ""
+	}
+	preference, err := n.subscriptions.GetChannelNotificationPreference(ctx, message.ChannelID, userID)
+	if err != nil {
+		return "the recipient's notification preference could not be verified"
+	}
+	mentioned, err := n.subscriptions.ListMentionedUserIDs(ctx, message.WorkspaceID, message.Body)
+	if err != nil {
+		return "the message's mentions could not be verified"
+	}
+	if err := store.ChannelPushAllowed(preference, slices.Contains(mentioned, userID)); err != nil {
+		return err.Error()
+	}
+	return ""
 }
 
 func (n *WebPushNotifier) reportDropped(dropped int) {

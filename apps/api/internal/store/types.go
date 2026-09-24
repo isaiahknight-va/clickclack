@@ -65,6 +65,28 @@ const (
 )
 
 var (
+	ErrPushChannelMuted = errors.New("the recipient muted the channel")
+	ErrPushNotMentioned = errors.New("the message does not mention the recipient")
+)
+
+// ChannelPushAllowed is the push policy for a channel message: a recipient who
+// muted the channel gets nothing, one who chose mentions gets only messages
+// that mention them, and everyone else gets every message. Recipient selection
+// applies it when a message is posted, and the web push worker applies it again
+// to the message as it reads when a queued push is sent.
+func ChannelPushAllowed(preference string, mentioned bool) error {
+	switch preference {
+	case ChannelNotifyMuted:
+		return ErrPushChannelMuted
+	case ChannelNotifyMentions:
+		if !mentioned {
+			return ErrPushNotMentioned
+		}
+	}
+	return nil
+}
+
+var (
 	ErrAlreadyPinned         = errors.New("message is already pinned")
 	ErrPinnedMessageNotFound = errors.New("pinned message not found")
 	ErrPinnedMessageLimit    = errors.New("channel pin limit reached (maximum 100)")
@@ -1249,6 +1271,7 @@ type Store interface {
 	UpdateCurrentUser(ctx context.Context, input UpdateCurrentUserInput) (CurrentUserState, error)
 	GetAppearancePreferences(ctx context.Context, userID string) (*AppearancePreferences, error)
 	ListPushNotificationRecipients(ctx context.Context, messageID string, mentionedUserIDs []string) ([]PushNotificationRecipient, error)
+	ListMentionedUserIDs(ctx context.Context, workspaceID, body string) ([]string, error)
 	UpsertPushSubscription(ctx context.Context, input PushSubscriptionInput) (PushSubscription, error)
 	ListPushSubscriptions(ctx context.Context, userID string) ([]PushSubscription, error)
 	DeletePushSubscription(ctx context.Context, userID, endpoint string) error

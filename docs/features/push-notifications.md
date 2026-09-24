@@ -112,10 +112,15 @@ slow push service, so it is checked again immediately before it is sent: the
 device must still be registered to the recipient, under a session that is
 still live and the key the server signs with now, with any backoff elapsed,
 and the recipient must still be able to read the message, which must not have
-been deleted. The text is taken from the message as it reads at that moment,
-so an edit made while the push waited is what the phone shows. A push that
-fails any of these checks is dropped with one log line naming the reason, and
-nothing is sent. The push service is called through the
+been deleted. The recipient must also still be chosen by the rules that chose
+them when the message was posted, applied to the message as it reads now and
+the notification setting they hold now: a push for a channel they muted while
+it waited, or one whose mention of them the author edited out when they get
+mentions only, is not sent. The text is taken from the message as it reads at
+that moment, so an edit made while the push waited is what the phone shows.
+The title, which names the author and the channel, is fixed when the push is
+queued. A push that fails any of these checks is dropped with one log line
+naming the reason, and nothing is sent. The push service is called through the
 same outbound policy as webhooks: no proxy, no redirects, and no destination
 inside the deployment's own network.
 
