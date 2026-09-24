@@ -46,3 +46,5 @@ Revision 4, merged with upstream main, final head f93e77ba (the merge commit ame
 Revision 7 (head ada34088: Retry-After in both forms): e1r10-* and e2r6-upgrade/ are the two evidence runs at that head, both RESULT: PASS.
 
 Revision 8 (head ffee8fc1, docs only): e1r11-* and e2r7-upgrade/ are the two evidence runs at that head, both RESULT: PASS.
+
+Revision 9 (head d15d38e9: send-time text and recipient re-check): e1r12-* and e2r8-upgrade/ are the two evidence runs at that head, both RESULT: PASS.
