@@ -2,8 +2,16 @@ package httpapi
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/ecdh"
+	"crypto/hkdf"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -913,6 +921,7 @@ func TestQueuedWebPushIsRevalidatedBeforeSending(t *testing.T) {
 type queuedPushFixture struct {
 	store             *sqlitestore.Store
 	databasePath      string
+	server            *httptest.Server
 	sender            *gatedSender
 	notifier          *WebPushNotifier
 	owner             string
@@ -925,6 +934,18 @@ type queuedPushFixture struct {
 // newQueuedPushFixture returns with every worker held on the relay and the
 // recipient's push for a freshly posted message waiting in the queue.
 func newQueuedPushFixture(t *testing.T) queuedPushFixture {
+	t.Helper()
+	sender := &gatedSender{gate: make(chan struct{}), inFlight: make(chan struct{}, 4*webPushWorkers)}
+	fixture := queuePushBehindHeldWorkers(t, "https://push.example.com", sender, sender.inFlight, sender.sentTo)
+	fixture.sender = sender
+	return fixture
+}
+
+// queuePushBehindHeldWorkers posts a message whose push for the recipient
+// waits in the queue while every worker is held on a /hold/ endpoint under
+// base. The sender decides what holding means; sent counts what reached an
+// endpoint.
+func queuePushBehindHeldWorkers(t *testing.T, base string, sender webPushSender, inFlight <-chan struct{}, sent func(endpoint string) int) queuedPushFixture {
 	t.Helper()
 	ctx := context.Background()
 	databasePath := filepath.Join(t.TempDir(), "clickclack.db")
@@ -979,14 +1000,13 @@ func newQueuedPushFixture(t *testing.T) queuedPushFixture {
 	}
 	var blockers []store.PushSubscriptionTarget
 	for index := range webPushWorkers {
-		endpoint := "https://push.example.com/hold/" + strconv.Itoa(index)
+		endpoint := base + "/hold/" + strconv.Itoa(index)
 		register(blocker, endpoint)
 		blockers = append(blockers, store.PushSubscriptionTarget{Endpoint: endpoint})
 	}
-	recipientEndpoint := "https://push.example.com/send/recipient"
+	recipientEndpoint := base + "/send/recipient"
 	recipientSession := register(recipient, recipientEndpoint)
 
-	sender := &gatedSender{gate: make(chan struct{}), inFlight: make(chan struct{}, 4*webPushWorkers)}
 	notifier := newWebPushNotifier(sender, st, "")
 	t.Cleanup(notifier.Close)
 	publicKey, _, err := webpush.GenerateKeys()
@@ -1004,7 +1024,7 @@ func newQueuedPushFixture(t *testing.T) queuedPushFixture {
 	}
 	for range webPushWorkers {
 		select {
-		case <-sender.inFlight:
+		case <-inFlight:
 		case <-time.After(5 * time.Second):
 			t.Fatal("the workers never reached the held relay")
 		}
@@ -1012,13 +1032,13 @@ func newQueuedPushFixture(t *testing.T) queuedPushFixture {
 	posted := postJSON[struct {
 		Message store.Message `json:"message"`
 	}](t, server.URL+"/api/channels/"+channels[0].ID+"/messages", map[string]any{"body": "queued behind a slow relay"})
-	if got := sender.sentTo(recipientEndpoint); got != 0 {
+	if got := sent(recipientEndpoint); got != 0 {
 		t.Fatalf("the recipient's push left before the workers were free: %d", got)
 	}
 	return queuedPushFixture{
 		store:             st,
 		databasePath:      databasePath,
-		sender:            sender,
+		server:            server,
 		notifier:          notifier,
 		owner:             owner.ID,
 		messageID:         posted.Message.ID,
@@ -1026,6 +1046,192 @@ func newQueuedPushFixture(t *testing.T) queuedPushFixture {
 		recipientSession:  recipientSession,
 		recipientEndpoint: recipientEndpoint,
 	}
+}
+
+// TestQueuedWebPushCarriesTheTextAtSendTime queues a real message's push
+// behind workers held on a push service, lets its author edit it through the
+// API, and then lets the push service go. What the phone decrypts must be the
+// message as it reads when the push is sent, not as it read when it queued.
+func TestQueuedWebPushCarriesTheTextAtSendTime(t *testing.T) {
+	t.Parallel()
+	const posted = "queued behind a slow relay"
+	for name, testCase := range map[string]struct {
+		edit string
+		want string
+	}{
+		"edited while queued": {edit: "edited while it waited", want: "edited while it waited"},
+		"unedited control":    {want: posted},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			relay := newHeldRelay(t)
+			publicKey, privateKey, err := webpush.GenerateKeys()
+			if err != nil {
+				t.Fatal(err)
+			}
+			sender := &webpush.Sender{
+				PublicKey:  publicKey,
+				PrivateKey: privateKey,
+				Subject:    "https://chat.example.com",
+				Client:     relay.server.Client(),
+			}
+			fixture := queuePushBehindHeldWorkers(t, relay.server.URL, sender, relay.inFlight, relay.received)
+			if testCase.edit != "" {
+				patchJSON[struct {
+					Message store.Message `json:"message"`
+				}](t, fixture.server.URL+"/api/messages/"+fixture.messageID, map[string]any{"body": testCase.edit})
+			}
+			relay.releaseHeld()
+			fixture.notifier.Close()
+
+			bodies := relay.bodies(fixture.recipientEndpoint)
+			if len(bodies) != 1 {
+				t.Fatalf("the recipient's device received %d pushes, want 1", len(bodies))
+			}
+			shown := openExamplePushPayload(t, bodies[0])
+			if shown.Body != testCase.want {
+				t.Fatalf("the phone shows %q, want %q", shown.Body, testCase.want)
+			}
+			if shown.Title != "Owner in #general" || shown.Tag != "clickclack:"+fixture.messageID {
+				t.Fatalf("unexpected title or tag: %#v", shown)
+			}
+		})
+	}
+}
+
+// heldRelay is a push service that holds every request to a /hold/ path until
+// released and keeps the body of every other request, so a test can queue a
+// push behind busy workers and read what the phone would be sent.
+type heldRelay struct {
+	server   *httptest.Server
+	inFlight chan struct{}
+	release  chan struct{}
+	once     sync.Once
+	mu       sync.Mutex
+	kept     map[string][][]byte
+}
+
+func newHeldRelay(t *testing.T) *heldRelay {
+	t.Helper()
+	relay := &heldRelay{
+		inFlight: make(chan struct{}, 4*webPushWorkers),
+		release:  make(chan struct{}),
+		kept:     map[string][][]byte{},
+	}
+	relay.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if strings.Contains(r.URL.Path, "/hold/") {
+			relay.inFlight <- struct{}{}
+			<-relay.release
+		} else {
+			relay.mu.Lock()
+			relay.kept[r.URL.Path] = append(relay.kept[r.URL.Path], body)
+			relay.mu.Unlock()
+		}
+		w.WriteHeader(http.StatusCreated)
+	}))
+	t.Cleanup(func() {
+		relay.releaseHeld()
+		relay.server.Close()
+	})
+	return relay
+}
+
+func (h *heldRelay) releaseHeld() {
+	h.once.Do(func() { close(h.release) })
+}
+
+func (h *heldRelay) bodies(endpoint string) [][]byte {
+	path := strings.TrimPrefix(endpoint, h.server.URL)
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return append([][]byte(nil), h.kept[path]...)
+}
+
+func (h *heldRelay) received(endpoint string) int {
+	return len(h.bodies(endpoint))
+}
+
+// exampleClientPrivateKey is the RFC 8291 Appendix A subscription private key,
+// the other half of exampleClientKey.
+const exampleClientPrivateKey = "q1dXpw3UpT5VOmu_cf_v6ih07Aems3njxI-JWgLcM94"
+
+// openExamplePushPayload does what the phone does with one push sent to the
+// example subscription: RFC 8291 key agreement, then the RFC 8188 record.
+func openExamplePushPayload(t *testing.T, body []byte) webpush.Message {
+	t.Helper()
+	decode := func(value string) []byte {
+		raw, err := base64.RawURLEncoding.DecodeString(value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return raw
+	}
+	clientKey, err := ecdh.P256().NewPrivateKey(decode(exampleClientPrivateKey))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const saltLength = 16
+	if len(body) < saltLength+5 {
+		t.Fatalf("the push body is %d bytes, too short for a record header", len(body))
+	}
+	keyLength := int(body[saltLength+4])
+	salt := body[:saltLength]
+	senderPublicKey := body[saltLength+5 : saltLength+5+keyLength]
+	senderPublic, err := ecdh.P256().NewPublicKey(senderPublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sharedSecret, err := clientKey.ECDH(senderPublic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyInfo := append([]byte("WebPush: info\x00"), clientKey.PublicKey().Bytes()...)
+	keyInfo = append(keyInfo, senderPublicKey...)
+	combiningKey, err := hkdf.Extract(sha256.New, sharedSecret, decode(exampleClientAuth))
+	if err != nil {
+		t.Fatal(err)
+	}
+	inputKeyingMaterial, err := hkdf.Expand(sha256.New, combiningKey, string(keyInfo), sha256.Size)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contentPRK, err := hkdf.Extract(sha256.New, inputKeyingMaterial, salt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contentKey, err := hkdf.Expand(sha256.New, contentPRK, "Content-Encoding: aes128gcm\x00", 16)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nonce, err := hkdf.Expand(sha256.New, contentPRK, "Content-Encoding: nonce\x00", 12)
+	if err != nil {
+		t.Fatal(err)
+	}
+	block, err := aes.NewCipher(contentKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := aead.Open(nil, nonce, body[saltLength+5+keyLength:], nil)
+	if err != nil {
+		t.Fatalf("the push does not open under the subscription's keys: %v", err)
+	}
+	if len(record) == 0 || record[len(record)-1] != 0x02 {
+		t.Fatalf("the record is not the last one: %x", record)
+	}
+	var message webpush.Message
+	if err := json.Unmarshal(record[:len(record)-1], &message); err != nil {
+		t.Fatal(err)
+	}
+	return message
 }
 
 // newWebPushTestStore opens a migrated SQLite store with a bootstrapped owner

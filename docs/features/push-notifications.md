@@ -112,8 +112,10 @@ slow push service, so it is checked again immediately before it is sent: the
 device must still be registered to the recipient, under a session that is
 still live and the key the server signs with now, with any backoff elapsed,
 and the recipient must still be able to read the message, which must not have
-been deleted. A push that fails any of these is dropped with one log line
-naming the reason, and nothing is sent. The push service is called through the
+been deleted. The text is taken from the message as it reads at that moment,
+so an edit made while the push waited is what the phone shows. A push that
+fails any of these checks is dropped with one log line naming the reason, and
+nothing is sent. The push service is called through the
 same outbound policy as webhooks: no proxy, no redirects, and no destination
 inside the deployment's own network.
 

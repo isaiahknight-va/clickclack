@@ -121,6 +121,9 @@ func webPushTitle(message store.Message, place store.Channel) string {
 	return author
 }
 
+// webPushBody is the text a push carries. The notifier builds it again from
+// the message as it reads at send time, so an edit made while the push waited
+// is what the phone shows; the sender truncates it.
 func webPushBody(message store.Message) string {
 	body := strings.TrimSpace(message.Body)
 	if body == "" {

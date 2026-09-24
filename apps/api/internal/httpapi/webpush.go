@@ -65,7 +65,9 @@ type webPushSender interface {
 
 // webPushDelivery is one queued push. It names the device and the message
 // rather than carrying the device's keys: authority is re-read from the store
-// when a worker picks it up, because it can change while the push waits.
+// when a worker picks it up, because it can change while the push waits. The
+// message's text can change too, so the body sent is built from that same
+// re-read; the queued payload supplies the title, tag, and route.
 type webPushDelivery struct {
 	userID    string
 	endpoint  string
@@ -250,12 +252,14 @@ func (n *WebPushNotifier) deliver(delivery webPushDelivery) {
 	}()
 	sendCtx, cancelSend := context.WithTimeout(context.Background(), webPushSendTimeout)
 	defer cancelSend()
-	subscription, reason := n.authorize(sendCtx, delivery)
+	subscription, current, reason := n.authorize(sendCtx, delivery)
 	if reason != "" {
 		log.Printf("web push delivery skipped for user %s: %s", delivery.userID, reason)
 		return
 	}
-	err := n.sender.Send(sendCtx, subscription, delivery.message)
+	payload := delivery.message
+	payload.Body = webPushBody(current)
+	err := n.sender.Send(sendCtx, subscription, payload)
 	ctx, cancel := context.WithTimeout(context.Background(), webPushBookkeepingTimeout)
 	defer cancel()
 	host := webpush.RelayHost(delivery.endpoint)
@@ -290,36 +294,36 @@ func (n *WebPushNotifier) deliver(delivery webPushDelivery) {
 // device must still be registered to this user under a live session and the
 // key the server signs with, with its backoff elapsed, and the user must still
 // be able to read the message, which must not have been deleted. It answers
-// the device's current keys, or the class of reason it may not be sent. A
-// lookup that fails for any other reason also refuses: without an answer, the
-// message text stays on the server.
-func (n *WebPushNotifier) authorize(ctx context.Context, delivery webPushDelivery) (webpush.Subscription, string) {
+// the device's current keys and the message as it reads now, or the class of
+// reason it may not be sent. A lookup that fails for any other reason also
+// refuses: without an answer, the message text stays on the server.
+func (n *WebPushNotifier) authorize(ctx context.Context, delivery webPushDelivery) (webpush.Subscription, store.Message, string) {
 	target, err := n.subscriptions.GetPushSubscriptionDelivery(ctx, delivery.userID, delivery.endpoint, n.keyID)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
-		return webpush.Subscription{}, "the device is no longer registered"
+		return webpush.Subscription{}, store.Message{}, "the device is no longer registered"
 	case errors.Is(err, store.ErrPushSessionEnded):
-		return webpush.Subscription{}, "the session that registered the device has ended"
+		return webpush.Subscription{}, store.Message{}, "the session that registered the device has ended"
 	case errors.Is(err, store.ErrPushSubscriptionKeyRetired):
-		return webpush.Subscription{}, "the device was registered under a retired key"
+		return webpush.Subscription{}, store.Message{}, "the device was registered under a retired key"
 	case errors.Is(err, store.ErrPushSubscriptionBackingOff):
-		return webpush.Subscription{}, "the device is backing off"
+		return webpush.Subscription{}, store.Message{}, "the device is backing off"
 	case err != nil:
-		return webpush.Subscription{}, "the device could not be verified"
+		return webpush.Subscription{}, store.Message{}, "the device could not be verified"
 	}
 	if delivery.messageID == "" {
-		return webpush.Subscription{}, "the message could not be verified"
+		return webpush.Subscription{}, store.Message{}, "the message could not be verified"
 	}
 	message, err := n.subscriptions.GetMessage(ctx, delivery.messageID, delivery.userID)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
-		return webpush.Subscription{}, "the user can no longer read the message"
+		return webpush.Subscription{}, store.Message{}, "the user can no longer read the message"
 	case err != nil:
-		return webpush.Subscription{}, "the message could not be verified"
+		return webpush.Subscription{}, store.Message{}, "the message could not be verified"
 	case message.DeletedAt != nil:
-		return webpush.Subscription{}, "the message was deleted"
+		return webpush.Subscription{}, store.Message{}, "the message was deleted"
 	}
-	return webpush.Subscription{Endpoint: target.Endpoint, P256dh: target.P256dh, Auth: target.Auth}, ""
+	return webpush.Subscription{Endpoint: target.Endpoint, P256dh: target.P256dh, Auth: target.Auth}, message, ""
 }
 
 func (n *WebPushNotifier) reportDropped(dropped int) {
