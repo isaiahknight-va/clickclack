@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Fixed the macOS menu bar icon, which was invisible on a dark menu bar: resizing the tray image dropped its template flag, so it now ships at 1x and 2x and is loaded as a template. Thanks @isaiahknight-va.
+- Fixed the macOS menu bar icon disappearing on dark menu bars by preserving the template flag after resizing. Thanks @isaiahknight-va.
 
 ## 0.5.1 - 2026-09-21
 

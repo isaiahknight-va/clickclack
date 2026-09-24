@@ -766,10 +766,10 @@ function reloadMainApp() {
 function createTray() {
   const image = nativeImage.createFromPath(
     assetPath(process.platform === "darwin" ? "trayTemplate.png" : "icon.png"),
-  );
+  ).resize({ height: process.platform === "darwin" ? 18 : 20 });
+  // Resizing creates a new image, so mark the final image as a template.
   if (process.platform === "darwin") image.setTemplateImage(true);
-  // resize() drops the template flag; macOS loads trayTemplate@2x.png beside the 18px image.
-  tray = new Tray(process.platform === "darwin" ? image : image.resize({ height: 20 }));
+  tray = new Tray(image);
   tray.setToolTip(APP_NAME);
   tray.on("click", showMainWindow);
   updateTrayMenu();
