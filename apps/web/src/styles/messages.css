@@ -1383,11 +1383,7 @@
   pointer-events: none;
 }
 
-/* Touch devices use the long-press action sheet instead of the hover toolbar,
-   unless the pointer in hand is a mouse or trackpad: a tablet with one attached
-   keeps reporting a coarse, hover-less primary pointer, and that pointer can
-   neither hover a hidden toolbar nor long-press. The root attribute is set from
-   real pointer events (lib/pointer-mode.svelte.ts). */
+/* Real mouse input restores hover controls on touch-first tablets. */
 @media (hover: none), (pointer: coarse) {
   :root:not([data-pointer-mode="mouse"]) .message-row {
     -webkit-touch-callout: none;

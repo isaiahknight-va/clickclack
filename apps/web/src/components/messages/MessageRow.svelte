@@ -222,19 +222,13 @@
     reactionsDisabled || !currentUserID || isPending || isFailed || reactionPending,
   );
 
-  // A reaction the user just added grows this row. When the list is not
-  // following the bottom (a trackpad or a finger usually leaves it a few
-  // pixels short), the new chip lands below the fold under the composer's
-  // status band. Reveal the chip on its optimistic render, before the request
-  // resolves, so a scroll the user makes meanwhile is never undone.
+  // Reveal the optimistic chip before the request settles so later scrolling stays put.
   function react(emoji: string) {
     void reactionController.toggle(message, emoji);
     void tick().then(revealReactionsBar);
   }
 
-  // Only the reactions bar is measured: attachments render below it, so the
-  // row's own bottom can be a screen further down. Removing the last
-  // reaction leaves no bar, and then there is nothing to reveal.
+  // Attachments can extend below the bar; removing the last reaction leaves no bar.
   function revealReactionsBar() {
     const scroller = rowEl?.closest(".messages-scroll");
     const bar = rowEl?.querySelector(".reactions-bar");
@@ -247,7 +241,7 @@
 
   function quickReact(emoji: string) {
     if (cannotReact) return;
-    void react(emoji);
+    react(emoji);
   }
 
   function toggleReactPicker() {
@@ -258,7 +252,7 @@
 
   function chooseToolbarReaction(emoji: string) {
     if (cannotReact) return;
-    void react(emoji);
+    react(emoji);
     showReactPicker = false;
   }
 
@@ -516,7 +510,7 @@
   function sheetReact(emoji: string) {
     closeActionSheet();
     if (cannotReact) return;
-    void react(emoji);
+    react(emoji);
   }
 
   function sheetOpenThread() {
@@ -697,7 +691,7 @@
         pending={reactionController.pending(message.id)}
         error={reactionController.error(message.id)}
         disabled={reactionsDisabled || !currentUserID}
-        onToggle={(emoji) => void react(emoji)}
+        onToggle={(emoji) => react(emoji)}
       />
     {/if}
     {#if message.attachments?.length}
