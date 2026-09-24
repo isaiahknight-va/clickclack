@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -127,10 +128,53 @@ func TestSendClassifiesRelayResponses(t *testing.T) {
 		t.Fatal("a temporary failure must never read as a dead subscription")
 	}
 
+	asked := time.Now().Add(10 * time.Minute).UTC().Truncate(time.Second)
+	retryAfterHeader = asked.Format(http.TimeFormat)
+	err = sender.Send(context.Background(), subscription, Message{Body: "hi"})
+	if !errors.As(err, &relayErr) {
+		t.Fatalf("expected a relay error, got %v", err)
+	}
+	if retry := time.Now().Add(relayErr.RetryAfter); retry.Before(asked) {
+		t.Fatalf("Retry-After %q became a retry at %s, before the relay asked", retryAfterHeader, retry.UTC().Format(time.RFC3339))
+	}
+
 	retryAfterHeader = "soon"
 	err = sender.Send(context.Background(), subscription, Message{Body: "hi"})
 	if !errors.As(err, &relayErr) || relayErr.RetryAfter != 0 {
 		t.Fatalf("unexpected relay error %#v", relayErr)
+	}
+}
+
+// TestRetryAfterReadsBothForms pins the header against a fixed clock: seconds
+// or an HTTP-date in any of the three formats RFC 9110 requires a recipient to
+// accept. A value that is past, empty, or neither form means no delay, and one
+// too long to represent saturates rather than wrapping into a short retry.
+func TestRetryAfterReadsBothForms(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, time.September, 24, 12, 0, 0, 0, time.UTC)
+	saturated := time.Duration(math.MaxInt64)
+	for value, want := range map[string]time.Duration{
+		"120":                              2 * time.Minute,
+		" 120 ":                            2 * time.Minute,
+		"Thu, 24 Sep 2026 12:10:00 GMT":    10 * time.Minute,
+		"Thursday, 24-Sep-26 12:10:00 GMT": 10 * time.Minute,
+		"Thu Sep 24 12:10:00 2026":         10 * time.Minute,
+		"Fri, 24 Sep 2027 12:00:00 GMT":    365 * 24 * time.Hour,
+		"Thu, 24 Sep 2026 11:50:00 GMT":    0,
+		"Thu, 24 Sep 2026 12:00:00 GMT":    0,
+		"0":                                0,
+		"-5":                               0,
+		"":                                 0,
+		"soon":                             0,
+		"12.5":                             0,
+		"99999999999":                      saturated,
+		"18446744074":                      saturated,
+		"99999999999999999999":             saturated,
+		"-99999999999999999999":            0,
+	} {
+		if got := retryAfter(value, now); got != want {
+			t.Fatalf("retryAfter(%q) = %s, want %s", value, got, want)
+		}
 	}
 }
 

@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -131,7 +132,7 @@ func (s *Sender) Send(ctx context.Context, subscription Subscription, message Me
 		return &RelayError{
 			Host:       RelayHost(subscription.Endpoint),
 			Status:     response.StatusCode,
-			RetryAfter: retryAfter(response.Header.Get("Retry-After")),
+			RetryAfter: retryAfter(response.Header.Get("Retry-After"), time.Now()),
 		}
 	}
 	return nil
@@ -188,15 +189,27 @@ func withoutEndpoint(err error) error {
 	return err
 }
 
-// retryAfter reads the delay form of the header. The HTTP-date form is rare
-// from push services and a missing value simply leaves the caller's own
-// backoff in charge.
-func retryAfter(value string) time.Duration {
-	seconds, err := strconv.Atoi(strings.TrimSpace(value))
-	if err != nil || seconds <= 0 {
+// retryAfter reads the header in both forms RFC 9110 allows: a number of
+// seconds, or an HTTP-date, which is measured from now. A date already past,
+// or a value that is neither, leaves the caller's own backoff in charge. A
+// delay too long to count in nanoseconds saturates instead of wrapping into
+// a short one, so the caller's cap applies rather than its shortest backoff.
+func retryAfter(value string, now time.Time) time.Duration {
+	value = strings.TrimSpace(value)
+	if seconds, err := strconv.ParseInt(value, 10, 64); err == nil || errors.Is(err, strconv.ErrRange) {
+		if seconds <= 0 {
+			return 0
+		}
+		if seconds > int64(math.MaxInt64/time.Second) {
+			return math.MaxInt64
+		}
+		return time.Duration(seconds) * time.Second
+	}
+	date, err := http.ParseTime(value)
+	if err != nil {
 		return 0
 	}
-	return time.Duration(seconds) * time.Second
+	return max(date.Sub(now), 0)
 }
 
 func truncateBody(body string) string {

@@ -385,6 +385,112 @@ func TestWebPushNotifierBacksOffATimedOutRelay(t *testing.T) {
 	}
 }
 
+// TestWebPushNotifierStoresTheRelaysRetryAfter follows a refusal from the push
+// service to the backoff on the stored row. Retry-After may be a number of
+// seconds or an HTTP-date, and either way the device is not tried again before
+// the relay asked; a date already past or a value that is neither leaves the
+// ladder in charge, and no answer schedules a device past the cap.
+func TestWebPushNotifierStoresTheRelaysRetryAfter(t *testing.T) {
+	t.Parallel()
+	firstRung := time.Minute
+	for name, testCase := range map[string]struct {
+		header   func(now time.Time) string
+		earliest func(before, asked time.Time) time.Time
+		latest   func(after, asked time.Time) time.Time
+	}{
+		"seconds": {
+			header:   func(time.Time) string { return "120" },
+			earliest: func(before, _ time.Time) time.Time { return before.Add(2 * time.Minute) },
+			latest:   func(after, _ time.Time) time.Time { return after.Add(2 * time.Minute) },
+		},
+		"http date": {
+			header:   func(now time.Time) string { return now.Add(10 * time.Minute).UTC().Format(http.TimeFormat) },
+			earliest: func(_, asked time.Time) time.Time { return asked },
+			latest:   func(after, _ time.Time) time.Time { return after.Add(10 * time.Minute) },
+		},
+		"http date already past": {
+			header:   func(now time.Time) string { return now.Add(-time.Hour).UTC().Format(http.TimeFormat) },
+			earliest: func(before, _ time.Time) time.Time { return before.Add(firstRung) },
+			latest:   func(after, _ time.Time) time.Time { return after.Add(firstRung) },
+		},
+		"neither form": {
+			header:   func(time.Time) string { return "soon" },
+			earliest: func(before, _ time.Time) time.Time { return before.Add(firstRung) },
+			latest:   func(after, _ time.Time) time.Time { return after.Add(firstRung) },
+		},
+		"http date past the cap": {
+			header:   func(now time.Time) string { return now.AddDate(1, 0, 0).UTC().Format(http.TimeFormat) },
+			earliest: func(before, _ time.Time) time.Time { return before.Add(store.MaxPushRetryDelay) },
+			latest:   func(after, _ time.Time) time.Time { return after.Add(store.MaxPushRetryDelay) },
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			st, owner, channel, databasePath := newWebPushTestStore(t)
+			message, _, err := st.CreateMessage(ctx, store.CreateMessageInput{ChannelID: channel.ID, AuthorID: owner.ID, Body: "slow down"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			before := time.Now()
+			header := testCase.header(before)
+			asked, _ := http.ParseTime(header)
+			relay := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Retry-After", header)
+				w.WriteHeader(http.StatusServiceUnavailable)
+			}))
+			t.Cleanup(relay.Close)
+			endpoint := relay.URL + "/send/device"
+			registerKeyedDevice(t, st, owner.ID, endpoint, "")
+			publicKey, privateKey, err := webpush.GenerateKeys()
+			if err != nil {
+				t.Fatal(err)
+			}
+			notifier := newWebPushNotifier(&webpush.Sender{
+				PublicKey:  publicKey,
+				PrivateKey: privateKey,
+				Subject:    "https://chat.example.com",
+				Client:     relay.Client(),
+			}, st, "")
+			if err := notifier.Notify(ctx, PushNotification{
+				UserID:        owner.ID,
+				MessageID:     message.ID,
+				Subscriptions: []store.PushSubscriptionTarget{{Endpoint: endpoint}},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			notifier.Close()
+			after := time.Now()
+
+			db, err := sql.Open("sqlite", "file:"+databasePath+"?_pragma=busy_timeout(5000)")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer db.Close()
+			var failures int64
+			var stored sql.NullString
+			if err := db.QueryRow(
+				`SELECT failure_count, next_attempt_at FROM user_push_subscriptions WHERE endpoint = ?`, endpoint,
+			).Scan(&failures, &stored); err != nil {
+				t.Fatal(err)
+			}
+			if failures != 1 {
+				t.Fatalf("the refused delivery recorded %d failures, want 1", failures)
+			}
+			next, err := time.Parse(time.RFC3339Nano, stored.String)
+			if err != nil {
+				t.Fatalf("next_attempt_at %q: %v", stored.String, err)
+			}
+			if earliest := testCase.earliest(before, asked); next.Before(earliest) {
+				t.Fatalf("Retry-After %q stored next_attempt_at %s, before %s", header, next.UTC().Format(time.RFC3339), earliest.UTC().Format(time.RFC3339))
+			}
+			if latest := testCase.latest(after, asked); next.After(latest) {
+				t.Fatalf("Retry-After %q stored next_attempt_at %s, after %s", header, next.UTC().Format(time.RFC3339), latest.UTC().Format(time.RFC3339))
+			}
+		})
+	}
+}
+
 // TestMessageNotificationsFanOutPerChannel proves the two delivery paths stay
 // separate: a Pushover-only user produces exactly one Pushover call and no web
 // push, and a push-only user the reverse.
