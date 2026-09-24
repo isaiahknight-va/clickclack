@@ -42,3 +42,5 @@ Revision 4 final upgrade evidence (head 2df1c2f6, apps tree identical to e866810
 Revision 4, merged with upstream main (head b859a1b8 = 2df1c2f6 merged with acd90551, dist regenerated, source unchanged): e1r8-* is the built-server authorization run and e2r4-upgrade/ the upgrade run, both at that head, both RESULT: PASS.
 
 Revision 4, merged with upstream main, final head f93e77ba (the merge commit amended to collapse the changelog to one line; source unchanged): e1r9-* and e2r5-upgrade/ are the two evidence runs at that head, both RESULT: PASS. e1r8/e2r4 were the same runs at the pre-amend merge head b859a1b8.
+
+Revision 7 (head ada34088: Retry-After in both forms): e1r10-* and e2r6-upgrade/ are the two evidence runs at that head, both RESULT: PASS.

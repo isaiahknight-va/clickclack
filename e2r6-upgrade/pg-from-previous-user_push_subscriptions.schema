@@ -1,0 +1,15 @@
+id text NO 
+user_id text NO 
+endpoint text NO 
+p256dh text NO 
+auth text NO 
+user_agent text NO ''::text
+session_token_hash text NO ''::text
+created_at text NO 
+updated_at text NO 
+last_success_at text YES 
+next_attempt_at text YES 
+failure_count bigint NO 0
+vapid_key_id text NO ''::text
+failing_since text YES 
+last_failure_at text YES 
