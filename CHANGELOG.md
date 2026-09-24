@@ -2,8 +2,10 @@
 
 ## Unreleased
 
-- Added Web Push notifications, so an installed ClickClack can alert a phone with no third-party account: `clickclack admin webpush keygen` plus the two VAPID keys turn it on, and each user opts in per device from account settings. Pushover and tab notifications are unchanged. Thanks @isaiahknight-va.
-- Added a web app manifest and home-screen icons, which iOS requires before a browser can subscribe to push.
+- Fixed the macOS menu bar icon disappearing on dark menu bars by preserving the template flag after resizing. Thanks @isaiahknight-va.
+- Restored trackpad message actions in chat and embeds, kept new reactions visible without undoing later scrolling, and prevented text selection over the iOS action sheet. Thanks @isaiahknight-va.
+- Fixed disappearing text after empty nested Markdown quotes and updated virtual scrolling, SQLite runtime support, and build tools while retaining runtime minimums and the dependency release-age gate.
+- Added Web Push notifications with a web app manifest and home-screen icons, so an installed ClickClack can alert a phone with no third-party account, opt-in per device. Thanks @isaiahknight-va.
 
 ## 0.5.1 - 2026-09-21
 
