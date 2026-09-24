@@ -166,7 +166,6 @@ func pushNotificationFor(userID, endpoint string) PushNotification {
 		UserID:    userID,
 		MessageID: "msg_1",
 		Title:     "Owner in #general",
-		Message:   "hello",
 		Tag:       "clickclack:msg_1",
 		URL:       "/app/wsp_1/chn_1",
 		Subscriptions: []store.PushSubscriptionTarget{{
@@ -621,8 +620,11 @@ func TestMessageNotificationsFanOutPerChannel(t *testing.T) {
 	if delivered.Title != "Owner in #general" {
 		t.Fatalf("unexpected title %q", delivered.Title)
 	}
-	if delivered.Message != "morning" {
-		t.Fatalf("unexpected body %q", delivered.Message)
+	// The queue holds no text: the worker reads it from the message when it
+	// sends, which TestQueuedWebPushCarriesTheTextAtSendTime checks in what the
+	// phone decrypts.
+	if delivered.Message != "" {
+		t.Fatalf("the queued web push carries text %q", delivered.Message)
 	}
 	if delivered.Tag != "clickclack:"+posted.Message.ID {
 		t.Fatalf("unexpected tag %q", delivered.Tag)
