@@ -69,8 +69,8 @@ type webPushSender interface {
 // webPushDelivery is one queued push. It names the device and the message
 // rather than carrying the device's keys: authority is re-read from the store
 // when a worker picks it up, because it can change while the push waits. The
-// message's text can change too, so the body sent is built from that same
-// re-read; the queued payload supplies the title, tag, and route.
+// queued payload supplies the title, tag, and route and holds no text: the
+// text is read from the message in that same re-read, as it reads at send.
 type webPushDelivery struct {
 	userID    string
 	endpoint  string
@@ -148,7 +148,6 @@ func (n *WebPushNotifier) Notify(_ context.Context, notification PushNotificatio
 	}
 	message := webpush.Message{
 		Title: notification.Title,
-		Body:  notification.Message,
 		Tag:   notification.Tag,
 		URL:   notification.URL,
 	}

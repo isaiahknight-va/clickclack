@@ -116,7 +116,9 @@ been deleted. The recipient must also still be chosen by the rules that chose
 them when the message was posted, applied to the message as it reads now and
 the notification setting they hold now: a push for a channel they muted while
 it waited, or one whose mention of them the author edited out when they get
-mentions only, is not sent. The text is taken from the message as it reads at
+mentions only, is not sent. A recipient who changes their handle while such a
+push waits is skipped the same way, since the handle in the message no longer
+names them. The text is taken from the message as it reads at
 that moment, so an edit made while the push waited is what the phone shows.
 The title, which names the author and the channel, is fixed when the push is
 queued. A push that fails any of these checks is dropped with one log line

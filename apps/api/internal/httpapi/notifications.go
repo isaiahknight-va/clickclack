@@ -11,8 +11,9 @@ import (
 )
 
 // PushNotification is one alert for one recipient. Pushover reads the
-// recipient key, the title, and the message; the web push notifier reads the
-// rest and ignores the key.
+// recipient key, the title, and the message. The web push notifier reads the
+// title and the rest and ignores the key; it is handed no message, because it
+// reads the text from the stored message when the push is sent.
 type PushNotification struct {
 	RecipientKey  string
 	Title         string
@@ -63,7 +64,6 @@ func (s *Server) notifyMessageCreated(ctx context.Context, message store.Message
 			UserID:        recipient.UserID,
 			MessageID:     message.ID,
 			Title:         webPushTitle(message, place),
-			Message:       webPushBody(message),
 			Tag:           webPushTag(message),
 			URL:           webPushURL(message),
 			Subscriptions: subscriptions,
@@ -121,9 +121,9 @@ func webPushTitle(message store.Message, place store.Channel) string {
 	return author
 }
 
-// webPushBody is the text a push carries. The notifier builds it again from
-// the message as it reads at send time, so an edit made while the push waited
-// is what the phone shows; the sender truncates it.
+// webPushBody is the text a push carries. The notifier builds it from the
+// message as it reads at send time, so an edit made while the push waited is
+// what the phone shows; the sender truncates it.
 func webPushBody(message store.Message) string {
 	body := strings.TrimSpace(message.Body)
 	if body == "" {
