@@ -2,6 +2,7 @@ package store
 
 import (
 	"errors"
+	"math"
 	"testing"
 	"time"
 )
@@ -89,6 +90,28 @@ func TestPushKeyRetiredNeedsBothKeysToDiffer(t *testing.T) {
 	} {
 		if got := PushKeyRetired(testCase.keyID, testCase.currentKeyID); got != testCase.want {
 			t.Fatalf("%s: retired is %v, want %v", name, got, testCase.want)
+		}
+	}
+}
+
+// A relay's Retry-After can only lengthen the ladder, and never past the cap,
+// however long the delay it asked for.
+func TestPushRetryDelayHonorsALongerRetryAfterUpToTheCap(t *testing.T) {
+	t.Parallel()
+	for _, testCase := range []struct {
+		failures   int64
+		retryAfter time.Duration
+		want       time.Duration
+	}{
+		{1, 0, time.Minute},
+		{1, 10 * time.Minute, 10 * time.Minute},
+		{3, 10 * time.Minute, 30 * time.Minute},
+		{1, 365 * 24 * time.Hour, MaxPushRetryDelay},
+		{1, time.Duration(math.MaxInt64), MaxPushRetryDelay},
+		{99, 0, MaxPushRetryDelay},
+	} {
+		if got := PushRetryDelay(testCase.failures, testCase.retryAfter); got != testCase.want {
+			t.Fatalf("PushRetryDelay(%d, %s) = %s, want %s", testCase.failures, testCase.retryAfter, got, testCase.want)
 		}
 	}
 }

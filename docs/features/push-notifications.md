@@ -116,7 +116,8 @@ Failures are handled by what the push service says:
 - 404 or 410 means the subscription is dead. The row is deleted.
 - Anything else, including 429, a 5xx, and a timeout, sets a backoff (one
   minute, then five, thirty, two hours, six, and a day at most, honoring a
-  longer `Retry-After`). No single failure deletes the row: a relay outage
+  longer `Retry-After` up to that day, whether it is given in seconds or as
+  an HTTP date). No single failure deletes the row: a relay outage
   must not cost users their devices. Every failure records when it happened,
   and the first of a run also records when the run began. A success, or the
   device registering again, clears the backoff and ends the run. The
