@@ -1,0 +1,43 @@
+date: 2026-09-26 (Saturday)
+NOTICE:  database "roam_upgrade_ev" does not exist, skipping
+== postgres: 1. the PARENT binary (upstream 31d299ee, v0.6.0) creates and populates the database
+healthz: {"status":"ok"}
+message 1 created
+message 2 created
+message 3 created
+stopped
+
+== postgres: 2. BEFORE, as the parent left it
+schema_migrations rows = 40
+migrations named 0036/0037 (postgres) or 0043/0044 (sqlite):
+  0036_user_push_subscriptions.sql
+  0037_user_push_subscriptions_key_and_failing_since.sql
+users = 1
+workspaces = 2
+channels = 2
+messages = 3
+user_push_subscriptions present = 1
+user_sidebar_channel_order present = 0
+
+== postgres: 3. the HEAD binary (merge 6d49fe9e) starts against the same database
+healthz: {"status":"ok"}
+error lines in the head log: 0
+GET /api/me = 200
+PATCH /api/me sidebar order = 200
+roamed order length for the workspace = 1
+stopped
+
+== postgres: 4. AFTER
+schema_migrations rows = 41
+migrations named 0036/0037 (postgres) or 0043/0044 (sqlite):
+  0036_user_push_subscriptions.sql
+  0036_user_sidebar_channel_order.sql
+  0037_user_push_subscriptions_key_and_failing_since.sql
+users = 1
+workspaces = 2
+channels = 2
+messages = 3
+user_push_subscriptions present = 1
+user_sidebar_channel_order present = 1
+user_sidebar_channel_order rows = 1
+scratch database dropped

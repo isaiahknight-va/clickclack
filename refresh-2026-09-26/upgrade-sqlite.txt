@@ -1,0 +1,45 @@
+date: 2026-09-26 (Saturday)
+== sqlite: 1. the PARENT binary (upstream 31d299ee, v0.6.0) creates and populates the database
+healthz: {"status":"ok"}
+message 1 created
+message 2 created
+message 3 created
+stopped
+
+== sqlite: 2. BEFORE, as the parent left it
+schema_migrations rows = 54
+migrations named 0036/0037 (postgres) or 0043/0044 (sqlite):
+  0036_bot_setup_defaults.sql
+  0037_managed_channels.sql
+  0043_user_push_subscriptions.sql
+  0044_user_push_subscriptions_key_and_failing_since.sql
+users = 1
+workspaces = 2
+channels = 2
+messages = 3
+user_push_subscriptions present = 1
+user_sidebar_channel_order present = 0
+
+== sqlite: 3. the HEAD binary (merge 6d49fe9e) starts against the same database
+healthz: {"status":"ok"}
+error lines in the head log: 0
+GET /api/me = 200
+PATCH /api/me sidebar order = 200
+roamed order length for the workspace = 1
+stopped
+
+== sqlite: 4. AFTER
+schema_migrations rows = 55
+migrations named 0036/0037 (postgres) or 0043/0044 (sqlite):
+  0036_bot_setup_defaults.sql
+  0037_managed_channels.sql
+  0043_user_push_subscriptions.sql
+  0043_user_sidebar_channel_order.sql
+  0044_user_push_subscriptions_key_and_failing_since.sql
+users = 1
+workspaces = 2
+channels = 2
+messages = 3
+user_push_subscriptions present = 1
+user_sidebar_channel_order present = 1
+user_sidebar_channel_order rows = 1
