@@ -411,8 +411,6 @@ test("a local order longer than the roaming cap keeps its tail across a reload",
   await expect
     .poll(() => accountChannelOrder(page, workspace.id))
     .toEqual(roamed.slice(0, ROAMING_CAP));
-  console.log(`local order before the roam: ${roamed.length} ids`);
-  console.log(`account order after the roam: ${roamed.slice(0, ROAMING_CAP).length} ids`);
 
   await page.reload();
   await waitForAppReady(page);
@@ -421,8 +419,6 @@ test("a local order longer than the roaming cap keeps its tail across a reload",
     .toEqual([created[0], created[created.length - 1]]);
 
   const cached = JSON.parse((await cachedChannelOrder(page, storageKey)) || "[]") as string[];
-  console.log(`cached order after the reload: ${cached.length} ids`);
-  console.log(`tail beyond the cap preserved: ${String(cached.length - ROAMING_CAP)} ids`);
   expect(cached.length).toBe(OVER_CAP_CHANNELS);
   expect(cached).toEqual(roamed);
   expect(cached.slice(ROAMING_CAP)).toEqual(roamed.slice(ROAMING_CAP));

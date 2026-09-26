@@ -208,6 +208,47 @@ func TestSidebarChannelOrderRejectsOversizedPatch(t *testing.T) {
 	}
 }
 
+func TestSidebarPreferencesReadReturnsEveryWorkspace(t *testing.T) {
+	ctx, st, suffix := newSidebarTestStore(t)
+
+	user, err := st.CreateUser(ctx, store.CreateUserInput{DisplayName: "Wide User", Email: "sidebar-wide-postgres-" + suffix + "@example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The workspace cap bounds one patch, not the snapshot: a member of more
+	// workspaces than one patch may list reads back every saved order.
+	want := make(map[string]string, store.MaxSidebarChannelOrderWorkspaces+1)
+	for i := 0; i <= store.MaxSidebarChannelOrderWorkspaces; i++ {
+		workspace, err := st.CreateWorkspace(ctx, store.CreateWorkspaceInput{Name: "Wide", Slug: "wide-" + suffix + "-" + strconv.Itoa(i)}, user.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		channel, _, err := st.CreateChannel(ctx, store.CreateChannelInput{WorkspaceID: workspace.ID, Name: "aa", Kind: "public", UserID: user.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.UpdateCurrentUser(ctx, store.UpdateCurrentUserInput{
+			UserID: user.ID,
+			SidebarPreferences: &store.SidebarPreferencesPatch{
+				ChannelOrder: map[string][]string{workspace.ID: {channel.ID}},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		want[workspace.ID] = channel.ID
+	}
+	preferences, err := st.GetSidebarPreferences(ctx, user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if preferences == nil || len(preferences.ChannelOrder) != store.MaxSidebarChannelOrderWorkspaces+1 {
+		t.Fatalf("expected %d saved orders, got %#v", store.MaxSidebarChannelOrderWorkspaces+1, preferences)
+	}
+	for workspaceID, channelID := range want {
+		assertChannelOrder(t, preferences, workspaceID, channelID)
+	}
+}
+
 func TestSidebarChannelOrderCascadesWithMembership(t *testing.T) {
 	ctx, st, suffix := newSidebarTestStore(t)
 
