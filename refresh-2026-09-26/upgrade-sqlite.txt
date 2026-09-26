@@ -8,7 +8,7 @@ stopped
 
 == sqlite: 2. BEFORE, as the parent left it
 schema_migrations rows = 54
-migrations named 0036/0037 (postgres) or 0043/0044 (sqlite):
+migrations with prefix 0036, 0037, 0043, or 0044:
   0036_bot_setup_defaults.sql
   0037_managed_channels.sql
   0043_user_push_subscriptions.sql
@@ -20,7 +20,7 @@ messages = 3
 user_push_subscriptions present = 1
 user_sidebar_channel_order present = 0
 
-== sqlite: 3. the HEAD binary (merge 6d49fe9e) starts against the same database
+== sqlite: 3. the HEAD binary (head 47c8c019, this PR merged with v0.6.0) starts against the same database
 healthz: {"status":"ok"}
 error lines in the head log: 0
 GET /api/me = 200
@@ -30,7 +30,7 @@ stopped
 
 == sqlite: 4. AFTER
 schema_migrations rows = 55
-migrations named 0036/0037 (postgres) or 0043/0044 (sqlite):
+migrations with prefix 0036, 0037, 0043, or 0044:
   0036_bot_setup_defaults.sql
   0037_managed_channels.sql
   0043_user_push_subscriptions.sql

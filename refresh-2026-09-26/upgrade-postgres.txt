@@ -9,7 +9,7 @@ stopped
 
 == postgres: 2. BEFORE, as the parent left it
 schema_migrations rows = 40
-migrations named 0036/0037 (postgres) or 0043/0044 (sqlite):
+migrations with prefix 0036, 0037, 0043, or 0044:
   0036_user_push_subscriptions.sql
   0037_user_push_subscriptions_key_and_failing_since.sql
 users = 1
@@ -19,7 +19,7 @@ messages = 3
 user_push_subscriptions present = 1
 user_sidebar_channel_order present = 0
 
-== postgres: 3. the HEAD binary (merge 6d49fe9e) starts against the same database
+== postgres: 3. the HEAD binary (head 47c8c019, this PR merged with v0.6.0) starts against the same database
 healthz: {"status":"ok"}
 error lines in the head log: 0
 GET /api/me = 200
@@ -29,7 +29,7 @@ stopped
 
 == postgres: 4. AFTER
 schema_migrations rows = 41
-migrations named 0036/0037 (postgres) or 0043/0044 (sqlite):
+migrations with prefix 0036, 0037, 0043, or 0044:
   0036_user_push_subscriptions.sql
   0036_user_sidebar_channel_order.sql
   0037_user_push_subscriptions_key_and_failing_since.sql

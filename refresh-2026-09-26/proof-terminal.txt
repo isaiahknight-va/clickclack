@@ -1,13 +1,14 @@
+date: 2026-09-26 (Saturday)
 $ node verify-roaming-order.mjs parent-main bin/clickclack-parent 18690 .   # built at 31d299ee (upstream main, v0.6.0)
-[parent-main] context A before drag: aa-muinsry4, mm-muinsry4, zz-muinsry4
-[parent-main] context A after drag:  zz-muinsry4, aa-muinsry4, mm-muinsry4
-[parent-main] context B (fresh):     aa-muinsry4, mm-muinsry4, zz-muinsry4
+[parent-main] context A before drag: aa-muiodx87, mm-muiodx87, zz-muiodx87
+[parent-main] context A after drag:  zz-muiodx87, aa-muiodx87, mm-muiodx87
+[parent-main] context B (fresh):     aa-muiodx87, mm-muiodx87, zz-muiodx87
 [parent-main] /api/me sidebar_preferences.channel_order for this workspace: absent
 [parent-main] verdict: FAIL (second context shows the default order)
 
-$ node verify-roaming-order.mjs head bin/clickclack-head 18691 .   # built at 6d49fe9e (this PR merged with v0.6.0)
-[head] context A before drag: aa-muinsuxg, mm-muinsuxg, zz-muinsuxg
-[head] context A after drag:  zz-muinsuxg, aa-muinsuxg, mm-muinsuxg
-[head] context B (fresh):     zz-muinsuxg, aa-muinsuxg, mm-muinsuxg
+$ node verify-roaming-order.mjs head bin/clickclack-head 18691 .   # built at 47c8c019 (this PR, merged with v0.6.0)
+[head] context A before drag: aa-muioe00x, mm-muioe00x, zz-muioe00x
+[head] context A after drag:  zz-muioe00x, aa-muioe00x, mm-muioe00x
+[head] context B (fresh):     zz-muioe00x, aa-muioe00x, mm-muioe00x
 [head] /api/me sidebar_preferences.channel_order for this workspace: 3 ids
 [head] verdict: PASS (order roamed)

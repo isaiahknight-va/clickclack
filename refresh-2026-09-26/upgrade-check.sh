@@ -18,7 +18,7 @@ q() {
 }
 snapshot() {
   echo "schema_migrations rows = $(q 'SELECT count(*) FROM schema_migrations')"
-  echo "migrations named 0036/0037 (postgres) or 0043/0044 (sqlite):"
+  echo "migrations with prefix 0036, 0037, 0043, or 0044:"
   q "SELECT name FROM schema_migrations WHERE name LIKE '0036_%' OR name LIKE '0037_%' OR name LIKE '0043_%' OR name LIKE '0044_%' ORDER BY name" | sed 's/^/  /'
   for t in users workspaces channels messages; do echo "$t = $(q "SELECT count(*) FROM $t")"; done
   echo "user_push_subscriptions present = $(q "SELECT count(*) FROM $( [[ $kind == postgres ]] && echo information_schema.tables WHERE table_name || echo sqlite_master WHERE name )='user_push_subscriptions'")"
@@ -36,7 +36,7 @@ ch=$(curl -fs -X POST $base/api/workspaces/$ws/channels -H 'content-type: applic
 for n in 1 2 3; do curl -fs -X POST $base/api/channels/$ch/messages -H 'content-type: application/json' -d "{\"body\":\"message $n\"}" >/dev/null && echo "message $n created"; done
 stop
 echo; echo "== $kind: 2. BEFORE, as the parent left it"; snapshot
-echo; echo "== $kind: 3. the HEAD binary (merge 6d49fe9e) starts against the same database"
+echo; echo "== $kind: 3. the HEAD binary (head 47c8c019, this PR merged with v0.6.0) starts against the same database"
 start clickclack-head
 echo "error lines in the head log: $(grep -ciE 'error|panic|fail' $data/clickclack-head.log)"
 me=$(curl -fs -o /dev/null -w '%{http_code}' $base/api/me); echo "GET /api/me = $me"
