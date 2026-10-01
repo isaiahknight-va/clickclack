@@ -1,0 +1,1524 @@
+{
+ "startedAt": "2026-10-01T18:47:43.802Z",
+ "runs": [
+  {
+   "candidate": "A",
+   "state": "S1",
+   "window": {
+    "visible": true,
+    "minimized": false,
+    "focused": false,
+    "bounds": {
+     "x": 1450,
+     "y": 606,
+     "width": 1100,
+     "height": 750
+    },
+    "throttling": false,
+    "title": "ClickClack ENERGY TEST (leave open)"
+   },
+   "cpu": {
+    "wall": 60.07,
+    "procs": {
+     "main": [
+      27188
+     ],
+     "renderer": [
+      27221
+     ],
+     "appRenderer": [
+      27221
+     ],
+     "gpu": [
+      27211
+     ],
+     "network": [
+      27212
+     ],
+     "other": []
+    },
+    "cpuPct": {
+     "main": 0.07,
+     "renderer": 1.61,
+     "otherRenderers": 0,
+     "gpu": 1.27,
+     "network": 0.03,
+     "other": 0
+    },
+    "perfDelta": {
+     "LayoutCount": 0,
+     "RecalcStyleCount": 0,
+     "LayoutDuration": 0,
+     "RecalcStyleDuration": 0,
+     "ScriptDuration": 0,
+     "TaskDuration": 0.05,
+     "ThreadTime": 0.03,
+     "ProcessTime": 0.98
+    }
+   },
+   "probe": {
+    "visibility": "visible",
+    "hasFocus": true,
+    "animations": [
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     }
+    ]
+   },
+   "raf5s": 722,
+   "trace": {
+    "spanMs": 10033,
+    "top": [
+     {
+      "label": "renderer/Compositor/Scheduler::BeginImplFrame",
+      "selfMs": 32.4,
+      "count": 1445
+     },
+     {
+      "label": "gpu/VizCompositorThread/Graphics.Pipeline",
+      "selfMs": 24.4,
+      "count": 2831
+     },
+     {
+      "label": "renderer/Compositor/SimpleWatcher::OnHandleReady",
+      "selfMs": 21.7,
+      "count": 1445
+     },
+     {
+      "label": "renderer/Compositor/AnimationHost::TickAnimations",
+      "selfMs": 17.8,
+      "count": 1445
+     },
+     {
+      "label": "browser/CrBrowserMain/ThreadControllerImpl::RunTask",
+      "selfMs": 17.7,
+      "count": 31
+     },
+     {
+      "label": "gpu/CVDisplayLink/CVDisplayLinkCallback",
+      "selfMs": 15.1,
+      "count": 1445
+     },
+     {
+      "label": "renderer/Compositor/Graphics.Pipeline",
+      "selfMs": 13.7,
+      "count": 4335
+     },
+     {
+      "label": "gpu/VizCompositorThread/ThreadControllerImpl::RunTask",
+      "selfMs": 12.4,
+      "count": 4330
+     },
+     {
+      "label": "renderer/Compositor/ThreadControllerImpl::RunTask",
+      "selfMs": 11.9,
+      "count": 6526
+     },
+     {
+      "label": "renderer/ThreadPoolForegroundWorker/ThreadPool_RunTask",
+      "selfMs": 11.2,
+      "count": 2
+     },
+     {
+      "label": "gpu/VizCompositorThread/SimpleWatcher::OnHandleReady",
+      "selfMs": 10.6,
+      "count": 1444
+     },
+     {
+      "label": "renderer/Compositor/LayerTreeImpl::UpdateTiles",
+      "selfMs": 9.9,
+      "count": 1271
+     },
+     {
+      "label": "renderer/Compositor/ExternalBeginFrameSource::OnBeginFrame",
+      "selfMs": 8.8,
+      "count": 1445
+     },
+     {
+      "label": "renderer/Compositor/Receive mojo message",
+      "selfMs": 8.2,
+      "count": 1445
+     },
+     {
+      "label": "gpu/VizCompositorThread/RunTask",
+      "selfMs": 8,
+      "count": 4335
+     },
+     {
+      "label": "renderer/Compositor/TileManager::ScheduleTasks",
+      "selfMs": 7.9,
+      "count": 1271
+     },
+     {
+      "label": "renderer/Compositor/Scheduler::BeginFrame",
+      "selfMs": 6.8,
+      "count": 1445
+     },
+     {
+      "label": "renderer/Compositor/LayerTreeImpl::UpdateDrawProperties::CalculateDrawProperties",
+      "selfMs": 6,
+      "count": 1271
+     },
+     {
+      "label": "renderer/CrRendererMain/ThreadControllerImpl::RunTask",
+      "selfMs": 6,
+      "count": 59
+     },
+     {
+      "label": "renderer/Compositor/Scheduler::ScheduleBeginImplFrameDeadline",
+      "selfMs": 5.5,
+      "count": 1444
+     },
+     {
+      "label": "renderer/Compositor/TileManager::PrepareTiles",
+      "selfMs": 5.4,
+      "count": 1271
+     },
+     {
+      "label": "renderer/Compositor/RunTask",
+      "selfMs": 4.9,
+      "count": 6530
+     },
+     {
+      "label": "renderer/Compositor/LayerTreeHostImpl::PrepareToDraw",
+      "selfMs": 4.9,
+      "count": 1445
+     },
+     {
+      "label": "renderer/Compositor/LayerTreeImpl::UpdateDrawProperties::Occlusion",
+      "selfMs": 4.3,
+      "count": 1271
+     },
+     {
+      "label": "gpu/VizCompositorThread/Receive mojo message",
+      "selfMs": 4.1,
+      "count": 1445
+     }
+    ],
+    "frameCounts": {
+     "renderer/Compositor/Graphics.Pipeline": 4335,
+     "gpu/VizCompositorThread/Graphics.Pipeline": 2890,
+     "renderer/Compositor/BeginFrame": 1445,
+     "renderer/Compositor/ProxyImpl::ScheduledActionDraw": 1445,
+     "renderer/CrRendererMain/FunctionCall": 2,
+     "renderer/CrRendererMain/TimerFire": 1
+    }
+   },
+   "latency": [
+    {
+     "marker": "latency-probe-mupw1nw2-dpn2h",
+     "postMs": 412,
+     "domMs": null
+    },
+    {
+     "marker": "latency-probe-mupw4a4d-wkt9k",
+     "postMs": 35,
+     "domMs": null
+    }
+   ]
+  },
+  {
+   "candidate": "A",
+   "state": "S2",
+   "window": {
+    "visible": true,
+    "minimized": false,
+    "focused": false,
+    "bounds": {
+     "x": 1450,
+     "y": 606,
+     "width": 1100,
+     "height": 750
+    },
+    "throttling": false,
+    "title": "ClickClack ENERGY TEST (leave open)"
+   },
+   "cpu": {
+    "wall": 60.01,
+    "procs": {
+     "main": [
+      27188
+     ],
+     "renderer": [
+      27221
+     ],
+     "appRenderer": [
+      27221
+     ],
+     "gpu": [
+      27211
+     ],
+     "network": [
+      27212
+     ],
+     "other": [
+      31855
+     ]
+    },
+    "cpuPct": {
+     "main": 0.03,
+     "renderer": 1.67,
+     "otherRenderers": 0,
+     "gpu": 1.42,
+     "network": 0,
+     "other": 0
+    },
+    "perfDelta": {
+     "LayoutCount": 0,
+     "RecalcStyleCount": 0,
+     "LayoutDuration": 0,
+     "RecalcStyleDuration": 0,
+     "ScriptDuration": 0.01,
+     "TaskDuration": 0.01,
+     "ThreadTime": 0.01,
+     "ProcessTime": 1
+    }
+   },
+   "probe": {
+    "visibility": "visible",
+    "hasFocus": true,
+    "animations": [
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     }
+    ]
+   },
+   "raf5s": 721
+  },
+  {
+   "candidate": "A",
+   "state": "S5",
+   "window": {
+    "visible": true,
+    "minimized": false,
+    "focused": false,
+    "bounds": {
+     "x": 1450,
+     "y": 606,
+     "width": 1100,
+     "height": 750
+    },
+    "throttling": false,
+    "title": "ClickClack ENERGY TEST (leave open)"
+   },
+   "check": {
+    "unreadBar": true,
+    "label": "40 new messages since 2:55 PM"
+   },
+   "cpu": {
+    "wall": 60.02,
+    "procs": {
+     "main": [
+      27188
+     ],
+     "renderer": [
+      27221
+     ],
+     "appRenderer": [
+      27221
+     ],
+     "gpu": [
+      27211
+     ],
+     "network": [
+      27212
+     ],
+     "other": [
+      31855
+     ]
+    },
+    "cpuPct": {
+     "main": 0.02,
+     "renderer": 14.88,
+     "otherRenderers": 0,
+     "gpu": 14.34,
+     "network": 0.02,
+     "other": 0.02
+    },
+    "perfDelta": {
+     "LayoutCount": 0,
+     "RecalcStyleCount": 8646,
+     "LayoutDuration": 0,
+     "RecalcStyleDuration": 0.85,
+     "ScriptDuration": 0,
+     "TaskDuration": 5.27,
+     "ThreadTime": 5.43,
+     "ProcessTime": 8.93
+    }
+   },
+   "probe": {
+    "visibility": "visible",
+    "hasFocus": true,
+    "animations": [
+     {
+      "name": "unread-bar-pulse",
+      "playState": "running",
+      "target": "button.unread-bar__jump",
+      "pseudo": "::before",
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     }
+    ]
+   },
+   "raf5s": 721,
+   "trace": {
+    "spanMs": 10054,
+    "top": [
+     {
+      "label": "renderer/CrRendererMain/Paint",
+      "selfMs": 308.2,
+      "count": 2890
+     },
+     {
+      "label": "gpu/CrGpuMain/CommitPresentedFrameToCA",
+      "selfMs": 289.2,
+      "count": 1444
+     },
+     {
+      "label": "gpu/CrGpuMain/RasterDecoderImpl::DoEndRasterCHROMIUM::Flush",
+      "selfMs": 240,
+      "count": 1445
+     },
+     {
+      "label": "renderer/Compositor/GpuChannelHost::VerifyFlush",
+      "selfMs": 142.1,
+      "count": 1444
+     },
+     {
+      "label": "renderer/CrRendererMain/Document::recalcStyle",
+      "selfMs": 124.6,
+      "count": 1445
+     },
+     {
+      "label": "gpu/VizCompositorThread/Graphics.Pipeline",
+      "selfMs": 117.9,
+      "count": 8665
+     },
+     {
+      "label": "renderer/Compositor/Graphics.Pipeline",
+      "selfMs": 108.5,
+      "count": 4333
+     },
+     {
+      "label": "gpu/CrGpuMain/RasterDecoderImpl::DoRasterCHROMIUM::Deserializing",
+      "selfMs": 82.6,
+      "count": 1445
+     },
+     {
+      "label": "renderer/CrRendererMain/Layerize",
+      "selfMs": 57.1,
+      "count": 1445
+     },
+     {
+      "label": "renderer/CrRendererMain/Blink.CompositingInputs.UpdateTime",
+      "selfMs": 56.1,
+      "count": 1445
+     },
+     {
+      "label": "renderer/CrRendererMain/Blink.PrePaint.UpdateTime",
+      "selfMs": 50.9,
+      "count": 1445
+     },
+     {
+      "label": "gpu/CrGpuMain/CARendererLayerTree::CommitScheduledCALayers",
+      "selfMs": 48,
+      "count": 1444
+     },
+     {
+      "label": "renderer/CrRendererMain/LocalFrameView::RunPaintLifecyclePhase",
+      "selfMs": 47.5,
+      "count": 1445
+     },
+     {
+      "label": "renderer/CrRendererMain/Blink.Paint.UpdateTime",
+      "selfMs": 46.3,
+      "count": 1445
+     },
+     {
+      "label": "gpu/CrGpuMain/SkiaOutputDevice->ScheduleOverlays()",
+      "selfMs": 42.2,
+      "count": 1444
+     },
+     {
+      "label": "renderer/CrRendererMain/Commit",
+      "selfMs": 41.9,
+      "count": 1445
+     },
+     {
+      "label": "renderer/CrRendererMain/AnimationTimeline::serviceAnimations",
+      "selfMs": 38.1,
+      "count": 1444
+     },
+     {
+      "label": "gpu/VizCompositorThread/ThreadControllerImpl::RunTask",
+      "selfMs": 33.1,
+      "count": 8676
+     },
+     {
+      "label": "renderer/Compositor/SimpleWatcher::OnHandleReady",
+      "selfMs": 32.2,
+      "count": 3178
+     },
+     {
+      "label": "gpu/CrGpuMain/ThreadControllerImpl::RunTask",
+      "selfMs": 31.7,
+      "count": 8702
+     },
+     {
+      "label": "renderer/Compositor/AnimationHost::TickAnimations",
+      "selfMs": 31.5,
+      "count": 2889
+     },
+     {
+      "label": "gpu/CrGpuMain/RasterDecoderImpl::DoBeginRasterCHROMIUM",
+      "selfMs": 31.2,
+      "count": 1445
+     },
+     {
+      "label": "gpu/VizCompositorThread/SimpleWatcher::OnHandleReady",
+      "selfMs": 30.7,
+      "count": 1445
+     },
+     {
+      "label": "gpu/CVDisplayLink/CVDisplayLinkCallback",
+      "selfMs": 24.9,
+      "count": 2888
+     },
+     {
+      "label": "renderer/CrRendererMain/Document::updateStyle",
+      "selfMs": 24.9,
+      "count": 1445
+     }
+    ],
+    "frameCounts": {
+     "gpu/VizCompositorThread/Graphics.Pipeline": 8665,
+     "renderer/Compositor/Graphics.Pipeline": 4333,
+     "renderer/CrRendererMain/Paint": 2890,
+     "gpu/CrGpuMain/Graphics.Pipeline": 2888,
+     "renderer/CrRendererMain/Commit": 1445,
+     "renderer/Compositor/DrawFrame": 1445,
+     "renderer/ThreadPoolForegroundWorker/RasterTask": 1445,
+     "renderer/Compositor/Commit": 1445,
+     "renderer/Compositor/BeginFrame": 1444,
+     "gpu/VizCompositorThread/Display::DrawAndSwap": 1444,
+     "renderer/Compositor/ProxyImpl::ScheduledActionDraw": 1444,
+     "renderer/CrRendererMain/ProxyMain::BeginMainFrame": 1444
+    }
+   }
+  },
+  {
+   "candidate": "A",
+   "state": "S6",
+   "window": {
+    "visible": true,
+    "minimized": false,
+    "focused": false,
+    "bounds": {
+     "x": 1450,
+     "y": 606,
+     "width": 1100,
+     "height": 750
+    },
+    "throttling": false,
+    "title": "ClickClack ENERGY TEST (leave open)"
+   },
+   "check": {
+    "typingVisible": 1
+   },
+   "cpu": {
+    "wall": 60.01,
+    "procs": {
+     "main": [
+      27188
+     ],
+     "renderer": [
+      27221
+     ],
+     "appRenderer": [
+      27221
+     ],
+     "gpu": [
+      27211
+     ],
+     "network": [
+      27212
+     ],
+     "other": [
+      31855
+     ]
+    },
+    "cpuPct": {
+     "main": 0.03,
+     "renderer": 2.77,
+     "otherRenderers": 0,
+     "gpu": 4.43,
+     "network": 0.02,
+     "other": 0
+    },
+    "perfDelta": {
+     "LayoutCount": 0,
+     "RecalcStyleCount": 0,
+     "LayoutDuration": 0,
+     "RecalcStyleDuration": 0,
+     "ScriptDuration": 0,
+     "TaskDuration": 0.08,
+     "ThreadTime": 0.2,
+     "ProcessTime": 1.66
+    }
+   },
+   "probe": {
+    "visibility": "visible",
+    "hasFocus": true,
+    "animations": [
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     }
+    ]
+   },
+   "raf5s": 721
+  },
+  {
+   "candidate": "A",
+   "state": "S7",
+   "window": {
+    "visible": true,
+    "minimized": false,
+    "focused": false,
+    "bounds": {
+     "x": 1450,
+     "y": 606,
+     "width": 1100,
+     "height": 750
+    },
+    "throttling": false,
+    "title": "ClickClack ENERGY TEST (leave open)"
+   },
+   "check": {
+    "livePreamble": 1,
+    "agentResponding": 1
+   },
+   "cpu": {
+    "wall": 60.02,
+    "procs": {
+     "main": [
+      27188
+     ],
+     "renderer": [
+      27221
+     ],
+     "appRenderer": [
+      27221
+     ],
+     "gpu": [
+      27211
+     ],
+     "network": [
+      27212
+     ],
+     "other": [
+      31855
+     ]
+    },
+    "cpuPct": {
+     "main": 0.03,
+     "renderer": 3.43,
+     "otherRenderers": 0,
+     "gpu": 5.73,
+     "network": 0.02,
+     "other": 0
+    },
+    "perfDelta": {
+     "LayoutCount": 36,
+     "RecalcStyleCount": 52,
+     "LayoutDuration": 0.01,
+     "RecalcStyleDuration": 0.01,
+     "ScriptDuration": 0.03,
+     "TaskDuration": 0.18,
+     "ThreadTime": 0.35,
+     "ProcessTime": 2.06
+    }
+   },
+   "probe": {
+    "visibility": "visible",
+    "hasFocus": true,
+    "animations": [
+     {
+      "name": "preamble-live-pulse",
+      "playState": "running",
+      "target": "span.preamble-state.is-live",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     }
+    ]
+   },
+   "raf5s": 721,
+   "trace": {
+    "spanMs": 10042,
+    "top": [
+     {
+      "label": "gpu/VizCompositorThread/Graphics.Pipeline",
+      "selfMs": 115.4,
+      "count": 8663
+     },
+     {
+      "label": "renderer/Compositor/Graphics.Pipeline",
+      "selfMs": 78.2,
+      "count": 4332
+     },
+     {
+      "label": "gpu/CrGpuMain/CommitPresentedFrameToCA",
+      "selfMs": 71.2,
+      "count": 1444
+     },
+     {
+      "label": "gpu/CrGpuMain/CARendererLayerTree::CommitScheduledCALayers",
+      "selfMs": 46.9,
+      "count": 1444
+     },
+     {
+      "label": "gpu/CrGpuMain/SkiaOutputDevice->ScheduleOverlays()",
+      "selfMs": 31.8,
+      "count": 1444
+     },
+     {
+      "label": "renderer/Compositor/AnimationHost::TickAnimations",
+      "selfMs": 31.4,
+      "count": 1447
+     },
+     {
+      "label": "renderer/Compositor/SimpleWatcher::OnHandleReady",
+      "selfMs": 29.8,
+      "count": 2889
+     },
+     {
+      "label": "gpu/VizCompositorThread/SimpleWatcher::OnHandleReady",
+      "selfMs": 29.2,
+      "count": 1444
+     },
+     {
+      "label": "gpu/CVDisplayLink/CVDisplayLinkCallback",
+      "selfMs": 24.6,
+      "count": 2886
+     },
+     {
+      "label": "renderer/Compositor/Scheduler::BeginImplFrame",
+      "selfMs": 24.6,
+      "count": 1444
+     },
+     {
+      "label": "gpu/CrGpuMain/ThreadControllerImpl::RunTask",
+      "selfMs": 24.5,
+      "count": 7212
+     },
+     {
+      "label": "gpu/VizCompositorThread/ThreadControllerImpl::RunTask",
+      "selfMs": 24.2,
+      "count": 8669
+     },
+     {
+      "label": "gpu/VizCompositorThread/Receive mojo message",
+      "selfMs": 20.2,
+      "count": 1444
+     },
+     {
+      "label": "renderer/Compositor/LayerTreeHostImpl::CalculateRenderPasses",
+      "selfMs": 18.7,
+      "count": 1444
+     },
+     {
+      "label": "renderer/Compositor/ThreadControllerImpl::RunTask",
+      "selfMs": 18.3,
+      "count": 9888
+     },
+     {
+      "label": "gpu/CrGpuMain/IOSurfaceImageBacking::WaitForCommandsToBeScheduled::Dawn",
+      "selfMs": 18.3,
+      "count": 6
+     },
+     {
+      "label": "renderer/CrRendererMain/RunTask",
+      "selfMs": 17.2,
+      "count": 1558
+     },
+     {
+      "label": "browser/CrBrowserMain/ThreadControllerImpl::RunTask",
+      "selfMs": 16.2,
+      "count": 37
+     },
+     {
+      "label": "renderer/Compositor/Receive mojo message",
+      "selfMs": 14.4,
+      "count": 2889
+     },
+     {
+      "label": "renderer/Compositor/LayerTreeImpl::UpdateTiles",
+      "selfMs": 14.1,
+      "count": 1447
+     },
+     {
+      "label": "gpu/VizCompositorThread/RunTask",
+      "selfMs": 13.1,
+      "count": 8672
+     },
+     {
+      "label": "gpu/VizCompositorThread/Surface::ActivateFrame",
+      "selfMs": 12.2,
+      "count": 1444
+     },
+     {
+      "label": "renderer/Compositor/RunTask",
+      "selfMs": 10.8,
+      "count": 10117
+     },
+     {
+      "label": "gpu/VizCompositorThread/ExternalBeginFrameSource::OnBeginFrame",
+      "selfMs": 10.8,
+      "count": 1443
+     },
+     {
+      "label": "renderer/Compositor/Scheduler::ScheduleBeginImplFrameDeadline",
+      "selfMs": 10.1,
+      "count": 2886
+     }
+    ],
+    "frameCounts": {
+     "gpu/VizCompositorThread/Graphics.Pipeline": 8663,
+     "renderer/Compositor/Graphics.Pipeline": 4332,
+     "gpu/CrGpuMain/Graphics.Pipeline": 2888,
+     "renderer/Compositor/BeginFrame": 1444,
+     "gpu/VizCompositorThread/Display::DrawAndSwap": 1444,
+     "renderer/Compositor/ProxyImpl::ScheduledActionDraw": 1444,
+     "renderer/Compositor/DrawFrame": 1444,
+     "renderer/CrRendererMain/FunctionCall": 16,
+     "renderer/CrRendererMain/TimerFire": 10,
+     "renderer/CrRendererMain/Paint": 6,
+     "renderer/ThreadPoolForegroundWorker/RasterTask": 6,
+     "renderer/CrRendererMain/ProxyMain::BeginMainFrame": 3
+    }
+   }
+  },
+  {
+   "candidate": "B",
+   "state": "S2",
+   "window": {
+    "visible": true,
+    "minimized": false,
+    "focused": false,
+    "bounds": {
+     "x": 1450,
+     "y": 606,
+     "width": 1100,
+     "height": 750
+    },
+    "throttling": true,
+    "title": "ClickClack ENERGY TEST (leave open)"
+   },
+   "cpu": {
+    "wall": 60.06,
+    "procs": {
+     "main": [
+      27188
+     ],
+     "renderer": [
+      27221
+     ],
+     "appRenderer": [
+      27221
+     ],
+     "gpu": [
+      27211
+     ],
+     "network": [
+      27212
+     ],
+     "other": [
+      31855
+     ]
+    },
+    "cpuPct": {
+     "main": 0.05,
+     "renderer": 1.63,
+     "otherRenderers": 0,
+     "gpu": 1.33,
+     "network": 0.02,
+     "other": 0
+    },
+    "perfDelta": {
+     "LayoutCount": 0,
+     "RecalcStyleCount": 0,
+     "LayoutDuration": 0,
+     "RecalcStyleDuration": 0,
+     "ScriptDuration": 0.02,
+     "TaskDuration": 0.04,
+     "ThreadTime": 0.02,
+     "ProcessTime": 0.97
+    }
+   },
+   "probe": {
+    "visibility": "visible",
+    "hasFocus": true,
+    "animations": [
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     }
+    ]
+   },
+   "raf5s": 721,
+   "trace": {
+    "spanMs": 10031,
+    "top": [
+     {
+      "label": "renderer/Compositor/Scheduler::BeginImplFrame",
+      "selfMs": 36.6,
+      "count": 1445
+     },
+     {
+      "label": "gpu/VizCompositorThread/Graphics.Pipeline",
+      "selfMs": 26.2,
+      "count": 2890
+     },
+     {
+      "label": "renderer/Compositor/SimpleWatcher::OnHandleReady",
+      "selfMs": 23.5,
+      "count": 1445
+     },
+     {
+      "label": "browser/CrBrowserMain/ThreadControllerImpl::RunTask",
+      "selfMs": 22.4,
+      "count": 48
+     },
+     {
+      "label": "renderer/Compositor/AnimationHost::TickAnimations",
+      "selfMs": 20.2,
+      "count": 1445
+     },
+     {
+      "label": "gpu/CVDisplayLink/CVDisplayLinkCallback",
+      "selfMs": 16.7,
+      "count": 1445
+     },
+     {
+      "label": "renderer/Compositor/Graphics.Pipeline",
+      "selfMs": 15,
+      "count": 4335
+     },
+     {
+      "label": "gpu/VizCompositorThread/ThreadControllerImpl::RunTask",
+      "selfMs": 13.3,
+      "count": 4335
+     },
+     {
+      "label": "renderer/Compositor/ThreadControllerImpl::RunTask",
+      "selfMs": 12.6,
+      "count": 6520
+     },
+     {
+      "label": "gpu/VizCompositorThread/SimpleWatcher::OnHandleReady",
+      "selfMs": 11.5,
+      "count": 1445
+     },
+     {
+      "label": "renderer/Compositor/ExternalBeginFrameSource::OnBeginFrame",
+      "selfMs": 9.8,
+      "count": 1445
+     },
+     {
+      "label": "renderer/Compositor/LayerTreeImpl::UpdateTiles",
+      "selfMs": 8.5,
+      "count": 1269
+     },
+     {
+      "label": "gpu/VizCompositorThread/RunTask",
+      "selfMs": 8.5,
+      "count": 4335
+     },
+     {
+      "label": "renderer/Compositor/TileManager::ScheduleTasks",
+      "selfMs": 8,
+      "count": 1269
+     },
+     {
+      "label": "renderer/Compositor/Scheduler::BeginFrame",
+      "selfMs": 7.1,
+      "count": 1445
+     },
+     {
+      "label": "renderer/Compositor/Receive mojo message",
+      "selfMs": 6.6,
+      "count": 1445
+     },
+     {
+      "label": "renderer/Compositor/LayerTreeImpl::UpdateDrawProperties::CalculateDrawProperties",
+      "selfMs": 6.5,
+      "count": 1269
+     },
+     {
+      "label": "browser/CrBrowserMain/RunTask",
+      "selfMs": 6,
+      "count": 54
+     },
+     {
+      "label": "renderer/Compositor/TileManager::PrepareTiles",
+      "selfMs": 5.9,
+      "count": 1269
+     },
+     {
+      "label": "renderer/PerfettoTrace/SimpleWatcher::OnHandleReady",
+      "selfMs": 5.8,
+      "count": 32
+     },
+     {
+      "label": "browser/PerfettoTrace/SimpleWatcher::OnHandleReady",
+      "selfMs": 5.8,
+      "count": 30
+     },
+     {
+      "label": "gpu/PerfettoTrace/SimpleWatcher::OnHandleReady",
+      "selfMs": 5.7,
+      "count": 33
+     },
+     {
+      "label": "renderer/Compositor/Scheduler::ScheduleBeginImplFrameDeadline",
+      "selfMs": 5.6,
+      "count": 1445
+     },
+     {
+      "label": "renderer/CrRendererMain/RunTask",
+      "selfMs": 5.5,
+      "count": 52
+     },
+     {
+      "label": "renderer/Compositor/RunTask",
+      "selfMs": 5.1,
+      "count": 6521
+     }
+    ],
+    "frameCounts": {
+     "renderer/Compositor/Graphics.Pipeline": 4335,
+     "gpu/VizCompositorThread/Graphics.Pipeline": 2890,
+     "renderer/Compositor/BeginFrame": 1445,
+     "renderer/Compositor/ProxyImpl::ScheduledActionDraw": 1445
+    }
+   }
+  },
+  {
+   "candidate": "C",
+   "state": "S1",
+   "window": {
+    "visible": true,
+    "minimized": false,
+    "focused": false,
+    "bounds": {
+     "x": 1450,
+     "y": 606,
+     "width": 1100,
+     "height": 750
+    },
+    "throttling": true,
+    "title": "ClickClack ENERGY TEST (leave open)"
+   },
+   "cpu": {
+    "wall": 60.02,
+    "procs": {
+     "main": [
+      27188
+     ],
+     "renderer": [
+      27221
+     ],
+     "appRenderer": [
+      27221
+     ],
+     "gpu": [
+      27211
+     ],
+     "network": [
+      27212
+     ],
+     "other": [
+      31855
+     ]
+    },
+    "cpuPct": {
+     "main": 0.03,
+     "renderer": 0.1,
+     "otherRenderers": 0,
+     "gpu": 0,
+     "network": 0.02,
+     "other": 0
+    },
+    "perfDelta": {
+     "LayoutCount": 0,
+     "RecalcStyleCount": 0,
+     "LayoutDuration": 0,
+     "RecalcStyleDuration": 0,
+     "ScriptDuration": 0,
+     "TaskDuration": 0.02,
+     "ThreadTime": 0.02,
+     "ProcessTime": 0.06
+    }
+   },
+   "probe": {
+    "visibility": "visible",
+    "hasFocus": true,
+    "animations": []
+   },
+   "raf5s": 720,
+   "trace": {
+    "spanMs": 10005,
+    "top": [
+     {
+      "label": "browser/CacheThread_BlockFile/ThreadControllerImpl::RunTask",
+      "selfMs": 16.1,
+      "count": 3
+     },
+     {
+      "label": "browser/CrBrowserMain/ThreadControllerImpl::RunTask",
+      "selfMs": 1.8,
+      "count": 35
+     },
+     {
+      "label": "gpu/CrGpuMain/ThreadControllerImpl::RunTask",
+      "selfMs": 0.9,
+      "count": 4
+     },
+     {
+      "label": "browser/PerfettoTrace/SimpleWatcher::OnHandleReady",
+      "selfMs": 0.6,
+      "count": 30
+     },
+     {
+      "label": "gpu/PerfettoTrace/SimpleWatcher::OnHandleReady",
+      "selfMs": 0.6,
+      "count": 27
+     },
+     {
+      "label": "renderer/PerfettoTrace/SimpleWatcher::OnHandleReady",
+      "selfMs": 0.6,
+      "count": 26
+     },
+     {
+      "label": "browser/CrBrowserMain/RunTask",
+      "selfMs": 0.5,
+      "count": 35
+     },
+     {
+      "label": "renderer/PerfettoTrace/Receive mojo message",
+      "selfMs": 0.5,
+      "count": 20
+     },
+     {
+      "label": "renderer/CrRendererMain/RunTask",
+      "selfMs": 0.4,
+      "count": 53
+     },
+     {
+      "label": "browser/PerfettoTrace/Receive mojo message",
+      "selfMs": 0.4,
+      "count": 22
+     },
+     {
+      "label": "browser/PerfettoTrace/ThreadControllerImpl::RunTask",
+      "selfMs": 0.3,
+      "count": 57
+     },
+     {
+      "label": "gpu/PerfettoTrace/RunTask",
+      "selfMs": 0.3,
+      "count": 44
+     },
+     {
+      "label": "gpu/PerfettoTrace/ThreadControllerImpl::RunTask",
+      "selfMs": 0.3,
+      "count": 44
+     },
+     {
+      "label": "renderer/CrRendererMain/ThreadControllerImpl::RunTask",
+      "selfMs": 0.2,
+      "count": 48
+     },
+     {
+      "label": "gpu/PerfettoTrace/Receive mojo message",
+      "selfMs": 0.2,
+      "count": 20
+     },
+     {
+      "label": "browser/PerfettoTrace/RunTask",
+      "selfMs": 0.2,
+      "count": 58
+     },
+     {
+      "label": "renderer/PerfettoTrace/ThreadControllerImpl::RunTask",
+      "selfMs": 0.2,
+      "count": 36
+     },
+     {
+      "label": "renderer/PerfettoTrace/RunTask",
+      "selfMs": 0.2,
+      "count": 36
+     },
+     {
+      "label": "gpu/CVDisplayLink/CVDisplayLinkCallback",
+      "selfMs": 0.2,
+      "count": 16
+     },
+     {
+      "label": "gpu/VizCompositorThread/ThreadControllerImpl::RunTask",
+      "selfMs": 0.1,
+      "count": 33
+     },
+     {
+      "label": "browser/ThreadPoolForegroundWorker/ThreadPool_RunTask",
+      "selfMs": 0.1,
+      "count": 2
+     },
+     {
+      "label": "gpu/VizCompositorThread/RunTask",
+      "selfMs": 0.1,
+      "count": 33
+     },
+     {
+      "label": "browser/PerfettoTrace/Receive mojo reply",
+      "selfMs": 0.1,
+      "count": 7
+     },
+     {
+      "label": "gpu/CrGpuMain/RunTask",
+      "selfMs": 0.1,
+      "count": 4
+     },
+     {
+      "label": "renderer/CrRendererMain/BlinkScheduler_PerformMicrotaskCheckpoint",
+      "selfMs": 0.1,
+      "count": 28
+     }
+    ],
+    "frameCounts": {}
+   }
+  },
+  {
+   "candidate": "C",
+   "state": "S5",
+   "window": {
+    "visible": true,
+    "minimized": false,
+    "focused": false,
+    "bounds": {
+     "x": 1450,
+     "y": 606,
+     "width": 1100,
+     "height": 750
+    },
+    "throttling": true,
+    "title": "ClickClack ENERGY TEST (leave open)"
+   },
+   "check": {
+    "unreadBar": true,
+    "label": "40 new messages since 3:02 PM"
+   },
+   "cpu": {
+    "wall": 60.02,
+    "procs": {
+     "main": [
+      27188
+     ],
+     "renderer": [
+      27221
+     ],
+     "appRenderer": [
+      27221
+     ],
+     "gpu": [
+      27211
+     ],
+     "network": [
+      27212
+     ],
+     "other": [
+      31855
+     ]
+    },
+    "cpuPct": {
+     "main": 0.03,
+     "renderer": 0.2,
+     "otherRenderers": 0,
+     "gpu": 0.02,
+     "network": 0,
+     "other": 0.02
+    },
+    "perfDelta": {
+     "LayoutCount": 0,
+     "RecalcStyleCount": 0,
+     "LayoutDuration": 0,
+     "RecalcStyleDuration": 0,
+     "ScriptDuration": 0,
+     "TaskDuration": 0.05,
+     "ThreadTime": 0.04,
+     "ProcessTime": 0.12
+    }
+   },
+   "probe": {
+    "visibility": "visible",
+    "hasFocus": true,
+    "animations": []
+   },
+   "raf5s": 721
+  },
+  {
+   "candidate": "C",
+   "state": "S7",
+   "window": {
+    "visible": true,
+    "minimized": false,
+    "focused": false,
+    "bounds": {
+     "x": 1450,
+     "y": 606,
+     "width": 1100,
+     "height": 750
+    },
+    "throttling": true,
+    "title": "ClickClack ENERGY TEST (leave open)"
+   },
+   "check": {
+    "livePreamble": 0,
+    "agentResponding": 1
+   },
+   "cpu": {
+    "wall": 60.02,
+    "procs": {
+     "main": [
+      27188
+     ],
+     "renderer": [
+      27221
+     ],
+     "appRenderer": [
+      27221
+     ],
+     "gpu": [
+      27211
+     ],
+     "network": [
+      27212
+     ],
+     "other": [
+      31855
+     ]
+    },
+    "cpuPct": {
+     "main": 0.03,
+     "renderer": 2.68,
+     "otherRenderers": 0,
+     "gpu": 4.45,
+     "network": 0.02,
+     "other": 0
+    },
+    "perfDelta": {
+     "LayoutCount": 20,
+     "RecalcStyleCount": 20,
+     "LayoutDuration": 0.01,
+     "RecalcStyleDuration": 0,
+     "ScriptDuration": 0.01,
+     "TaskDuration": 0.12,
+     "ThreadTime": 0.23,
+     "ProcessTime": 1.61
+    }
+   },
+   "probe": {
+    "visibility": "visible",
+    "hasFocus": true,
+    "animations": [
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     }
+    ]
+   },
+   "raf5s": 720
+  }
+ ],
+ "events": [
+  "2026-10-01T19:05:23.737Z visible batch done 2026-10-01T18:47:53.002Z to 2026-10-01T19:05:23.737Z"
+ ],
+ "procsAtStart": {
+  "main": [
+   27188
+  ],
+  "renderer": [
+   27221
+  ],
+  "appRenderer": [
+   27221
+  ],
+  "gpu": [
+   27211
+  ],
+  "network": [
+   27212
+  ],
+  "other": []
+ },
+ "visibleBatchStart": "2026-10-01T18:47:53.002Z",
+ "repro": {
+  "marker": "repro-mupw6wbb",
+  "foundOwnMessageViaApi": true,
+  "dom": {
+   "question": true,
+   "answer": true
+  },
+  "at": "2026-10-01T18:53:50.338Z"
+ },
+ "visibleBatchEnd": "2026-10-01T19:05:23.737Z"
+}

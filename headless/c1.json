@@ -1,0 +1,82 @@
+{
+ "label": "c1",
+ "base": "http://127.0.0.1:18161",
+ "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+ "traceMs": 10000,
+ "results": [
+  {
+   "build": "c1",
+   "scenario": "idle-channel",
+   "runningAtStart": [],
+   "runningAtEnd": [],
+   "frames": {
+    "beginFrame": 0,
+    "drawnFrames": 0,
+    "mainThreadFrames": 0,
+    "mainThreadPaints": 0,
+    "gpuSwaps": 1,
+    "spanMs": 13156
+   }
+  },
+  {
+   "build": "c1",
+   "scenario": "idle-dm",
+   "runningAtStart": [],
+   "runningAtEnd": [],
+   "frames": {
+    "beginFrame": 0,
+    "drawnFrames": 0,
+    "mainThreadFrames": 0,
+    "mainThreadPaints": 0,
+    "gpuSwaps": 1,
+    "spanMs": 13107
+   }
+  },
+  {
+   "build": "c1",
+   "scenario": "unread-bar-open",
+   "runningAtStart": [
+    "unread-bar-pulse on .unread-bar__jump::before"
+   ],
+   "runningAtEnd": [
+    "unread-bar-pulse on .unread-bar__jump::before"
+   ],
+   "frames": {
+    "beginFrame": 600,
+    "drawnFrames": 600,
+    "mainThreadFrames": 600,
+    "mainThreadPaints": 1200,
+    "gpuSwaps": 600,
+    "spanMs": 10012
+   }
+  },
+  {
+   "build": "c1",
+   "scenario": "embed-channel",
+   "runningAtStart": [],
+   "runningAtEnd": [],
+   "frames": {
+    "beginFrame": 0,
+    "drawnFrames": 0,
+    "mainThreadFrames": 0,
+    "mainThreadPaints": 0,
+    "gpuSwaps": 1,
+    "spanMs": 13049
+   }
+  },
+  {
+   "build": "c1",
+   "scenario": "embed-thread",
+   "runningAtStart": [],
+   "runningAtEnd": [],
+   "frames": {
+    "beginFrame": 0,
+    "drawnFrames": 0,
+    "mainThreadFrames": 0,
+    "mainThreadPaints": 0,
+    "gpuSwaps": 1,
+    "spanMs": 13049
+   }
+  }
+ ]
+}

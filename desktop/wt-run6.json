@@ -1,0 +1,925 @@
+{
+ "startedAt": "2026-10-01T19:49:57.147Z",
+ "runs": [
+  {
+   "candidate": "D",
+   "state": "S3",
+   "expect": "hidden",
+   "window": {
+    "visible": false,
+    "minimized": false,
+    "focused": false,
+    "opacity": 1,
+    "throttling": false,
+    "badge": 0
+   },
+   "prep": {
+    "dist": 0,
+    "unreadBar": null
+   },
+   "cpu": {
+    "wall": 60.02,
+    "procs": {
+     "main": [
+      27188
+     ],
+     "renderer": [
+      27221
+     ],
+     "appRenderer": [
+      27221
+     ],
+     "gpu": [
+      27211
+     ],
+     "network": [
+      27212
+     ],
+     "other": [
+      31855
+     ]
+    },
+    "cpuPct": {
+     "main": 0.03,
+     "renderer": 0.13,
+     "otherRenderers": 0,
+     "gpu": 0,
+     "network": 0.02,
+     "other": 0
+    },
+    "perfDelta": {
+     "LayoutCount": 0,
+     "RecalcStyleCount": 0,
+     "LayoutDuration": 0,
+     "RecalcStyleDuration": 0,
+     "ScriptDuration": 0,
+     "TaskDuration": 0.03,
+     "ThreadTime": 0.03,
+     "ProcessTime": 0.08
+    }
+   },
+   "probe": {
+    "visibility": "visible",
+    "hasFocus": true,
+    "animations": []
+   },
+   "raf5s": 720,
+   "trace": {
+    "spanMs": 10004,
+    "top": [
+     {
+      "label": "renderer/CrRendererMain/V8.BytecodeBudgetInterruptWithStackCheck",
+      "selfMs": 5.4,
+      "count": 1
+     },
+     {
+      "label": "browser/CrBrowserMain/ThreadControllerImpl::RunTask",
+      "selfMs": 2.6,
+      "count": 32
+     },
+     {
+      "label": "renderer/CrRendererMain/FunctionCall",
+      "selfMs": 1.6,
+      "count": 2
+     },
+     {
+      "label": "browser/PerfettoTrace/SimpleWatcher::OnHandleReady",
+      "selfMs": 1.3,
+      "count": 31
+     },
+     {
+      "label": "renderer/PerfettoTrace/SimpleWatcher::OnHandleReady",
+      "selfMs": 1.3,
+      "count": 27
+     },
+     {
+      "label": "browser/CrBrowserMain/RunTask",
+      "selfMs": 1.1,
+      "count": 32
+     },
+     {
+      "label": "gpu/PerfettoTrace/SimpleWatcher::OnHandleReady",
+      "selfMs": 1.1,
+      "count": 28
+     },
+     {
+      "label": "renderer/CrRendererMain/RunTask",
+      "selfMs": 1,
+      "count": 46
+     },
+     {
+      "label": "browser/PerfettoTrace/Receive mojo message",
+      "selfMs": 0.9,
+      "count": 22
+     },
+     {
+      "label": "browser/PerfettoTrace/ThreadControllerImpl::RunTask",
+      "selfMs": 0.8,
+      "count": 62
+     },
+     {
+      "label": "renderer/PerfettoTrace/Receive mojo message",
+      "selfMs": 0.7,
+      "count": 20
+     },
+     {
+      "label": "gpu/CrGpuMain/ThreadControllerImpl::RunTask",
+      "selfMs": 0.6,
+      "count": 3
+     },
+     {
+      "label": "renderer/PerfettoTrace/ThreadControllerImpl::RunTask",
+      "selfMs": 0.5,
+      "count": 42
+     },
+     {
+      "label": "browser/PerfettoTrace/RunTask",
+      "selfMs": 0.5,
+      "count": 62
+     },
+     {
+      "label": "gpu/PerfettoTrace/ThreadControllerImpl::RunTask",
+      "selfMs": 0.4,
+      "count": 44
+     },
+     {
+      "label": "renderer/CrRendererMain/ThreadControllerImpl::RunTask",
+      "selfMs": 0.4,
+      "count": 45
+     },
+     {
+      "label": "gpu/PerfettoTrace/Receive mojo message",
+      "selfMs": 0.4,
+      "count": 20
+     },
+     {
+      "label": "renderer/ThreadPoolForegroundWorker/ThreadPool_RunTask",
+      "selfMs": 0.4,
+      "count": 1
+     },
+     {
+      "label": "renderer/PerfettoTrace/RunTask",
+      "selfMs": 0.3,
+      "count": 42
+     },
+     {
+      "label": "gpu/PerfettoTrace/RunTask",
+      "selfMs": 0.3,
+      "count": 44
+     },
+     {
+      "label": "browser/ThreadPoolForegroundWorker/ThreadPool_RunTask",
+      "selfMs": 0.2,
+      "count": 2
+     },
+     {
+      "label": "renderer/CrRendererMain/BlinkScheduler_PerformMicrotaskCheckpoint",
+      "selfMs": 0.2,
+      "count": 42
+     },
+     {
+      "label": "browser/PerfettoTrace/Receive mojo reply",
+      "selfMs": 0.1,
+      "count": 11
+     },
+     {
+      "label": "browser/Chrome_DevToolsHandlerThread/ThreadControllerImpl::RunTask",
+      "selfMs": 0.1,
+      "count": 2
+     },
+     {
+      "label": "gpu/CVDisplayLink/CVDisplayLinkCallback",
+      "selfMs": 0.1,
+      "count": 14
+     }
+    ],
+    "frameCounts": {
+     "renderer/CrRendererMain/FunctionCall": 2,
+     "renderer/CrRendererMain/TimerFire": 1
+    }
+   },
+   "latency": [
+    {
+     "marker": "latency-probe-mupy9p9i-rq0u",
+     "domMs": 7
+    },
+    {
+     "marker": "latency-probe-mupy9qyx-vsiq",
+     "domMs": 10
+    }
+   ],
+   "validWindowState": true
+  },
+  {
+   "candidate": "D",
+   "state": "S4",
+   "expect": "minimized",
+   "window": {
+    "visible": false,
+    "minimized": true,
+    "focused": false,
+    "opacity": 1,
+    "throttling": false,
+    "badge": 0
+   },
+   "prep": {
+    "dist": 0,
+    "unreadBar": null
+   },
+   "cpu": {
+    "wall": 60.03,
+    "procs": {
+     "main": [
+      27188
+     ],
+     "renderer": [
+      27221
+     ],
+     "appRenderer": [
+      27221
+     ],
+     "gpu": [
+      27211
+     ],
+     "network": [
+      27212
+     ],
+     "other": [
+      31855
+     ]
+    },
+    "cpuPct": {
+     "main": 0.03,
+     "renderer": 0.18,
+     "otherRenderers": 0,
+     "gpu": 0,
+     "network": 0.02,
+     "other": 0.02
+    },
+    "perfDelta": {
+     "LayoutCount": 0,
+     "RecalcStyleCount": 0,
+     "LayoutDuration": 0,
+     "RecalcStyleDuration": 0,
+     "ScriptDuration": 0.01,
+     "TaskDuration": 0.03,
+     "ThreadTime": 0.03,
+     "ProcessTime": 0.12
+    }
+   },
+   "probe": {
+    "visibility": "visible",
+    "hasFocus": true,
+    "animations": []
+   },
+   "raf5s": 721,
+   "latency": [
+    {
+     "marker": "latency-probe-mupybmpd-wb5z",
+     "domMs": 15
+    },
+    {
+     "marker": "latency-probe-mupyboev-ayp4",
+     "domMs": 15
+    }
+   ],
+   "validWindowState": true
+  },
+  {
+   "candidate": "D",
+   "state": "S5-hidden",
+   "expect": "hidden",
+   "window": {
+    "visible": false,
+    "minimized": false,
+    "focused": false,
+    "opacity": 1,
+    "throttling": false,
+    "badge": 40
+   },
+   "bar": "40 new messages since 3:53 PM",
+   "cpu": {
+    "wall": 60.03,
+    "procs": {
+     "main": [
+      27188
+     ],
+     "renderer": [
+      27221
+     ],
+     "appRenderer": [
+      27221
+     ],
+     "gpu": [
+      27211
+     ],
+     "network": [
+      27212
+     ],
+     "other": [
+      31855
+     ]
+    },
+    "cpuPct": {
+     "main": 0.03,
+     "renderer": 0.23,
+     "otherRenderers": 0,
+     "gpu": 0,
+     "network": 0.02,
+     "other": 0
+    },
+    "perfDelta": {
+     "LayoutCount": 0,
+     "RecalcStyleCount": 0,
+     "LayoutDuration": 0,
+     "RecalcStyleDuration": 0,
+     "ScriptDuration": 0,
+     "TaskDuration": 0.03,
+     "ThreadTime": 0.03,
+     "ProcessTime": 0.14
+    }
+   },
+   "probe": {
+    "visibility": "visible",
+    "hasFocus": true,
+    "animations": []
+   },
+   "raf5s": 721,
+   "validWindowState": true
+  },
+  {
+   "candidate": "C",
+   "state": "S3",
+   "expect": "hidden",
+   "window": {
+    "visible": false,
+    "minimized": false,
+    "focused": false,
+    "opacity": 1,
+    "throttling": true,
+    "badge": 0
+   },
+   "prep": {
+    "dist": 0,
+    "unreadBar": null
+   },
+   "cpu": {
+    "wall": 60.02,
+    "procs": {
+     "main": [
+      27188
+     ],
+     "renderer": [
+      27221
+     ],
+     "appRenderer": [
+      27221
+     ],
+     "gpu": [
+      27211
+     ],
+     "network": [
+      27212
+     ],
+     "other": [
+      31855
+     ]
+    },
+    "cpuPct": {
+     "main": 0.03,
+     "renderer": 0.2,
+     "otherRenderers": 0,
+     "gpu": 0,
+     "network": 0.02,
+     "other": 0
+    },
+    "perfDelta": {
+     "LayoutCount": 0,
+     "RecalcStyleCount": 0,
+     "LayoutDuration": 0,
+     "RecalcStyleDuration": 0,
+     "ScriptDuration": 0.01,
+     "TaskDuration": 0.03,
+     "ThreadTime": 0.03,
+     "ProcessTime": 0.12
+    }
+   },
+   "probe": {
+    "visibility": "visible",
+    "hasFocus": true,
+    "animations": []
+   },
+   "raf5s": 721,
+   "latency": [
+    {
+     "marker": "latency-probe-mupyfas7-1zkd",
+     "domMs": 16
+    },
+    {
+     "marker": "latency-probe-mupyfchq-fxjc",
+     "domMs": 17
+    }
+   ],
+   "validWindowState": true
+  },
+  {
+   "candidate": "C",
+   "state": "S4",
+   "expect": "minimized",
+   "window": {
+    "visible": false,
+    "minimized": true,
+    "focused": false,
+    "opacity": 1,
+    "throttling": true,
+    "badge": 0
+   },
+   "prep": {
+    "dist": 0,
+    "unreadBar": null
+   },
+   "cpu": {
+    "wall": 60.02,
+    "procs": {
+     "main": [
+      27188
+     ],
+     "renderer": [
+      27221
+     ],
+     "appRenderer": [
+      27221
+     ],
+     "gpu": [
+      27211
+     ],
+     "network": [
+      27212
+     ],
+     "other": [
+      31855
+     ]
+    },
+    "cpuPct": {
+     "main": 0.03,
+     "renderer": 0.22,
+     "otherRenderers": 0,
+     "gpu": 0.02,
+     "network": 0,
+     "other": 0
+    },
+    "perfDelta": {
+     "LayoutCount": 0,
+     "RecalcStyleCount": 0,
+     "LayoutDuration": 0,
+     "RecalcStyleDuration": 0,
+     "ScriptDuration": 0,
+     "TaskDuration": 0.03,
+     "ThreadTime": 0.03,
+     "ProcessTime": 0.12
+    }
+   },
+   "probe": {
+    "visibility": "visible",
+    "hasFocus": true,
+    "animations": []
+   },
+   "raf5s": 720,
+   "latency": [
+    {
+     "marker": "latency-probe-mupyh87s-gbuu",
+     "domMs": 18
+    },
+    {
+     "marker": "latency-probe-mupyh9xe-dath",
+     "domMs": 11
+    }
+   ],
+   "validWindowState": true
+  },
+  {
+   "candidate": "A",
+   "state": "S3",
+   "expect": "hidden",
+   "window": {
+    "visible": false,
+    "minimized": false,
+    "focused": false,
+    "opacity": 1,
+    "throttling": false,
+    "badge": 0
+   },
+   "prep": {
+    "dist": 0,
+    "unreadBar": null
+   },
+   "cpu": {
+    "wall": 60.01,
+    "procs": {
+     "main": [
+      27188
+     ],
+     "renderer": [
+      27221
+     ],
+     "appRenderer": [
+      27221
+     ],
+     "gpu": [
+      27211
+     ],
+     "network": [
+      27212
+     ],
+     "other": [
+      31855
+     ]
+    },
+    "cpuPct": {
+     "main": 0.02,
+     "renderer": 1.58,
+     "otherRenderers": 0,
+     "gpu": 1.45,
+     "network": 0.02,
+     "other": 0
+    },
+    "perfDelta": {
+     "LayoutCount": 0,
+     "RecalcStyleCount": 0,
+     "LayoutDuration": 0,
+     "RecalcStyleDuration": 0,
+     "ScriptDuration": 0,
+     "TaskDuration": 0.02,
+     "ThreadTime": 0.02,
+     "ProcessTime": 0.95
+    }
+   },
+   "probe": {
+    "visibility": "visible",
+    "hasFocus": true,
+    "animations": [
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     }
+    ]
+   },
+   "raf5s": 720,
+   "trace": {
+    "spanMs": 10014,
+    "top": [
+     {
+      "label": "renderer/Compositor/Scheduler::BeginImplFrame",
+      "selfMs": 26.7,
+      "count": 1442
+     },
+     {
+      "label": "gpu/VizCompositorThread/Graphics.Pipeline",
+      "selfMs": 19.7,
+      "count": 2825
+     },
+     {
+      "label": "renderer/Compositor/SimpleWatcher::OnHandleReady",
+      "selfMs": 18,
+      "count": 1442
+     },
+     {
+      "label": "renderer/Compositor/AnimationHost::TickAnimations",
+      "selfMs": 15.1,
+      "count": 1442
+     },
+     {
+      "label": "gpu/CVDisplayLink/CVDisplayLinkCallback",
+      "selfMs": 12.6,
+      "count": 1441
+     },
+     {
+      "label": "renderer/Compositor/Graphics.Pipeline",
+      "selfMs": 11.4,
+      "count": 4326
+     },
+     {
+      "label": "renderer/Compositor/ThreadControllerImpl::RunTask",
+      "selfMs": 10.2,
+      "count": 6508
+     },
+     {
+      "label": "gpu/VizCompositorThread/ThreadControllerImpl::RunTask",
+      "selfMs": 9.9,
+      "count": 4322
+     },
+     {
+      "label": "gpu/VizCompositorThread/SimpleWatcher::OnHandleReady",
+      "selfMs": 8.3,
+      "count": 1442
+     },
+     {
+      "label": "renderer/Compositor/Receive mojo message",
+      "selfMs": 6.6,
+      "count": 1442
+     },
+     {
+      "label": "renderer/Compositor/TileManager::ScheduleTasks",
+      "selfMs": 6.5,
+      "count": 1269
+     },
+     {
+      "label": "renderer/Compositor/ExternalBeginFrameSource::OnBeginFrame",
+      "selfMs": 6.2,
+      "count": 1442
+     },
+     {
+      "label": "gpu/VizCompositorThread/RunTask",
+      "selfMs": 6.1,
+      "count": 4324
+     },
+     {
+      "label": "renderer/Compositor/LayerTreeImpl::UpdateTiles",
+      "selfMs": 5.6,
+      "count": 1269
+     },
+     {
+      "label": "renderer/Compositor/Scheduler::BeginFrame",
+      "selfMs": 5.3,
+      "count": 1442
+     },
+     {
+      "label": "renderer/Compositor/LayerTreeImpl::UpdateDrawProperties::CalculateDrawProperties",
+      "selfMs": 5,
+      "count": 1269
+     },
+     {
+      "label": "renderer/Compositor/TileManager::PrepareTiles",
+      "selfMs": 4.8,
+      "count": 1269
+     },
+     {
+      "label": "renderer/Compositor/Scheduler::ScheduleBeginImplFrameDeadline",
+      "selfMs": 4.4,
+      "count": 1441
+     },
+     {
+      "label": "renderer/Compositor/RunTask",
+      "selfMs": 4.3,
+      "count": 6518
+     },
+     {
+      "label": "browser/CrBrowserMain/ThreadControllerImpl::RunTask",
+      "selfMs": 4.1,
+      "count": 32
+     },
+     {
+      "label": "renderer/Compositor/LayerTreeHostImpl::PrepareToDraw",
+      "selfMs": 4,
+      "count": 1442
+     },
+     {
+      "label": "renderer/Compositor/LayerTreeImpl::UpdateDrawProperties::Occlusion",
+      "selfMs": 3.5,
+      "count": 1269
+     },
+     {
+      "label": "renderer/Compositor/TileManager::PrepareToDraw",
+      "selfMs": 3,
+      "count": 1442
+     },
+     {
+      "label": "gpu/VizCompositorThread/Receive mojo message",
+      "selfMs": 3,
+      "count": 1442
+     },
+     {
+      "label": "renderer/Compositor/draw_property_utils::ComputeDrawPropertiesOfVisibleLayers",
+      "selfMs": 2.7,
+      "count": 1269
+     }
+    ],
+    "frameCounts": {
+     "renderer/Compositor/Graphics.Pipeline": 4326,
+     "gpu/VizCompositorThread/Graphics.Pipeline": 2883,
+     "renderer/Compositor/BeginFrame": 1442,
+     "renderer/Compositor/ProxyImpl::ScheduledActionDraw": 1442,
+     "renderer/CrRendererMain/FunctionCall": 2,
+     "renderer/CrRendererMain/TimerFire": 1
+    }
+   },
+   "latency": [
+    {
+     "marker": "latency-probe-mupyjgz3-yq91",
+     "domMs": 29
+    },
+    {
+     "marker": "latency-probe-mupyjikn-bxx4",
+     "domMs": 7
+    }
+   ],
+   "validWindowState": true
+  },
+  {
+   "candidate": "A",
+   "state": "S4",
+   "expect": "minimized",
+   "window": {
+    "visible": false,
+    "minimized": true,
+    "focused": false,
+    "opacity": 1,
+    "throttling": false,
+    "badge": 0
+   },
+   "prep": {
+    "dist": 0,
+    "unreadBar": null
+   },
+   "cpu": {
+    "wall": 60.03,
+    "procs": {
+     "main": [
+      27188
+     ],
+     "renderer": [
+      27221
+     ],
+     "appRenderer": [
+      27221
+     ],
+     "gpu": [
+      27211
+     ],
+     "network": [
+      27212
+     ],
+     "other": [
+      31855
+     ]
+    },
+    "cpuPct": {
+     "main": 0.02,
+     "renderer": 1.37,
+     "otherRenderers": 0,
+     "gpu": 1.18,
+     "network": 0,
+     "other": 0
+    },
+    "perfDelta": {
+     "LayoutCount": 0,
+     "RecalcStyleCount": 0,
+     "LayoutDuration": 0,
+     "RecalcStyleDuration": 0,
+     "ScriptDuration": 0,
+     "TaskDuration": 0.02,
+     "ThreadTime": 0.02,
+     "ProcessTime": 0.82
+    }
+   },
+   "probe": {
+    "visibility": "visible",
+    "hasFocus": true,
+    "animations": [
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     }
+    ]
+   },
+   "raf5s": 721,
+   "latency": [
+    {
+     "marker": "latency-probe-mupyleal-8gpc",
+     "domMs": 9
+    },
+    {
+     "marker": "latency-probe-mupylfzz-1tky",
+     "domMs": 6
+    }
+   ],
+   "validWindowState": true
+  },
+  {
+   "candidate": "A",
+   "state": "S5-hidden",
+   "expect": "hidden",
+   "window": {
+    "visible": false,
+    "minimized": false,
+    "focused": false,
+    "opacity": 1,
+    "throttling": false,
+    "badge": 40
+   },
+   "bar": "40 new messages since 4:00 PM",
+   "cpu": {
+    "wall": 60.01,
+    "procs": {
+     "main": [
+      27188
+     ],
+     "renderer": [
+      27221
+     ],
+     "appRenderer": [
+      27221
+     ],
+     "gpu": [
+      27211
+     ],
+     "network": [
+      27212
+     ],
+     "other": [
+      31855
+     ]
+    },
+    "cpuPct": {
+     "main": 0.03,
+     "renderer": 14.88,
+     "otherRenderers": 0,
+     "gpu": 12.83,
+     "network": 0,
+     "other": 0
+    },
+    "perfDelta": {
+     "LayoutCount": 0,
+     "RecalcStyleCount": 8645,
+     "LayoutDuration": 0,
+     "RecalcStyleDuration": 0.69,
+     "ScriptDuration": 0,
+     "TaskDuration": 5.62,
+     "ThreadTime": 5.78,
+     "ProcessTime": 8.93
+    }
+   },
+   "probe": {
+    "visibility": "visible",
+    "hasFocus": true,
+    "animations": [
+     {
+      "name": "unread-bar-pulse",
+      "playState": "running",
+      "target": "button.unread-bar__jump",
+      "pseudo": "::before",
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     },
+     {
+      "name": "typing-dot",
+      "playState": "running",
+      "target": "i.",
+      "pseudo": null,
+      "iterations": null
+     }
+    ]
+   },
+   "raf5s": 720,
+   "validWindowState": true
+  }
+ ],
+ "events": []
+}

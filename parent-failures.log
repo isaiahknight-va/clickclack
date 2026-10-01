@@ -1,0 +1,728 @@
+[WebServer] $ pnpm build:web && pnpm build:sdk && pnpm embed:webassets
+
+[WebServer] $ pnpm --filter @clickclack/web build
+
+[WebServer] $ vite build
+
+[WebServer] [plugin rolldown:vite-resolve] Module "stream" has been externalized for browser compatibility, imported by "<repo> See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+
+[WebServer] $ pnpm --filter @clickclack/sdk-ts build
+
+[WebServer] $ tsc -p tsconfig.json && node scripts/copy-generated-types.mjs
+
+[WebServer] $ node scripts/embed-web-dist.mjs apps/web/dist apps/api/internal/webassets/dist
+
+[WebServer] 2026/10/01 18:34:10 dev auth user: Local Captain (usr_01m3wsn39dkqnknt7apsaw2brx)
+
+[WebServer] 2026/10/01 18:34:10 WARNING: E2E build allows loopback callback destinations
+[WebServer] 2026/10/01 18:34:10 web push enabled: application server key 3fa233c3d845
+[WebServer] 2026/10/01 18:34:10 ClickClack listening on http://127.0.0.1:18140
+[WebServer] 2026/10/01 18:34:10 WARNING: E2E build allows loopback callback destinations
+
+[WebServer] 2026/10/01 18:34:11 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61129" correlation_id="corr_ecdfefde24b8e6d1c84978687eb13c6f" route="/*" status=200 bytes=6835 elapsed=621.583µs
+
+
+Running 4 tests using 1 worker
+
+[1/4] [chromium] › tests/e2e/idle-animations.spec.ts:86:7 › an idle channel runs no animations
+[WebServer] 2026/10/01 18:34:12 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61138" correlation_id="corr_3386fdae7ffe1490d61a7b3b12e50c3a" route="/api/workspaces" status=201 bytes=207 elapsed=1.084834ms
+
+[WebServer] 2026/10/01 18:34:12 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61138" correlation_id="corr_ca6c71467434797065aa7cf3fa642e52" route="/api/workspaces/{workspace_id}/channels" status=201 bytes=598 elapsed=774.583µs
+
+[WebServer] 2026/10/01 18:34:12 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61138" correlation_id="corr_ff5453daa23b57cfa819dbf612e63205" route="/api/workspaces/{workspace_id}/bots" status=201 bytes=666 elapsed=690.375µs
+
+[WebServer] 2026/10/01 18:34:12 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61138" correlation_id="corr_f2b4eb13faaa73ef0026cde09852538c" route="/api/dms" status=201 bytes=686 elapsed=793.959µs
+
+[WebServer] 2026/10/01 18:34:12 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61138" correlation_id="corr_262477cdc986402a2a1e19d54c09ece8" route="/api/channels/{channel_id}/messages" status=201 bytes=1057 elapsed=1.454792ms
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61139" correlation_id="corr_f8adc067843a7fa53b7b0ed9dd248382" route="/*" status=200 bytes=6550 elapsed=102.958µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61139" correlation_id="corr_08f4cac07355ec80324edc98496a67cc" route="/*" status=200 bytes=82 elapsed=44.834µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61142" correlation_id="corr_aa054436ae650e43012bb4bf3a0054c2" route="/*" status=200 bytes=158 elapsed=6.125µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61143" correlation_id="corr_5483654b067af7e734107016d1ec3e29" route="/*" status=200 bytes=623 elapsed=23.833µs
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61140" correlation_id="corr_4f68428cbb3b05ccdc280465c5ffbfb1" route="/*" status=200 bytes=29123 elapsed=107.042µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61144" correlation_id="corr_78eec3e51c4dfced91dc14935cc9d66e" route="/*" status=200 bytes=6083 elapsed=155.5µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61141" correlation_id="corr_eefc0dd03009af4952a8931a583dd4cd" route="/*" status=200 bytes=57792 elapsed=536.958µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61141" correlation_id="corr_54c18a71d4d2973fab0724ac60a61e92" route="/*" status=200 bytes=619 elapsed=46.709µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61144" correlation_id="corr_076d6ccda613bb68253adda8b9125655" route="/*" status=200 bytes=22 elapsed=1.114708ms
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61142" correlation_id="corr_d22baf93e4c46caa799bf0915cb19068" route="/*" status=200 bytes=1233 elapsed=1.109541ms
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61140" correlation_id="corr_3b6270b049049925b230ba363c9948a3" route="/*" status=200 bytes=565 elapsed=1.130375ms
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61143" correlation_id="corr_7e2c607225d2c0cf2520e1dc1778595c" route="/*" status=200 bytes=65 elapsed=8.333µs
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61141" correlation_id="corr_796de88068ab0e2919ef85550cc7e036" route="/*" status=200 bytes=7334 elapsed=51.709µs
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61139" correlation_id="corr_307efc80ab3ef20c1dd42ce469b0a16f" route="/*" status=200 bytes=183538 elapsed=1.7825ms
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61139" correlation_id="corr_c67a590d6ee73ef7feeb59d70d137a53" route="/*" status=200 bytes=1822 elapsed=22.084µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61139" correlation_id="corr_6ae7dc7d4797a7597dc7e8d7bf055547" route="/*" status=200 bytes=358 elapsed=27.75µs
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61141" correlation_id="corr_f481277dc93dce5194f612a9b89e9ff1" route="/*" status=200 bytes=294 elapsed=52.417µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61139" correlation_id="corr_6494729845964d522ef8b63a691d822b" route="/*" status=200 bytes=279 elapsed=21.125µs
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61142" correlation_id="corr_7a098edb46d727fb43e29502561c3a33" route="/*" status=200 bytes=1707 elapsed=19.167µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61141" correlation_id="corr_95e1e12f6b72b261d726d3ae47cdaa4f" route="/*" status=200 bytes=197736 elapsed=743µs
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61143" correlation_id="corr_cf7d91cce64339e88c2ae76495857f7c" route="/*" status=200 bytes=127 elapsed=8.292µs
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61140" correlation_id="corr_ccee1d73ce752377903c8b049619551e" route="/*" status=200 bytes=39 elapsed=2.75µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61144" correlation_id="corr_9fef38ddb865816b5d73dfdef62a9856" route="/*" status=200 bytes=132724 elapsed=388.167µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61139" correlation_id="corr_d04402023ac2124c37d9d60b9e48997b" route="/*" status=200 bytes=3355 elapsed=63.75µs
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61142" correlation_id="corr_fb5273ef5188423c345d772830ef258d" route="/*" status=200 bytes=75 elapsed=14µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61141" correlation_id="corr_9d05878d52c20ca773b4d562d3a38451" route="/*" status=200 bytes=9269 elapsed=191.083µs
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61142" correlation_id="corr_0ad9745233eaec52718f56188f969bde" route="/*" status=200 bytes=218 elapsed=5.334µs
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61144" correlation_id="corr_e3ca207c2f79f389f2cb1d3c3b92469d" route="/*" status=200 bytes=34964 elapsed=157.042µs
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61140" correlation_id="corr_38fb2098f2b58b5d91fcd57af4c8f3d7" route="/*" status=200 bytes=3019 elapsed=55.584µs
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61144" correlation_id="corr_3861faf8c4e691aad233e8224aaa39f2" route="/*" status=200 bytes=5236 elapsed=21.875µs
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61143" correlation_id="corr_2a9905c875c3643a4305c937271bc6ff" route="/*" status=200 bytes=3965 elapsed=71.625µs
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61139" correlation_id="corr_1d09eafdb2a4f567678a9490e1a112f3" route="/*" status=200 bytes=48854 elapsed=138.5µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61143" correlation_id="corr_b1d6c7dcc5b63f6c5086b85b091f424a" route="/*" status=200 bytes=993 elapsed=124.25µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61143" correlation_id="corr_a43c6e97086193f5cdf54f03bfca5e4c" route="/api/home-link" status=200 bytes=25 elapsed=25.25µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61143" correlation_id="corr_71a30baee1f1fd39d28551169cbc7872" route="/api/me" status=200 bytes=370 elapsed=400.166µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61143" correlation_id="corr_9d068aeb54e0e99186731bf311e51149" route="/*" status=200 bytes=29400 elapsed=102.042µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61144" correlation_id="corr_ef49eb3b120c23c695d205ed09013f0f" route="/*" status=200 bytes=41344 elapsed=193.084µs
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61139" correlation_id="corr_ba4648561456e18cce3411f1ce45f4c6" route="/*" status=200 bytes=23128 elapsed=88.042µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61139" correlation_id="corr_c60d672e613d437ad1a1c859f6d97d5d" route="/api/workspaces" status=200 bytes=393 elapsed=540.166µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61139" correlation_id="corr_17e80806ddae272dbbf4413d01134980" route="/api/routes/{workspace_route_id}/{target_route_id}" status=200 bytes=268 elapsed=428.791µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61139" correlation_id="corr_f02bae70716349a8384a6363ba10cd0e" route="/api/workspaces/{workspace_id}/channels" status=200 bytes=291 elapsed=306.166µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61139" correlation_id="corr_52a4b94c4e672d7ede180f53390b1e5f" route="/api/dms" status=200 bytes=689 elapsed=289.292µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61139" correlation_id="corr_cd8ff707ab86349b5642069389f2d75c" route="/api/workspaces/{workspace_id}/moderation/members" status=200 bytes=658 elapsed=398.667µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61143" correlation_id="corr_cdb237b2ed35edc9615758df6258f92d" route="/api/workspaces/{workspace_id}/bot-commands" status=200 bytes=20 elapsed=498.333µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61144" correlation_id="corr_958812c6fb500a72ca1d8297bb93ae23" route="/api/workspaces/{workspace_id}/slash-commands" status=200 bytes=22 elapsed=688.791µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61141" correlation_id="corr_bd9258a9be640385bb0bbfdc3cd9c7b0" route="/api/workspaces/{workspace_id}/topics" status=200 bytes=14 elapsed=999.083µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61141" correlation_id="corr_a630a30a67dbde1db31cc1cb78e2d76e" route="/api/workspaces/{workspace_id}/members" status=200 bytes=776 elapsed=306.417µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61143" correlation_id="corr_c8960cd99fa994fd8c28b4072670e82a" route="/api/channels/{channel_id}/pins" status=200 bytes=16 elapsed=663.75µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61141" correlation_id="corr_046cc2bd172ad0c1d857b4b5cd378539" route="/api/channels/{channel_id}/notification-settings" status=200 bytes=21 elapsed=668.375µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61144" correlation_id="corr_0d7465ad46d384121505f930ec09819b" route="/api/channels/{channel_id}/messages" status=200 bytes=817 elapsed=1.081042ms
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61144" correlation_id="corr_8dda70744a6e304258a93984a1d4705a" route="/api/realtime/events" status=200 bytes=362 elapsed=604.5µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61144" correlation_id="corr_587f545edede367fc5660158cc1f3513" route="/api/workspaces" status=200 bytes=393 elapsed=513.625µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61139" correlation_id="corr_4bde84a30cefa8ba9a0323337db67cb5" route="/api/workspaces/{workspace_id}/moderation/members" status=200 bytes=658 elapsed=589.417µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61140" correlation_id="corr_bde4fb8831394646a35590091ba440c0" route="/api/workspaces/{workspace_id}/slash-commands" status=200 bytes=22 elapsed=824.083µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61141" correlation_id="corr_0bf72788673e9e6d331e1bf61f9e51d6" route="/api/workspaces/{workspace_id}/channels" status=200 bytes=291 elapsed=1.219458ms
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61143" correlation_id="corr_132899ff98bb18b5f2bee4476e3d2173" route="/api/dms" status=200 bytes=689 elapsed=1.318417ms
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61142" correlation_id="corr_e39ce37c9663420e567e476802f41b37" route="/api/workspaces/{workspace_id}/bot-commands" status=200 bytes=20 elapsed=1.370375ms
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61144" correlation_id="corr_1176a3f8a994a9588b508b5019c03400" route="/api/workspaces/{workspace_id}/topics" status=200 bytes=14 elapsed=1.196416ms
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61144" correlation_id="corr_37473a2096e5727ec74871ded789a7b8" route="/api/channels/{channel_id}/messages" status=200 bytes=817 elapsed=967.042µs
+
+[WebServer] 2026/10/01 18:34:12 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61144" correlation_id="corr_bd8956607edb67daf61e0160ef5ac64a" route="/api/channels/{channel_id}/pins" status=200 bytes=16 elapsed=242.875µs
+
+[WebServer] 2026/10/01 18:34:12 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61144" correlation_id="corr_ff1eb677c285b8f4dfc2909dacc53493" route="/api/channels/{channel_id}/read" status=200 bytes=164 elapsed=840.084µs
+
+[WebServer] 2026/10/01 18:34:17 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61146" correlation_id="corr_7fb194d31a1c4248bb44b639e80f0bbd" route="/api/realtime/ws" status=101 bytes=0 elapsed=4.989535417s
+
+  1) [chromium] › tests/e2e/idle-animations.spec.ts:86:7 › an idle channel runs no animations ──────
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 5
+
+    - Array []
+    + Array [
+    +   "typing-dot on .typing-indicator__dots",
+    +   "typing-dot on .typing-indicator__dots",
+    +   "typing-dot on .typing-indicator__dots",
+    + ]
+
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+
+      93 |     await waitForAppReady(page);
+      94 |     await expect(page.locator(".markdown").filter({ hasText: `Settled ${surface}` })).toBeVisible();
+    > 95 |     await expect.poll(() => runningAnimations(page)).toEqual([]);
+         |                                                      ^
+      96 |   });
+      97 | }
+      98 |
+        at <repo>
+
+    Error Context: test-results/idle-animations-an-idle-channel-runs-no-animations-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/idle-animations-an-idle-channel-runs-no-animations-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/idle-animations-an-idle-channel-runs-no-animations-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[2/4] [chromium] › tests/e2e/idle-animations.spec.ts:86:7 › an idle DM runs no animations
+[WebServer] 2026/10/01 18:34:18 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61151" correlation_id="corr_a426e4e139afe8c400378a91022f3d4e" route="/api/workspaces" status=201 bytes=207 elapsed=982.958µs
+
+[WebServer] 2026/10/01 18:34:18 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61151" correlation_id="corr_ca34adbe70f9a6740bac0fe74ddeab35" route="/api/workspaces/{workspace_id}/channels" status=201 bytes=598 elapsed=798.958µs
+
+[WebServer] 2026/10/01 18:34:18 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61151" correlation_id="corr_f6023fe052153f1553ed2e577001191f" route="/api/workspaces/{workspace_id}/bots" status=201 bytes=666 elapsed=788.5µs
+
+[WebServer] 2026/10/01 18:34:18 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61151" correlation_id="corr_6986264190fc8db1630a1d663ec6ab7c" route="/api/dms" status=201 bytes=686 elapsed=766.958µs
+
+[WebServer] 2026/10/01 18:34:18 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61151" correlation_id="corr_315b3c09562b52da32e5c04e6f172096" route="/api/dms/{conversation_id}/messages" status=201 bytes=1074 elapsed=1.346292ms
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61152" correlation_id="corr_6e43859a0c59bcbad9605c5da09afbe6" route="/*" status=200 bytes=6550 elapsed=62.292µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61152" correlation_id="corr_d056a91e80ca77073fa328e1c241c47a" route="/*" status=200 bytes=82 elapsed=28.625µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61153" correlation_id="corr_d21458b18caec8f2fd912fec95a644ea" route="/*" status=200 bytes=29123 elapsed=134µs
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61152" correlation_id="corr_bd137fcab591e84b0c797fd078eabb29" route="/*" status=200 bytes=183538 elapsed=129.375µs
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61155" correlation_id="corr_dd2f39620dfece7b7e0061788760fc49" route="/*" status=200 bytes=158 elapsed=174.083µs
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61154" correlation_id="corr_018de1e85fd1ff23204485bb36a47142" route="/*" status=200 bytes=57792 elapsed=201.167µs
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61156" correlation_id="corr_0e9f17aa28c65ab4638c900382fdaf53" route="/*" status=200 bytes=623 elapsed=55.834µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61157" correlation_id="corr_4175b627379cea9184d9737a9f3cc692" route="/*" status=200 bytes=6083 elapsed=96.042µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61155" correlation_id="corr_d1b063ad27c80e3edb6b4453f52af205" route="/*" status=200 bytes=65 elapsed=14.75µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61152" correlation_id="corr_ce868cd7f7d3ed49c265b92d0321fc22" route="/*" status=200 bytes=1233 elapsed=776.25µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61156" correlation_id="corr_d5e102048fd0fbd5be1028196a9c0d12" route="/*" status=200 bytes=565 elapsed=45.75µs
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61154" correlation_id="corr_58caed7ed28de559d69b441fffb256ad" route="/*" status=200 bytes=619 elapsed=64.084µs
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61153" correlation_id="corr_074cda4100c8abd73c640f01f56a8603" route="/*" status=200 bytes=22 elapsed=9.708µs
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61155" correlation_id="corr_9cdf87e086f2f9a7b3baf67bcdc11f07" route="/*" status=200 bytes=1822 elapsed=81.291µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61157" correlation_id="corr_2596f032e7a3cb85dc434abcce96165c" route="/*" status=200 bytes=7334 elapsed=100.875µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61157" correlation_id="corr_d370845ddbd8289f2cc4cb37bc302b1f" route="/*" status=200 bytes=358 elapsed=14.291µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61153" correlation_id="corr_4b8fe53ef347d814cb9d06f604fc803a" route="/*" status=200 bytes=294 elapsed=14µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61153" correlation_id="corr_911b23426a234fdded301dbb037ebf23" route="/*" status=200 bytes=279 elapsed=16.666µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61157" correlation_id="corr_7c723cb6e4f976fff030eefd033848b6" route="/*" status=200 bytes=197736 elapsed=146.958µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61155" correlation_id="corr_138d5e04562b8d96072cc1a17185c875" route="/*" status=200 bytes=1707 elapsed=66.75µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61154" correlation_id="corr_06c2780f261ab02a4f8fa1a2598dfbea" route="/*" status=200 bytes=127 elapsed=14.375µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61156" correlation_id="corr_f97e77d1465406e5ce8e364b8986b0db" route="/*" status=200 bytes=39 elapsed=22.875µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61152" correlation_id="corr_ccb6aa9f4b31475ce485969bf08d02c3" route="/*" status=200 bytes=132724 elapsed=147.375µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61155" correlation_id="corr_9f32899ac43b787ffa064030e85bd40b" route="/*" status=200 bytes=75 elapsed=12.833µs
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61153" correlation_id="corr_cc128ed9842c705c1da76b02581df7a1" route="/*" status=200 bytes=3355 elapsed=382.166µs
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61154" correlation_id="corr_c966be0ee5b0d6111176d64d074ba2eb" route="/*" status=200 bytes=3965 elapsed=48.958µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61157" correlation_id="corr_12a8bafffccb247ee2290f01dd824e5f" route="/*" status=200 bytes=5236 elapsed=87.875µs
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61152" correlation_id="corr_224a94fbb7003cc0f4de1c0e74f3c87d" route="/*" status=200 bytes=34964 elapsed=55.75µs
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61155" correlation_id="corr_bcae6e310de486f9accb04fa5bd7acfa" route="/*" status=200 bytes=218 elapsed=5.209µs
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61154" correlation_id="corr_32006c85e1de4ad156feefc9beb42c49" route="/*" status=200 bytes=9269 elapsed=27.166µs
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61156" correlation_id="corr_5091eea01fc00be8f38c3f48e614e9bb" route="/*" status=200 bytes=3019 elapsed=37.5µs
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61153" correlation_id="corr_b5c91f10eab3f7c5064ffd2c31bddf58" route="/*" status=200 bytes=48854 elapsed=67.417µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61155" correlation_id="corr_e7bf037b374a8cf751b2e5a4b70d6004" route="/*" status=200 bytes=993 elapsed=51.333µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61155" correlation_id="corr_4660b6958228db325dc5fb56a5945a9b" route="/api/home-link" status=200 bytes=25 elapsed=22.041µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61153" correlation_id="corr_ac49d75305b50adbeda397b1fb1cc53b" route="/api/me" status=200 bytes=370 elapsed=308.542µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61154" correlation_id="corr_7b9a0d84873161f4b6d5629ea1f3c196" route="/*" status=200 bytes=23128 elapsed=51.458µs
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61153" correlation_id="corr_8928621367c119acd76353111f28f134" route="/*" status=200 bytes=29400 elapsed=62.042µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61155" correlation_id="corr_669f9a5c7153e37aff8a4c30c73758bd" route="/*" status=200 bytes=41344 elapsed=83.125µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61155" correlation_id="corr_24d7eda08ccbc7f74a914741890ce413" route="/api/workspaces" status=200 bytes=586 elapsed=372.709µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61155" correlation_id="corr_f219eeaa5f9e500fa5543c6c7fd3589e" route="/api/routes/{workspace_route_id}/{target_route_id}" status=200 bytes=266 elapsed=478.125µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61155" correlation_id="corr_6f50a26d36230aeb6693067ebe2aeabf" route="/api/workspaces/{workspace_id}/channels" status=200 bytes=291 elapsed=406.041µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61155" correlation_id="corr_ff41921a92dcb7ce2c46934e7e6635d6" route="/api/dms" status=200 bytes=689 elapsed=464.208µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61155" correlation_id="corr_451f73c67f9db5ac93acb65a80ab0634" route="/api/workspaces/{workspace_id}/moderation/members" status=200 bytes=658 elapsed=533.666µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61153" correlation_id="corr_b0eb66f1338b47f05fa589913acfcf8c" route="/api/workspaces/{workspace_id}/slash-commands" status=200 bytes=22 elapsed=1.096792ms
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61154" correlation_id="corr_59a5a1a93e4f1c92b5adf11ac21dc71c" route="/api/workspaces/{workspace_id}/bot-commands" status=200 bytes=20 elapsed=1.215375ms
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61152" correlation_id="corr_cc4238f6a9a4039ee5f8d237974dfa0a" route="/api/workspaces/{workspace_id}/topics" status=200 bytes=14 elapsed=1.400417ms
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61152" correlation_id="corr_156ba7ecef4600b2df794ccbc45dbed9" route="/api/workspaces/{workspace_id}/members" status=200 bytes=776 elapsed=484.042µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61154" correlation_id="corr_7a8091ca510ac22538f6f08798f3e12b" route="/api/dms/{conversation_id}/messages" status=200 bytes=823 elapsed=835.959µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61154" correlation_id="corr_16936c2c7d5f4970cbd8d76bd63bc84e" route="/api/realtime/events" status=200 bytes=362 elapsed=807.083µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61154" correlation_id="corr_614fc8c49ac5e18c8949e0acec48b66d" route="/api/workspaces" status=200 bytes=586 elapsed=366.708µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61152" correlation_id="corr_c662e9fcc54842974bb7405eab899753" route="/api/workspaces/{workspace_id}/channels" status=200 bytes=291 elapsed=660.167µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61155" correlation_id="corr_c020aae25209f06337b2c68cccc30522" route="/api/workspaces/{workspace_id}/moderation/members" status=200 bytes=658 elapsed=911µs
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61153" correlation_id="corr_56b12d32c2488e917a6c1c144d2cdcd7" route="/api/dms" status=200 bytes=689 elapsed=1.763208ms
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61156" correlation_id="corr_c8400cf242adcc8fb0340f89159963c5" route="/api/workspaces/{workspace_id}/bot-commands" status=200 bytes=20 elapsed=1.462667ms
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61157" correlation_id="corr_c5e35d3443e5709c8fae7a4bac3ef4d0" route="/api/workspaces/{workspace_id}/slash-commands" status=200 bytes=22 elapsed=1.510292ms
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61154" correlation_id="corr_6e7e3add998e2e7e430880b2daf6a5c2" route="/api/workspaces/{workspace_id}/topics" status=200 bytes=14 elapsed=1.767083ms
+
+[WebServer] 2026/10/01 18:34:18 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61154" correlation_id="corr_18c3924805aa10c72fbbf2b1c6cc0344" route="/api/dms/{conversation_id}/messages" status=200 bytes=823 elapsed=457.417µs
+
+[WebServer] 2026/10/01 18:34:18 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61154" correlation_id="corr_39daaf3e3fd7eddb04d032a26693ecb0" route="/api/dms/{conversation_id}/read" status=200 bytes=163 elapsed=748.542µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61159" correlation_id="corr_144bbd01f9a23f5b9cdf76b181753e48" route="/api/realtime/ws" status=101 bytes=0 elapsed=4.980124209s
+
+  2) [chromium] › tests/e2e/idle-animations.spec.ts:86:7 › an idle DM runs no animations ───────────
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 5
+
+    - Array []
+    + Array [
+    +   "typing-dot on .typing-indicator__dots",
+    +   "typing-dot on .typing-indicator__dots",
+    +   "typing-dot on .typing-indicator__dots",
+    + ]
+
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+
+      93 |     await waitForAppReady(page);
+      94 |     await expect(page.locator(".markdown").filter({ hasText: `Settled ${surface}` })).toBeVisible();
+    > 95 |     await expect.poll(() => runningAnimations(page)).toEqual([]);
+         |                                                      ^
+      96 |   });
+      97 | }
+      98 |
+        at <repo>
+
+    Error Context: test-results/idle-animations-an-idle-DM-runs-no-animations-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/idle-animations-an-idle-DM-runs-no-animations-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/idle-animations-an-idle-DM-runs-no-animations-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[3/4] [chromium] › tests/e2e/idle-animations.spec.ts:99:5 › typing dots run only while someone is typing
+[WebServer] 2026/10/01 18:34:23 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61173" correlation_id="corr_14f1a6b1c9597833fff64fd484284636" route="/api/workspaces" status=201 bytes=207 elapsed=1.062166ms
+
+[WebServer] 2026/10/01 18:34:23 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61173" correlation_id="corr_53ab7a93ffe40374082dcb25921cd90b" route="/api/workspaces/{workspace_id}/channels" status=201 bytes=597 elapsed=830.375µs
+
+[WebServer] 2026/10/01 18:34:23 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61173" correlation_id="corr_c7ef09b8509cba5f0a491722d0067e4d" route="/api/workspaces/{workspace_id}/bots" status=201 bytes=666 elapsed=918.875µs
+
+[WebServer] 2026/10/01 18:34:23 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61173" correlation_id="corr_b2339f245949e81ced830404256e4394" route="/api/dms" status=201 bytes=686 elapsed=712µs
+
+[WebServer] 2026/10/01 18:34:23 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61173" correlation_id="corr_54d4ebf62a00069c2228d4b3011b26a5" route="/api/channels/{channel_id}/messages" status=201 bytes=1055 elapsed=1.2035ms
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61174" correlation_id="corr_d26a5ae58a4926a72a5147a9797b1202" route="/*" status=200 bytes=6550 elapsed=170.791µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61174" correlation_id="corr_47f2a677694806c5698c0a9e12a8ebfd" route="/*" status=200 bytes=82 elapsed=20.458µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61177" correlation_id="corr_e417f514ad6715c75a06437e3a01b8a6" route="/*" status=200 bytes=158 elapsed=13.667µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61178" correlation_id="corr_09fc6a921bee7be0008e8e2f7d7748a0" route="/*" status=200 bytes=623 elapsed=40.958µs
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61179" correlation_id="corr_6ada38b49b5a559284738d510d0c0bf8" route="/*" status=200 bytes=6083 elapsed=39.958µs
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61176" correlation_id="corr_4f4c7df7c7896dd8b18be78292fdb27b" route="/*" status=200 bytes=57792 elapsed=65.958µs
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61174" correlation_id="corr_08b66db2195e49d6c8c0c64d6e13e094" route="/*" status=200 bytes=1233 elapsed=28.291µs
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61175" correlation_id="corr_651817efb093c5d797bb0e90e5a58212" route="/*" status=200 bytes=29123 elapsed=70.541µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61177" correlation_id="corr_4010f091bbf15cdd831222baadee4b34" route="/*" status=200 bytes=183538 elapsed=82.834µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61178" correlation_id="corr_545d0731731afd0c5cb1a58b249f5f2e" route="/*" status=200 bytes=65 elapsed=17.292µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61176" correlation_id="corr_8d777a561e376268269eaaebe6da2673" route="/*" status=200 bytes=22 elapsed=7.458µs
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61175" correlation_id="corr_e1f65d2bf5b871e43e463a8c5a65f97d" route="/*" status=200 bytes=619 elapsed=46.875µs
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61177" correlation_id="corr_8581932e957242766c37fb6daba40ee2" route="/*" status=200 bytes=1822 elapsed=14.708µs
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61174" correlation_id="corr_7cade54787474ba482fbe0e03b46d56b" route="/*" status=200 bytes=565 elapsed=39.334µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61179" correlation_id="corr_bce843f24cc219094a44689e10676040" route="/*" status=200 bytes=7334 elapsed=85.167µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61177" correlation_id="corr_7562f2d7152070e4b4dc009ea1c6b994" route="/*" status=200 bytes=294 elapsed=11.916µs
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61179" correlation_id="corr_9d9131b8691c110bd973df9294c4d96e" route="/*" status=200 bytes=358 elapsed=16.084µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61179" correlation_id="corr_532d9ae9c52b37281f4a88fbf4b7197a" route="/*" status=200 bytes=1707 elapsed=80µs
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61174" correlation_id="corr_91864047016f6e539847089c0cb11248" route="/*" status=200 bytes=279 elapsed=7.333µs
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61177" correlation_id="corr_70e21d9e3de0acd794398c9806aba9a7" route="/*" status=200 bytes=197736 elapsed=332.792µs
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61176" correlation_id="corr_3fb8ba69bc22ef0a332f9350b8483667" route="/*" status=200 bytes=39 elapsed=11.75µs
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61175" correlation_id="corr_d4d64fdc328ec57bd26876fef7803963" route="/*" status=200 bytes=127 elapsed=5µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61178" correlation_id="corr_1b8187cd85dfa435a2d5be48d9b65187" route="/*" status=200 bytes=132724 elapsed=87.709µs
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61179" correlation_id="corr_e9076d98d71df998ef167b282dc9ef5f" route="/*" status=200 bytes=3355 elapsed=17.458µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61174" correlation_id="corr_b23120c0ef87510ebe9429291e98a6be" route="/*" status=200 bytes=75 elapsed=13.666µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61176" correlation_id="corr_a6c88b97667e72af55ae3567ae67723f" route="/*" status=200 bytes=3965 elapsed=31.042µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61174" correlation_id="corr_544d9c5d89d2295f740c7028912f8a22" route="/*" status=200 bytes=218 elapsed=10µs
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61179" correlation_id="corr_5c4d324f1c2ef5ff4cd8c69092ed65f0" route="/*" status=200 bytes=48854 elapsed=42.583µs
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61175" correlation_id="corr_1b655b7b3efcb39f04e0b37341d4f5c9" route="/*" status=200 bytes=3019 elapsed=11.5µs
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61177" correlation_id="corr_bf34ec140087ff7ddf85a372d7365e44" route="/*" status=200 bytes=34964 elapsed=23.792µs
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61176" correlation_id="corr_5a35b0e686893409358f4450bb9cceda" route="/*" status=200 bytes=9269 elapsed=11.5µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61174" correlation_id="corr_f873471c14088f99433859a011f7f457" route="/*" status=200 bytes=993 elapsed=38.458µs
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61178" correlation_id="corr_5123aa1c22e299f8a95ced7d35329b93" route="/*" status=200 bytes=5236 elapsed=14.958µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61178" correlation_id="corr_41d946381afd2ba46dc2ff63f1bdf238" route="/api/home-link" status=200 bytes=25 elapsed=16.75µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61174" correlation_id="corr_03346c1fa50d816c6171076fd9d02f9a" route="/api/me" status=200 bytes=370 elapsed=258.667µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61174" correlation_id="corr_39e73cc44dad29cdfc43613b7254a748" route="/*" status=200 bytes=29400 elapsed=77.958µs
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61176" correlation_id="corr_8ede50248b26bf8168b021d9ccd4ab9b" route="/*" status=200 bytes=23128 elapsed=47.834µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61178" correlation_id="corr_d56a05f1de666f68a46c03bd78544e45" route="/*" status=200 bytes=41344 elapsed=119.083µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61178" correlation_id="corr_b2bb0f5cc50e95ae3f2226c9adae589f" route="/api/workspaces" status=200 bytes=779 elapsed=537.583µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61178" correlation_id="corr_28044ccf28822ee6e82bbc077911d572" route="/api/routes/{workspace_route_id}/{target_route_id}" status=200 bytes=268 elapsed=397.25µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61178" correlation_id="corr_21e62a65edb475859cf605986c448cc3" route="/api/workspaces/{workspace_id}/channels" status=200 bytes=291 elapsed=434.125µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61178" correlation_id="corr_6ebb93125e18ceae52e7b6c270341ed4" route="/api/dms" status=200 bytes=689 elapsed=342.5µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61178" correlation_id="corr_4dd124aa6323f60e7f5eba1e616f6c3a" route="/api/workspaces/{workspace_id}/moderation/members" status=200 bytes=658 elapsed=316.75µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61174" correlation_id="corr_bdd32a8649afd4088ad58b17de66c0e3" route="/api/workspaces/{workspace_id}/bot-commands" status=200 bytes=20 elapsed=486.875µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61176" correlation_id="corr_56790fc64dc81450ef97fc2493e755b8" route="/api/workspaces/{workspace_id}/slash-commands" status=200 bytes=22 elapsed=738.041µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61177" correlation_id="corr_1b7392bb36155e4264b45565c96e4f5d" route="/api/workspaces/{workspace_id}/topics" status=200 bytes=14 elapsed=762.459µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61177" correlation_id="corr_784525d0e20559ecc983efdc73dd3d0d" route="/api/workspaces/{workspace_id}/members" status=200 bytes=776 elapsed=673.75µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61174" correlation_id="corr_6b9ca5a9f650f3e953e8dd3f3d36ee2a" route="/api/channels/{channel_id}/pins" status=200 bytes=16 elapsed=814.333µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61178" correlation_id="corr_0d27e55986b9a84cdd60582ee649d6cb" route="/api/channels/{channel_id}/notification-settings" status=200 bytes=21 elapsed=1.144416ms
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61176" correlation_id="corr_48747c7c03d6248ddda1a636752167c1" route="/api/channels/{channel_id}/messages" status=200 bytes=815 elapsed=1.575917ms
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61176" correlation_id="corr_8b5559b891de5a97e0c7e49a0611cd67" route="/api/realtime/events" status=200 bytes=361 elapsed=694.625µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61176" correlation_id="corr_b0638558b49a3ab8b907a887fb9e4541" route="/api/workspaces" status=200 bytes=779 elapsed=408.333µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61177" correlation_id="corr_0bf04d132fe7e3dd06d90422431068a5" route="/api/workspaces/{workspace_id}/moderation/members" status=200 bytes=658 elapsed=557.5µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61179" correlation_id="corr_5bcd09031ebffb81a4a246d8d8b18d46" route="/api/workspaces/{workspace_id}/slash-commands" status=200 bytes=22 elapsed=747.416µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61178" correlation_id="corr_ec8fc84c1a682c96426427792e038d0c" route="/api/workspaces/{workspace_id}/channels" status=200 bytes=291 elapsed=1.272917ms
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61175" correlation_id="corr_fed58e581feb38d9718df36b5453fea8" route="/api/workspaces/{workspace_id}/bot-commands" status=200 bytes=20 elapsed=1.611792ms
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61174" correlation_id="corr_03060fe4ee5867651248087a4e270b88" route="/api/dms" status=200 bytes=689 elapsed=1.747084ms
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61176" correlation_id="corr_afd95e85cc3a1afaa4161428d109d00c" route="/api/workspaces/{workspace_id}/topics" status=200 bytes=14 elapsed=1.562125ms
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61176" correlation_id="corr_7038a343cf42ffb7d556c3cf761b258d" route="/api/channels/{channel_id}/messages" status=200 bytes=815 elapsed=436.916µs
+
+[WebServer] 2026/10/01 18:34:23 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61176" correlation_id="corr_e0672d23e0fb527f4be2c9ef24a3d196" route="/api/channels/{channel_id}/pins" status=200 bytes=16 elapsed=127.459µs
+
+[WebServer] 2026/10/01 18:34:23 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61173" correlation_id="corr_169677448c4e42408b942f1a37b010e7" route="/api/realtime/ephemeral" status=202 bytes=322 elapsed=580.708µs
+
+[WebServer] 2026/10/01 18:34:23 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61176" correlation_id="corr_6b2fc94b145a52fd76f8d6df898703f2" route="/api/channels/{channel_id}/read" status=200 bytes=164 elapsed=886.042µs
+
+[WebServer] 2026/10/01 18:34:24 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61173" correlation_id="corr_f5b60becbc1e39a370c2f30bb8ef519e" route="/api/realtime/ephemeral" status=202 bytes=322 elapsed=475.209µs
+
+[WebServer] 2026/10/01 18:34:29 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61181" correlation_id="corr_42d0bb761ece57e0c92e9ce587e5430b" route="/api/realtime/ws" status=101 bytes=0 elapsed=5.468808709s
+
+  3) [chromium] › tests/e2e/idle-animations.spec.ts:99:5 › typing dots run only while someone is typing 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 5
+
+    - Array []
+    + Array [
+    +   "typing-dot on .typing-indicator__dots",
+    +   "typing-dot on .typing-indicator__dots",
+    +   "typing-dot on .typing-indicator__dots",
+    + ]
+
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+
+      113 |   await publishTyping(page, s, "typing.stopped");
+      114 |   await expect(indicator).not.toHaveClass(/\bvisible\b/);
+    > 115 |   await expect.poll(() => runningAnimations(page)).toEqual([]);
+          |                                                    ^
+      116 | });
+      117 |
+      118 | test("the unread jump bar pulses three times, then rests", async ({ page }) => {
+        at <repo>
+
+    Error Context: test-results/idle-animations-typing-dots-run-only-while-someone-is-typing-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/idle-animations-typing-dots-run-only-while-someone-is-typing-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/idle-animations-typing-dots-run-only-while-someone-is-typing-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[4/4] [chromium] › tests/e2e/idle-animations.spec.ts:118:5 › the unread jump bar pulses three times, then rests
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_98c480f2f59728c7aee66cc3784a7655" route="/api/workspaces" status=201 bytes=207 elapsed=1.691875ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_b85fe9636ea4b934cc34595d02a2f444" route="/api/workspaces/{workspace_id}/channels" status=201 bytes=598 elapsed=1.765125ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_f61943075953b423be466fbcde7aa60c" route="/api/workspaces/{workspace_id}/bots" status=201 bytes=666 elapsed=1.067792ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_93c7d2e8315edafc4f4a851c4a70a6b9" route="/api/dms" status=201 bytes=686 elapsed=1.155584ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_e0e4189dbde28b443e32fc1279c61a7a" route="/api/channels/{channel_id}/messages" status=201 bytes=1144 elapsed=44.966792ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_b0edc6d35b64f9ff518fd648884212f9" route="/api/channels/{channel_id}/messages" status=201 bytes=1144 elapsed=1.953875ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_ff3548094b787c504c5cf3b3085b6077" route="/api/channels/{channel_id}/messages" status=201 bytes=1144 elapsed=1.709167ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_c7553090338d883ed1c008e17415f037" route="/api/channels/{channel_id}/messages" status=201 bytes=1143 elapsed=1.210875ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_60cfa2676a975a8b8d3ed91aa1834e74" route="/api/channels/{channel_id}/messages" status=201 bytes=1144 elapsed=3.51375ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_42e0afbfa019ffa1b615514b68286e4a" route="/api/channels/{channel_id}/messages" status=201 bytes=1144 elapsed=2.48675ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_35c7c70a0d7b9645202ea990b756d2ac" route="/api/channels/{channel_id}/messages" status=201 bytes=1144 elapsed=1.394125ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_685e80d69984c0854c5d4948f4b014fd" route="/api/channels/{channel_id}/messages" status=201 bytes=1144 elapsed=1.191917ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_c35ecc7b6527b7c7832b63d41781592f" route="/api/channels/{channel_id}/messages" status=201 bytes=1144 elapsed=1.2025ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_40e8235c260fc83ceadbecc4354719d2" route="/api/channels/{channel_id}/messages" status=201 bytes=1146 elapsed=1.652417ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_189266b9473115c0a38776b95adf6b76" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=1.190625ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_ea2529fbbee2cfe5d3499fc52067d311" route="/api/channels/{channel_id}/messages" status=201 bytes=1146 elapsed=1.311125ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_d6c26ced4996f40e06ab0dc1b039c6d6" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=1.595916ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_e738532a27335a5b6067c3ae3cf6e593" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=3.526417ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_25ee1ab0db3c4f1a4e12e3aab2ef1f27" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=2.97775ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_c77b7e7733884badffa9b472f2d03549" route="/api/channels/{channel_id}/messages" status=201 bytes=1146 elapsed=1.107125ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_1f7bfa8002d3512414529540f031b8d2" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=940.458µs
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_0f6a0ce84ad29209538455efb85da896" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=964.917µs
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_c28dd92b14b5224f957d8b48755c6afa" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=1.180708ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_32c3f372b5fe0c6e9027af28800b6042" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=860.458µs
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_0262de185a323c42c36e806db7e44a6b" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=1.199167ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_6e5961647c3b8a2c89040b95a3a1fb3e" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=2.029791ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_cd31840f03b1f86b70a57d0d7db62ca9" route="/api/channels/{channel_id}/messages" status=201 bytes=1146 elapsed=1.095ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_a541558d5929da8001bc86b4a883624f" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=1.388833ms
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_a95c2461d436a35b3f9f3a932fc20272" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=967.625µs
+
+[WebServer] 2026/10/01 18:34:29 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_c58a951da795dc3fb3e41728e5d21dc5" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=997.25µs
+
+[WebServer] 2026/10/01 18:34:30 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_9eddd3b78361d93fd79bfa600ca45757" route="/api/channels/{channel_id}/messages" status=201 bytes=1146 elapsed=950.667µs
+
+[WebServer] 2026/10/01 18:34:30 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_f1bfe80760e55fdd1b2dcb371d519312" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=1.118959ms
+
+[WebServer] 2026/10/01 18:34:30 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_0e2ea2f080f78a4272f5efa9f1a85936" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=950.25µs
+
+[WebServer] 2026/10/01 18:34:30 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_9f12872a39caa9206b6cb78cc5e61c3c" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=891.333µs
+
+[WebServer] 2026/10/01 18:34:30 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_01ac4ce2a749a3dadd5dfbae531aaf8b" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=934.458µs
+
+[WebServer] 2026/10/01 18:34:30 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_413c8c9cc5ae4c03f14e2bc85288e551" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=923.417µs
+
+[WebServer] 2026/10/01 18:34:30 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_da49b122a4de016964d9e84575e4e57e" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=855.916µs
+
+[WebServer] 2026/10/01 18:34:30 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_897f7917a73d01e0ffc60bc1a157541d" route="/api/channels/{channel_id}/messages" status=201 bytes=1146 elapsed=873.084µs
+
+[WebServer] 2026/10/01 18:34:30 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_ced272ffb7508cf63653ee478a94e769" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=1.417334ms
+
+[WebServer] 2026/10/01 18:34:30 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_bb5ea347ec14752eabaf0837579d0136" route="/api/channels/{channel_id}/messages" status=201 bytes=1144 elapsed=838.167µs
+
+[WebServer] 2026/10/01 18:34:30 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_26edd1a0e2f01db21b01ecfe724e5f29" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=1.133166ms
+
+[WebServer] 2026/10/01 18:34:30 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_81cc916822345d2aa60b65c4c02731a8" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=938.042µs
+
+[WebServer] 2026/10/01 18:34:30 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_966aa50d8dd973154e24c4e9c5d0e84a" route="/api/channels/{channel_id}/messages" status=201 bytes=1147 elapsed=925.958µs
+
+[WebServer] 2026/10/01 18:34:30 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_a3629c536f1ca27c36cada720b4e6741" route="/api/channels/{channel_id}/messages" status=201 bytes=1146 elapsed=882.667µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61184" correlation_id="corr_4a1da70d71f7c2601b3277b19858fc4b" route="/*" status=200 bytes=6550 elapsed=83.208µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61184" correlation_id="corr_d8e62bd61c7c843e2dc09c5fa0b4e7a6" route="/*" status=200 bytes=82 elapsed=38.125µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61188" correlation_id="corr_9544f3f445498c807ca94fd5fca18f6f" route="/*" status=200 bytes=623 elapsed=110.583µs
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61187" correlation_id="corr_d6c5574b7ed17745fb2d55ac823a8626" route="/*" status=200 bytes=158 elapsed=40.959µs
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61189" correlation_id="corr_471cf98b669ed721eb0912c4bcc7ef13" route="/*" status=200 bytes=6083 elapsed=47.583µs
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61185" correlation_id="corr_31800f4489a5104917b3e4180f847e41" route="/*" status=200 bytes=29123 elapsed=146.834µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61186" correlation_id="corr_5c7a89fac201946cebbe29774782999d" route="/*" status=200 bytes=57792 elapsed=118.458µs
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61184" correlation_id="corr_627fea55caee5bb2bc4977ad63cbab2a" route="/*" status=200 bytes=183538 elapsed=150.208µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61188" correlation_id="corr_44fc41c592ec8617ec21cc317d14200a" route="/*" status=200 bytes=65 elapsed=9.583µs
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61185" correlation_id="corr_47582ccd16798864774056e9a906fcac" route="/*" status=200 bytes=22 elapsed=3.042µs
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61186" correlation_id="corr_1032ff46443fd8b2b86f41a6d3f6e0bd" route="/*" status=200 bytes=7334 elapsed=31.542µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61187" correlation_id="corr_83ad1e2e32dd6ea93a1dc1c9838f4215" route="/*" status=200 bytes=565 elapsed=50.584µs
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61184" correlation_id="corr_559ba1bc7bfd977f363584e3599eea35" route="/*" status=200 bytes=1233 elapsed=108.958µs
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61189" correlation_id="corr_8dbc12d2d3d457f0d45af9135d5c7757" route="/*" status=200 bytes=619 elapsed=21.583µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61188" correlation_id="corr_93a5d4c84da8111da7ebd27720135a1c" route="/*" status=200 bytes=1822 elapsed=157.166µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61186" correlation_id="corr_0c6babd1fc111d24a6fe5e3dc0d3cf3f" route="/*" status=200 bytes=294 elapsed=20.458µs
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61188" correlation_id="corr_ebcb522c98741c9cc22c858acb71bcc9" route="/*" status=200 bytes=358 elapsed=11.875µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61189" correlation_id="corr_1bececc38d0a9505479e70c514f17390" route="/*" status=200 bytes=279 elapsed=18.292µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61187" correlation_id="corr_f62a75e5a56298675625e5fc263844a2" route="/*" status=200 bytes=197736 elapsed=166.334µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61186" correlation_id="corr_096b0747639dd509139840730b4aa110" route="/*" status=200 bytes=1707 elapsed=63.25µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61188" correlation_id="corr_5f83bcf4d98300e695028a41521873ac" route="/*" status=200 bytes=127 elapsed=6.834µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61184" correlation_id="corr_5f2bb9fb9eedf9f5dd5586ce4836c2b6" route="/*" status=200 bytes=39 elapsed=3.958µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61185" correlation_id="corr_8a24754baf7dfd2076fa1c4df8c0324b" route="/*" status=200 bytes=132724 elapsed=217.209µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61189" correlation_id="corr_5b1ca48e45743716d4e5c3eac8dac9e8" route="/*" status=200 bytes=3355 elapsed=33.375µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61186" correlation_id="corr_5f0526160dbd560707c81d89aec8650f" route="/*" status=200 bytes=75 elapsed=3.584µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61188" correlation_id="corr_160eaff4232666ece9f48572f0478368" route="/*" status=200 bytes=3965 elapsed=58.333µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61184" correlation_id="corr_d5cc6874de282ea5cfec6adfbc70b81f" route="/*" status=200 bytes=3019 elapsed=38.666µs
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61189" correlation_id="corr_14d0dd958f7a98719c0d630ae78aec11" route="/*" status=200 bytes=48854 elapsed=861.584µs
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61186" correlation_id="corr_61c1836c324e40a0286bb40b5a816c7b" route="/*" status=200 bytes=218 elapsed=7.75µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61188" correlation_id="corr_0a79ea8e734b59b76115462ed7c00610" route="/*" status=200 bytes=9269 elapsed=88.75µs
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61187" correlation_id="corr_200ef5572515dda7cb038c8bef1bef4c" route="/*" status=200 bytes=34964 elapsed=1.561167ms
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61184" correlation_id="corr_3bcedfa4a3df2e336635c8f79e0bea8c" route="/*" status=200 bytes=993 elapsed=16.833µs
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61185" correlation_id="corr_1b8e75d8aaa37d38fc3d8e7c6d56a556" route="/*" status=200 bytes=5236 elapsed=13.75µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61185" correlation_id="corr_376468f5edeaadd8d44e6b557660b9cd" route="/api/home-link" status=200 bytes=25 elapsed=82.959µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61184" correlation_id="corr_1f28bffaf4a58ecfb42dd8ec1b625507" route="/api/me" status=200 bytes=370 elapsed=497.666µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61184" correlation_id="corr_c2362695c2cc8c4cba91f24894cca08c" route="/*" status=200 bytes=29400 elapsed=82.417µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61185" correlation_id="corr_602fd88d7a68f3adc5208d5eea63e363" route="/*" status=200 bytes=41344 elapsed=75.708µs
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61187" correlation_id="corr_f4787a6797ae22dae42c6af4df597f96" route="/*" status=200 bytes=23128 elapsed=62.041µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61187" correlation_id="corr_20a74ae72f4c6ce9f2c1aca20b46ea79" route="/api/workspaces" status=200 bytes=972 elapsed=480.75µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61187" correlation_id="corr_5c7514dda65e28a8f2ca1c7330dfabdb" route="/api/routes/{workspace_route_id}/{target_route_id}" status=200 bytes=268 elapsed=446.417µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61187" correlation_id="corr_e195af68ebcbca5ec407bb735dda3ba5" route="/api/workspaces/{workspace_id}/channels" status=200 bytes=292 elapsed=603.875µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61187" correlation_id="corr_6d9337f6ab41dbe3a461adc068ba602d" route="/api/dms" status=200 bytes=689 elapsed=910.333µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61187" correlation_id="corr_81def3cf7b46835649d50b5f0b1307d2" route="/api/workspaces/{workspace_id}/moderation/members" status=200 bytes=658 elapsed=970.459µs
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61185" correlation_id="corr_1b4a4b9bc911364814e7b902c552b87d" route="/api/workspaces/{workspace_id}/slash-commands" status=200 bytes=22 elapsed=969.833µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61184" correlation_id="corr_db2a687dd47827c503de532f1754fca1" route="/api/workspaces/{workspace_id}/bot-commands" status=200 bytes=20 elapsed=1.280458ms
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61188" correlation_id="corr_49a853b7a115c6f0f3fd667b34dc3843" route="/api/workspaces/{workspace_id}/topics" status=200 bytes=14 elapsed=1.294042ms
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61188" correlation_id="corr_a641e5a5d5152c5d31d12ff640679d03" route="/api/workspaces/{workspace_id}/members" status=200 bytes=776 elapsed=1.049458ms
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61185" correlation_id="corr_c882dde3151bd7ebbcde1d205251b6c2" route="/api/channels/{channel_id}/pins" status=200 bytes=16 elapsed=1.199041ms
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61187" correlation_id="corr_3d0ffc7a4cec6b17a1d99ed9fb12f608" route="/api/channels/{channel_id}/notification-settings" status=200 bytes=21 elapsed=1.287958ms
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61184" correlation_id="corr_1bd6ac53e577c3d686e5d682e1486d32" route="/api/channels/{channel_id}/messages" status=200 bytes=33058 elapsed=2.024209ms
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61184" correlation_id="corr_6319a478a4ee4460c5ff2bdf14bd94d9" route="/api/realtime/events" status=200 bytes=362 elapsed=587.792µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61184" correlation_id="corr_ce40633eb1a38c13c929245b41122918" route="/api/workspaces" status=200 bytes=972 elapsed=305.083µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61189" correlation_id="corr_5b1c27abfa8f0476ac99e53323488e97" route="/api/workspaces/{workspace_id}/bot-commands" status=200 bytes=20 elapsed=847.25µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61186" correlation_id="corr_2ec9e44d818b9736f476a4c9654451a9" route="/api/workspaces/{workspace_id}/slash-commands" status=200 bytes=22 elapsed=932.917µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61187" correlation_id="corr_0e001f8a588a7e8568ba01259086daf9" route="/api/workspaces/{workspace_id}/channels" status=200 bytes=292 elapsed=1.404166ms
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61185" correlation_id="corr_04b7ede82b76dc4774ef753136bc8a77" route="/api/dms" status=200 bytes=689 elapsed=1.392125ms
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61188" correlation_id="corr_eac0eaa886d3825b96344c95848cdbe3" route="/api/workspaces/{workspace_id}/moderation/members" status=200 bytes=658 elapsed=1.7605ms
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61184" correlation_id="corr_ea6f5d9a357b1740bd5858a37cafe871" route="/api/workspaces/{workspace_id}/topics" status=200 bytes=14 elapsed=1.638958ms
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61184" correlation_id="corr_52e6d5f19cd928fac68bced6b19a9fa7" route="/api/channels/{channel_id}/messages" status=200 bytes=33058 elapsed=811.375µs
+
+[WebServer] 2026/10/01 18:34:30 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61184" correlation_id="corr_70a2baefb9823667adcf01c19c73632c" route="/api/channels/{channel_id}/pins" status=200 bytes=16 elapsed=327.583µs
+
+[WebServer] 2026/10/01 18:34:30 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61184" correlation_id="corr_04a0b6f431be1ac4a34e90c412ba5028" route="/api/channels/{channel_id}/read" status=200 bytes=165 elapsed=1.3515ms
+
+[WebServer] 2026/10/01 18:34:30 method="POST" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61183" correlation_id="corr_7f2e0264789a0448e47aeb62c6ac9549" route="/api/channels/{channel_id}/messages" status=201 bytes=978 elapsed=2.103208ms
+
+[WebServer] 2026/10/01 18:34:39 method="GET" scheme="http" host="127.0.0.1:18140" proto="HTTP/1.1" remote="127.0.0.1:61191" correlation_id="corr_4e482c8aace703c7f51ca8d71cba912b" route="/api/realtime/ws" status=101 bytes=0 elapsed=9.052468s
+
+  4) [chromium] › tests/e2e/idle-animations.spec.ts:118:5 › the unread jump bar pulses three times, then rests 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 3
+
+    - Array []
+    + Array [
+    +   "unread-bar-pulse on .unread-bar__jump::before",
+    + ]
+
+    Call Log:
+    - Timeout 8000ms exceeded while waiting on the predicate
+
+      151 |   expect(await onJump()).toEqual(["unread-bar-pulse on .unread-bar__jump::before"]);
+      152 |   // Three 1.8 s pulses, then the dot stays still while the bar remains.
+    > 153 |   await expect.poll(onJump, { timeout: 8_000 }).toEqual([]);
+          |                                                 ^
+      154 |   await expect(page.locator(".unread-bar__jump")).toBeVisible();
+      155 | });
+      156 |
+        at <repo>
+
+    Error Context: test-results/idle-animations-the-unread-6acbf-lses-three-times-then-rests-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/idle-animations-the-unread-6acbf-lses-three-times-then-rests-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/idle-animations-the-unread-6acbf-lses-three-times-then-rests-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  4 failed
+    [chromium] › tests/e2e/idle-animations.spec.ts:86:7 › an idle channel runs no animations ───────
+    [chromium] › tests/e2e/idle-animations.spec.ts:86:7 › an idle DM runs no animations ────────────
+    [chromium] › tests/e2e/idle-animations.spec.ts:99:5 › typing dots run only while someone is typing 
+    [chromium] › tests/e2e/idle-animations.spec.ts:118:5 › the unread jump bar pulses three times, then rests 

@@ -1,0 +1,74 @@
+diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
+index 4fd029ae..a2c3c067 100644
+--- a/apps/desktop/src/main.ts
++++ b/apps/desktop/src/main.ts
+@@ -44,6 +44,9 @@ import {
+ const PROTOCOLS = [LEGACY_DESKTOP_PROTOCOL, DESKTOP_AUTH_PROTOCOL] as const;
+ const SETTINGS_FILE = "desktop.json";
+ const APP_NAME = "ClickClack";
++// Energy-measurement harness only: no URL-scheme registration, a native titled
++// frame, and a window that never takes focus on its own.
++const ENERGY_HARNESS = process.env.CLICKCLACK_ENERGY_HARNESS === "1";
+ 
+ let mainWindow: BrowserWindow | null = null;
+ let settingsWindow: BrowserWindow | null = null;
+@@ -73,7 +76,7 @@ let integratedTitleBar = false;
+ if (!app.requestSingleInstanceLock()) {
+   app.quit();
+ } else {
+-  registerProtocol();
++  if (!ENERGY_HARNESS) registerProtocol();
+   app.on("second-instance", (_event, commandLine) => {
+     const link = protocolURLFromArgs(commandLine);
+     if (link) handleProtocolURL(link);
+@@ -92,7 +95,9 @@ async function start() {
+   if (process.platform === "win32") app.setAppUserModelId("chat.clickclack.desktop");
+   nativeTheme.themeSource = "system";
+   settings = await readSettings();
+-  integratedTitleBar = await serverSupportsIntegratedTitleBar(settings.serverUrl);
++  integratedTitleBar = ENERGY_HARNESS
++    ? false
++    : await serverSupportsIntegratedTitleBar(settings.serverUrl);
+   applyLoginItemSetting();
+   registerIPC();
+   secureSession();
+@@ -149,11 +154,12 @@ function createMainWindow(route = currentRoute): BrowserWindow {
+     minHeight: 560,
+     minWidth: 760,
+     show: false,
+-    title: APP_NAME,
++    title: ENERGY_HARNESS ? "ClickClack ENERGY TEST (leave open)" : APP_NAME,
+     ...(integratedTitleBar
+       ? desktopTitleBarOptions(process.platform, nativeTheme.shouldUseDarkColors)
+       : {}),
+     width: saved.width ?? 1280,
++    ...(ENERGY_HARNESS && process.env.CLICKCLACK_ENERGY_INVISIBLE === "1" ? { opacity: 0 } : {}),
+     ...(saved.x === undefined ? {} : { x: saved.x }),
+     ...(saved.y === undefined ? {} : { y: saved.y }),
+     webPreferences: {
+@@ -161,7 +167,8 @@ function createMainWindow(route = currentRoute): BrowserWindow {
+         `${DESKTOP_SERVER_ORIGIN_ARG}${normalizeServerURL(settings.serverUrl)}`,
+         ...(integratedTitleBar ? [DESKTOP_TITLEBAR_ARG] : []),
+       ],
+-      backgroundThrottling: false,
++      // Harness A/B switch for candidate B (creation-time, like the shipped option).
++      backgroundThrottling: ENERGY_HARNESS && process.env.CLICKCLACK_ENERGY_BT === "1",
+       contextIsolation: true,
+       nodeIntegration: false,
+       preload: distPath("app-preload.cjs"),
+@@ -171,9 +178,15 @@ function createMainWindow(route = currentRoute): BrowserWindow {
+     },
+   });
+   mainWindow = window;
++  if (ENERGY_HARNESS && process.env.CLICKCLACK_ENERGY_INVISIBLE === "1") window.setIgnoreMouseEvents(true);
+   configureWebContents(window);
+ 
++  if (ENERGY_HARNESS) window.on("page-title-updated", (event) => event.preventDefault());
+   window.once("ready-to-show", () => {
++    if (ENERGY_HARNESS) {
++      window.showInactive();
++      return;
++    }
+     if (saved.maximized) window.maximize();
+     window.show();
+   });
