@@ -81,3 +81,22 @@ Message lists, search results, threads, DMs, and the profile control all hydrate
 avatars from the user attached to each message or conversation member.
 The member directory uses the same avatar fallback: an unavailable image shows
 the user's initial while retaining the member or bot styling.
+
+## Personal channel order
+
+Drag a channel, use its move handle with the arrow keys, or choose a move action
+from its menu to change your personal sidebar order. The order is saved with your
+account and appears on other browsers and devices when they next load the app.
+Other members' sidebars are unchanged. Same-browser tabs still share updates;
+the local cache keeps reordering usable offline or when an account save fails.
+A later reorder retries saving. Local edits take precedence for the current page;
+reload to fetch changes made on another device.
+
+`GET /api/me` includes `user.sidebar_preferences.channel_order`, keyed by workspace
+ID. `PATCH /api/me` accepts `sidebar_preferences: { channel_order: { "workspace-id":
+["channel-id"] } }`. Each supplied workspace replaces only its own order; an empty
+array clears it. The caller must belong to the workspace. Unknown channel IDs are
+dropped and duplicates keep their first position. Up to 100 workspaces and 500
+channel IDs per workspace can be saved per request. Larger local orders retain
+their tail on the browser where they were arranged. Appearance and sidebar
+preferences update independently.

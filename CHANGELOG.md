@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Personal sidebar channel order now follows your account across browsers and devices, with the existing local cache retained for offline use. Thanks @isaiahknight-va.
+
 - Corrected the source-install pnpm version and quickstart caller-authentication count to match the current toolchain and authentication guide. Thanks @KrasimirKralev.
 - Updated DOMPurify, Vite, Electron 43, desktop packaging, Wrangler, Node.js types, and pnpm while preserving runtime minimums and the 48-hour dependency release-age gate; Docker builds now include every workspace manifest for frozen-lockfile validation.
 
