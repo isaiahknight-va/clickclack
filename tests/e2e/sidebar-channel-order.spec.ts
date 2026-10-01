@@ -159,16 +159,22 @@ test("unavailable local storage still saves channel order to the account", async
     .click();
   await expect.poll(() => visibleChannelNames(page)).toEqual([names[1], names[0], names[2]]);
 
-  await expect.poll(async () => {
-    const response = await page.request.get("/api/me");
-    return (await response.json()).user.sidebar_preferences?.channel_order?.[workspace.id]?.length;
-  }).toBe(3);
+  await expect
+    .poll(async () => {
+      const response = await page.request.get("/api/me");
+      return (await response.json()).user.sidebar_preferences?.channel_order?.[workspace.id]
+        ?.length;
+    })
+    .toBe(3);
   await page.reload();
   await waitForAppReady(page);
   await expect.poll(() => visibleChannelNames(page)).toEqual([names[1], names[0], names[2]]);
 });
 
-test("channel order roams to an independent browser session", async ({ page, browser }, testInfo) => {
+test("channel order roams to an independent browser session", async ({
+  page,
+  browser,
+}, testInfo) => {
   const { workspace, names } = await createWorkspaceWithChannels(page, "Roaming order");
   await page.goto(`/app/${workspace.route_id}`);
   await waitForAppReady(page);
@@ -176,11 +182,13 @@ test("channel order roams to an independent browser session", async ({ page, bro
   await page.keyboard.press("ArrowUp");
   const reordered = [names[0], names[2], names[1]];
   await expect.poll(() => visibleChannelNames(page)).toEqual(reordered);
-  await expect.poll(async () => {
-    const response = await page.request.get("/api/me");
-    const { user } = await response.json();
-    return user.sidebar_preferences?.channel_order?.[workspace.id]?.length;
-  }).toBe(3);
+  await expect
+    .poll(async () => {
+      const response = await page.request.get("/api/me");
+      const { user } = await response.json();
+      return user.sidebar_preferences?.channel_order?.[workspace.id]?.length;
+    })
+    .toBe(3);
 
   const independent = await browser.newContext();
   try {

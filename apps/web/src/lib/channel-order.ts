@@ -13,9 +13,11 @@ export function parseChannelOrder(raw: string | null): string[] {
   if (!raw || raw.length > 1_000_000) return [];
   try {
     const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length <= 10_000 &&
+    return Array.isArray(parsed) &&
+      parsed.length <= 10_000 &&
       parsed.every((id) => typeof id === "string" && id.length <= 128)
-      ? [...new Set(parsed)] : [];
+      ? [...new Set(parsed)]
+      : [];
   } catch {
     return [];
   }
@@ -44,7 +46,9 @@ export function resolveChannelOrder(user: User | null, workspaceID: string): str
   let local: string[] = [];
   try {
     local = parseChannelOrder(window.localStorage.getItem(key));
-  } catch { /* Offline cache is optional. */ }
+  } catch {
+    /* Offline cache is optional. */
+  }
   const server = user.sidebar_preferences?.channel_order?.[workspaceID];
   if (server === undefined) return local;
   // The account stores the first 500 IDs; preserve a larger local tail.
@@ -67,7 +71,9 @@ export function saveChannelOrder(
   const write = (writes.get(key) ?? Promise.resolve()).then(async () => {
     if (localChanges.get(key) !== order || !isCurrentUser()) return;
     try {
-      const body = JSON.stringify({ sidebar_preferences: { channel_order: { [workspaceID]: order.slice(0, 500) } } });
+      const body = JSON.stringify({
+        sidebar_preferences: { channel_order: { [workspaceID]: order.slice(0, 500) } },
+      });
       await request("/api/me", {
         method: "PATCH",
         keepalive: new TextEncoder().encode(body).length < 60_000,
@@ -78,6 +84,8 @@ export function saveChannelOrder(
     }
   });
   writes.set(key, write);
-  void write.then(() => { if (writes.get(key) === write) writes.delete(key); });
+  void write.then(() => {
+    if (writes.get(key) === write) writes.delete(key);
+  });
   return write;
 }
