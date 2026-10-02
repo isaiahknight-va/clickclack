@@ -1,0 +1,83 @@
+Running 4 tests using 1 worker
+  ✘  1 [chromium] › tests/e2e/sidebar-long-workspace-name.spec.ts:70:5 › a long workspace name truncates and keeps the sidebar create buttons usable (5.1s)
+  ✓  2 [chromium] › tests/e2e/sidebar-long-workspace-name.spec.ts:84:5 › a short workspace name keeps the same sidebar layout (790ms)
+  ✘  3 [chromium] › tests/e2e/sidebar-long-workspace-name.spec.ts:94:5 › the mobile drawer keeps its create buttons with a long workspace name (5.4s)
+  ✘  4 [chromium] › tests/e2e/sidebar-long-workspace-name.spec.ts:105:5 › a long account name keeps the desktop sidebar create buttons usable (5.8s)
+  1) [chromium] › tests/e2e/sidebar-long-workspace-name.spec.ts:70:5 › a long workspace name truncates and keeps the sidebar create buttons usable 
+    Error: Create channel
+    Create channel
+    expect(received).toEqual(expected) // deep equality
+    - Expected  - 2
+    + Received  + 2
+      Object {
+    -   "inSidebar": true,
+    +   "inSidebar": false,
+        "inViewport": true,
+    -   "topmost": true,
+    +   "topmost": false,
+      }
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+      55 |   for (const { button, heading } of controls) {
+      56 |     const control = sidebar.getByRole("button", { name: button });
+    > 57 |     await expect.poll(() => placement(control), { message: button }).toEqual(usable);
+         |                                                                      ^
+      58 |     await control.click();
+      59 |     const dialog = page.locator(".profile-modal").getByRole("heading", { name: heading });
+      60 |     await expect(dialog).toBeVisible();
+        at expectCreateButtons (tests/e2e/sidebar-long-workspace-name.spec.ts:57:70)
+        at tests/e2e/sidebar-long-workspace-name.spec.ts:76:9
+  2) [chromium] › tests/e2e/sidebar-long-workspace-name.spec.ts:94:5 › the mobile drawer keeps its create buttons with a long workspace name 
+    Error: Create channel
+    Create channel
+    expect(received).toEqual(expected) // deep equality
+    - Expected  - 3
+    + Received  + 3
+      Object {
+    -   "inSidebar": true,
+    -   "inViewport": true,
+    -   "topmost": true,
+    +   "inSidebar": false,
+    +   "inViewport": false,
+    +   "topmost": false,
+      }
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+      55 |   for (const { button, heading } of controls) {
+      56 |     const control = sidebar.getByRole("button", { name: button });
+    > 57 |     await expect.poll(() => placement(control), { message: button }).toEqual(usable);
+         |                                                                      ^
+      58 |     await control.click();
+      59 |     const dialog = page.locator(".profile-modal").getByRole("heading", { name: heading });
+      60 |     await expect(dialog).toBeVisible();
+        at expectCreateButtons (tests/e2e/sidebar-long-workspace-name.spec.ts:57:70)
+        at tests/e2e/sidebar-long-workspace-name.spec.ts:100:9
+  3) [chromium] › tests/e2e/sidebar-long-workspace-name.spec.ts:105:5 › a long account name keeps the desktop sidebar create buttons usable 
+    Error: Create channel
+    Create channel
+    expect(received).toEqual(expected) // deep equality
+    - Expected  - 2
+    + Received  + 2
+      Object {
+    -   "inSidebar": true,
+    +   "inSidebar": false,
+        "inViewport": true,
+    -   "topmost": true,
+    +   "topmost": false,
+      }
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+      55 |   for (const { button, heading } of controls) {
+      56 |     const control = sidebar.getByRole("button", { name: button });
+    > 57 |     await expect.poll(() => placement(control), { message: button }).toEqual(usable);
+         |                                                                      ^
+      58 |     await control.click();
+      59 |     const dialog = page.locator(".profile-modal").getByRole("heading", { name: heading });
+      60 |     await expect(dialog).toBeVisible();
+        at expectCreateButtons (tests/e2e/sidebar-long-workspace-name.spec.ts:57:70)
+        at tests/e2e/sidebar-long-workspace-name.spec.ts:126:9
+  3 failed
+    [chromium] › tests/e2e/sidebar-long-workspace-name.spec.ts:70:5 › a long workspace name truncates and keeps the sidebar create buttons usable 
+    [chromium] › tests/e2e/sidebar-long-workspace-name.spec.ts:94:5 › the mobile drawer keeps its create buttons with a long workspace name 
+    [chromium] › tests/e2e/sidebar-long-workspace-name.spec.ts:105:5 › a long account name keeps the desktop sidebar create buttons usable 
+  1 passed (51.1s)

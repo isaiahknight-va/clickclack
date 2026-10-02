@@ -1,0 +1,233 @@
+{
+  "build": "before",
+  "webDesktopSize": {
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "sidebar": {
+      "left": 72,
+      "right": 332,
+      "top": 0,
+      "bottom": 720,
+      "width": 260,
+      "gridColumn": "390.359px"
+    },
+    "createChannel": {
+      "rect": {
+        "left": 432,
+        "right": 450,
+        "top": 79,
+        "bottom": 97
+      },
+      "inSidebar": false,
+      "inViewport": true,
+      "topmost": false,
+      "elementAtCenter": "div.empty"
+    },
+    "startDirectMessage": {
+      "rect": {
+        "left": 432,
+        "right": 450,
+        "top": 160,
+        "bottom": 178
+      },
+      "inSidebar": false,
+      "inViewport": true,
+      "topmost": false,
+      "elementAtCenter": "div.empty"
+    },
+    "collapseSidebar": {
+      "rect": {
+        "left": 416,
+        "right": 446,
+        "top": 15,
+        "bottom": 45
+      },
+      "inSidebar": false,
+      "inViewport": true,
+      "topmost": false,
+      "elementAtCenter": "div.topbar-title"
+    },
+    "workspaceName": {
+      "text": "Zainul Syafiq Worrkspace Note Clickclack",
+      "scrollWidth": 296,
+      "clientWidth": 296,
+      "truncated": false
+    },
+    "accountName": {
+      "text": "Local Captain",
+      "scrollWidth": 310,
+      "clientWidth": 310,
+      "truncated": false
+    },
+    "titlebarWorkspace": null
+  },
+  "mobileDrawer": {
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "sidebar": {
+      "left": 72,
+      "right": 332,
+      "top": 0,
+      "bottom": 844,
+      "width": 260,
+      "gridColumn": "390.359px"
+    },
+    "createChannel": {
+      "rect": {
+        "left": 432,
+        "right": 450,
+        "top": 79,
+        "bottom": 97
+      },
+      "inSidebar": false,
+      "inViewport": false,
+      "topmost": false,
+      "elementAtCenter": null
+    },
+    "startDirectMessage": {
+      "rect": {
+        "left": 432,
+        "right": 450,
+        "top": 160,
+        "bottom": 178
+      },
+      "inSidebar": false,
+      "inViewport": false,
+      "topmost": false,
+      "elementAtCenter": null
+    },
+    "collapseSidebar": {
+      "rect": {
+        "left": 416,
+        "right": 446,
+        "top": 15,
+        "bottom": 45
+      },
+      "inSidebar": false,
+      "inViewport": false,
+      "topmost": false,
+      "elementAtCenter": null
+    },
+    "workspaceName": {
+      "text": "Zainul Syafiq Worrkspace Note Clickclack",
+      "scrollWidth": 296,
+      "clientWidth": 296,
+      "truncated": false
+    },
+    "accountName": {
+      "text": "Local Captain",
+      "scrollWidth": 310,
+      "clientWidth": 310,
+      "truncated": false
+    },
+    "titlebarWorkspace": null
+  },
+  "desktopTitleBar": {
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "sidebar": {
+      "left": 72,
+      "right": 332,
+      "top": 52,
+      "bottom": 720,
+      "width": 260,
+      "gridColumn": "260px"
+    },
+    "createChannel": {
+      "rect": {
+        "left": 302,
+        "right": 320,
+        "top": 71,
+        "bottom": 89
+      },
+      "inSidebar": true,
+      "inViewport": true,
+      "topmost": true,
+      "elementAtCenter": "button.add-button"
+    },
+    "startDirectMessage": {
+      "rect": {
+        "left": 302,
+        "right": 320,
+        "top": 152,
+        "bottom": 170
+      },
+      "inSidebar": true,
+      "inViewport": true,
+      "topmost": true,
+      "elementAtCenter": "button.add-button"
+    },
+    "collapseSidebar": null,
+    "workspaceName": null,
+    "accountName": {
+      "text": "Local Captain",
+      "scrollWidth": 180,
+      "clientWidth": 180,
+      "truncated": false
+    },
+    "titlebarWorkspace": {
+      "text": "Zainul Syafiq Worrkspace Note Clickclack",
+      "scrollWidth": 275,
+      "clientWidth": 186,
+      "truncated": true
+    }
+  },
+  "desktopTitleBarLongAccount": {
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "sidebar": {
+      "left": 72,
+      "right": 332,
+      "top": 52,
+      "bottom": 720,
+      "width": 260,
+      "gridColumn": "285.516px"
+    },
+    "createChannel": {
+      "rect": {
+        "left": 328,
+        "right": 346,
+        "top": 71,
+        "bottom": 89
+      },
+      "inSidebar": false,
+      "inViewport": true,
+      "topmost": false,
+      "elementAtCenter": "div.empty"
+    },
+    "startDirectMessage": {
+      "rect": {
+        "left": 328,
+        "right": 346,
+        "top": 152,
+        "bottom": 170
+      },
+      "inSidebar": false,
+      "inViewport": true,
+      "topmost": false,
+      "elementAtCenter": "div.empty"
+    },
+    "collapseSidebar": null,
+    "workspaceName": null,
+    "accountName": {
+      "text": "Zainul Syafiq Worrkspace Tester",
+      "scrollWidth": 206,
+      "clientWidth": 206,
+      "truncated": false
+    },
+    "titlebarWorkspace": {
+      "text": "Zainul Syafiq Worrkspace Note Clickclack",
+      "scrollWidth": 275,
+      "clientWidth": 186,
+      "truncated": true
+    }
+  }
+}
