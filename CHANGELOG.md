@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Prevent a slow browser push endpoint from occupying every delivery worker, while keeping one shared limit of 1,024 pending alerts and normal success bookkeeping. Thanks @SebTardif.
+
 - Keep startup available during default OpenClaw ID discovery server errors while custom issuers still fail closed. Thanks @SebTardif.
 
 ## 0.7.0 - 2026-09-30

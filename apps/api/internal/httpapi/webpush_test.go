@@ -134,6 +134,7 @@ type fakeSender struct {
 	err           error
 	sent          int
 	hold          chan struct{}
+	delay         time.Duration
 	panc          bool
 	subscriptions []webpush.Subscription
 }
@@ -141,6 +142,7 @@ type fakeSender struct {
 func (f *fakeSender) Send(_ context.Context, subscription webpush.Subscription, _ webpush.Message) error {
 	f.mu.Lock()
 	hold := f.hold
+	delay := f.delay
 	err := f.err
 	shouldPanic := f.panc
 	f.sent++
@@ -148,6 +150,9 @@ func (f *fakeSender) Send(_ context.Context, subscription webpush.Subscription, 
 	f.mu.Unlock()
 	if hold != nil {
 		<-hold
+	}
+	if delay > 0 {
+		time.Sleep(delay)
 	}
 	if shouldPanic {
 		panic("push exploded")
@@ -226,20 +231,23 @@ func TestWebPushNotifierToleratesBookkeepingFailures(t *testing.T) {
 }
 
 // TestWebPushNotifierSurvivesAPanickingDelivery guards the detached pool: an
-// unrecovered panic in a worker would take the whole server down.
+// unrecovered panic in a worker would take the whole server down. One
+// endpoint keeps a single in-flight send. Later pushes for it wait, and
+// nothing accepted may disappear.
 func TestWebPushNotifierSurvivesAPanickingDelivery(t *testing.T) {
 	t.Parallel()
 	sender := &fakeSender{panc: true}
 	subscriptions := &fakeSubscriptionStore{}
 	notifier := newWebPushNotifier(sender, subscriptions, "")
-	for range 8 {
+	const burst = 8
+	for range burst {
 		if err := notifier.Notify(context.Background(), pushNotificationFor("usr_1", "https://push.example.com/send/device")); err != nil {
 			t.Fatal(err)
 		}
 	}
 	notifier.Close()
-	if sender.count() != 8 {
-		t.Fatalf("every delivery must be attempted, got %d", sender.count())
+	if attempts := sender.count(); attempts != burst {
+		t.Fatalf("every accepted delivery must be attempted after a panic, got %d", attempts)
 	}
 	if len(subscriptions.recorded()) != 0 {
 		t.Fatalf("a panicking delivery records nothing: %#v", subscriptions.recorded())
@@ -252,16 +260,36 @@ func TestWebPushNotifierDropsWhenTheQueueIsFull(t *testing.T) {
 	sender := &fakeSender{hold: hold}
 	notifier := newWebPushNotifier(sender, &fakeSubscriptionStore{}, "")
 	notification := pushNotificationFor("usr_1", "https://push.example.com/send/device")
-	for range webPushQueueSize + webPushWorkers + 50 {
+	for range webPushQueueSize*2 + webPushWorkers + 50 {
 		if err := notifier.Notify(context.Background(), notification); err != nil {
 			t.Fatal(err)
 		}
 	}
-	notifier.dropMu.Lock()
-	dropped := notifier.dropped
-	notifier.dropMu.Unlock()
+	deadline := time.Now().Add(2 * time.Second)
+	var dropped int64
+	for time.Now().Before(deadline) {
+		notifier.dropMu.Lock()
+		dropped = notifier.dropped
+		notifier.dropMu.Unlock()
+		if dropped > 0 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 	if dropped == 0 {
 		t.Fatal("expected the overflow to be counted")
+	}
+	notifier.flightMu.Lock()
+	waiters := 0
+	for _, list := range notifier.pending {
+		waiters += len(list)
+	}
+	pending := notifier.pendingCount
+	notifier.flightMu.Unlock()
+	queued := len(notifier.queue)
+	t.Logf("pending=%d waiters=%d channel=%d dropped=%d", pending, waiters, queued, dropped)
+	if pending > webPushQueueSize || waiters+queued > webPushQueueSize {
+		t.Fatalf("pending budget exceeded: pending=%d waiters=%d channel=%d", pending, waiters, queued)
 	}
 	close(hold)
 	notifier.Close()
@@ -411,6 +439,293 @@ func TestWebPushNotifierBacksOffATimedOutRelay(t *testing.T) {
 	}
 	if !nextAttempt.Valid || nextAttempt.String == "" {
 		t.Fatal("the timed-out device has no backoff, so every message would retry it")
+	}
+}
+
+// TestWebPushNotifierCapsInFlightDeliveriesPerSubscription holds one endpoint
+// inside Send and queues more pushes for it. Only one worker may stay there.
+// A different endpoint must still get a worker from the rest of the pool.
+func TestWebPushNotifierCapsInFlightDeliveriesPerSubscription(t *testing.T) {
+	t.Parallel()
+	sender := &concurrencySender{started: make(chan string, 16), hold: make(chan struct{})}
+	notifier := newWebPushNotifier(sender, &fakeSubscriptionStore{}, "")
+	t.Cleanup(notifier.Close)
+	t.Cleanup(sender.release)
+
+	slow := "https://push.example.com/send/slow"
+	for range 8 {
+		if err := notifier.Notify(context.Background(), pushNotificationFor("usr_1", slow)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	select {
+	case got := <-sender.started:
+		if got != slow {
+			t.Fatalf("first send was %s", got)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("no delivery started")
+	}
+	time.Sleep(50 * time.Millisecond)
+	if max := sender.maxConcurrent(slow); max != 1 {
+		t.Fatalf("subscription had %d deliveries in flight, want 1", max)
+	}
+
+	other := "https://push.example.com/send/other"
+	if err := notifier.Notify(context.Background(), pushNotificationFor("usr_2", other)); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for sender.maxConcurrent(other) < 1 {
+		if time.Now().After(deadline) {
+			t.Fatal("a different subscription never started while the slow one was in flight")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if max := sender.maxConcurrent(slow); max != 1 {
+		t.Fatalf("subscription had %d deliveries in flight after another device started, want 1", max)
+	}
+}
+
+// TestWebPushNotifierIsolatesEndpointsOverHTTP holds one real encrypted send
+// and lets a second endpoint proceed. Extra pushes for the held endpoint do
+// not take more workers.
+func TestWebPushNotifierIsolatesEndpointsOverHTTP(t *testing.T) {
+	ctx := context.Background()
+	st, owner, channel, _ := newWebPushTestStore(t)
+	message, _, err := st.CreateMessage(ctx, store.CreateMessageInput{ChannelID: channel.ID, AuthorID: owner.ID, Body: "burst"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	slowInFlight, slowMax, slowRequests, otherStarted := 0, 0, 0, 0
+	hold := make(chan struct{})
+	relay := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body)
+		if strings.HasSuffix(r.URL.Path, "/slow") {
+			mu.Lock()
+			slowInFlight++
+			slowRequests++
+			if slowInFlight > slowMax {
+				slowMax = slowInFlight
+			}
+			mu.Unlock()
+			<-hold
+			mu.Lock()
+			slowInFlight--
+			mu.Unlock()
+		} else {
+			mu.Lock()
+			otherStarted++
+			mu.Unlock()
+		}
+		w.WriteHeader(http.StatusCreated)
+	}))
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { close(hold) }) }
+	t.Cleanup(func() {
+		release()
+		relay.Close()
+	})
+	slow := relay.URL + "/slow"
+	other := relay.URL + "/other"
+	registerKeyedDevice(t, st, owner.ID, slow, "")
+	registerKeyedDevice(t, st, owner.ID, other, "")
+	publicKey, privateKey, err := webpush.GenerateKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	notifier := newWebPushNotifier(&webpush.Sender{
+		PublicKey:  publicKey,
+		PrivateKey: privateKey,
+		Subject:    "https://chat.example.com",
+		Client:     relay.Client(),
+	}, st, "")
+	t.Cleanup(notifier.Close)
+	t.Cleanup(release)
+	notify := func(endpoint string) {
+		t.Helper()
+		if err := notifier.Notify(ctx, PushNotification{
+			UserID:        owner.ID,
+			MessageID:     message.ID,
+			Subscriptions: []store.PushSubscriptionTarget{{Endpoint: endpoint}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	notify(slow)
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		mu.Lock()
+		started := slowInFlight == 1
+		mu.Unlock()
+		if started {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the slow endpoint never accepted a request")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	notify(slow)
+	notify(slow)
+	notify(slow)
+	notify(other)
+	deadline = time.Now().Add(5 * time.Second)
+	for {
+		mu.Lock()
+		ready := otherStarted == 1 && slowMax == 1
+		mu.Unlock()
+		if ready {
+			break
+		}
+		if time.Now().After(deadline) {
+			mu.Lock()
+			other, max := otherStarted, slowMax
+			mu.Unlock()
+			t.Fatalf("other=%d slow_max=%d", other, max)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	release()
+	deadline = time.Now().Add(5 * time.Second)
+	for {
+		mu.Lock()
+		done := slowRequests == 4 && slowInFlight == 0
+		mu.Unlock()
+		if done {
+			break
+		}
+		if time.Now().After(deadline) {
+			mu.Lock()
+			requests, inFlight := slowRequests, slowInFlight
+			mu.Unlock()
+			t.Fatalf("slow_requests=%d in_flight=%d", requests, inFlight)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	notifier.Close()
+	mu.Lock()
+	t.Logf("slow_max=%d slow_requests=%d other_while_held=%d", slowMax, slowRequests, otherStarted)
+	mu.Unlock()
+}
+
+type concurrencySender struct {
+	mu      sync.Mutex
+	current map[string]int
+	max     map[string]int
+	started chan string
+	hold    chan struct{}
+	once    sync.Once
+}
+
+func (c *concurrencySender) Send(_ context.Context, subscription webpush.Subscription, _ webpush.Message) error {
+	endpoint := subscription.Endpoint
+	c.mu.Lock()
+	if c.current == nil {
+		c.current = map[string]int{}
+		c.max = map[string]int{}
+	}
+	c.current[endpoint]++
+	if c.current[endpoint] > c.max[endpoint] {
+		c.max[endpoint] = c.current[endpoint]
+	}
+	c.mu.Unlock()
+	c.started <- endpoint
+	<-c.hold
+	c.mu.Lock()
+	c.current[endpoint]--
+	c.mu.Unlock()
+	return nil
+}
+
+func (c *concurrencySender) maxConcurrent(endpoint string) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.max[endpoint]
+}
+
+func (c *concurrencySender) release() {
+	c.once.Do(func() { close(c.hold) })
+}
+
+// TestWebPushNotifierRecordsASlowSuccess records a delayed 201 as a normal success. It does not start a cooldown.
+func TestWebPushNotifierRecordsASlowSuccess(t *testing.T) {
+	previousTimeout := webPushSendTimeout
+	webPushSendTimeout = 2 * time.Second
+	defer func() { webPushSendTimeout = previousTimeout }()
+
+	subscriptions := &fakeSubscriptionStore{}
+	notifier := newWebPushNotifier(&fakeSender{delay: 180 * time.Millisecond}, subscriptions, "")
+	if err := notifier.Notify(context.Background(), pushNotificationFor("usr_1", "https://push.example.com/send/device")); err != nil {
+		t.Fatal(err)
+	}
+	notifier.Close()
+	recorded := subscriptions.recorded()
+	if len(recorded) != 1 || recorded[0].kind != "success" {
+		t.Fatalf("slow success bookkeeping = %#v", recorded)
+	}
+	if recorded[0].userID != "usr_1" || recorded[0].endpoint != "https://push.example.com/send/device" {
+		t.Fatalf("unexpected bookkeeping target %#v", recorded[0])
+	}
+}
+
+// TestSlowSuccessfulPushLeavesFailureHistoryClear sends through webpush.Sender
+// to a local relay that waits and then returns 201. The sqlite row records
+// success without a cooldown or a failure run.
+func TestSlowSuccessfulPushLeavesFailureHistoryClear(t *testing.T) {
+	previousTimeout := webPushSendTimeout
+	webPushSendTimeout = 2 * time.Second
+	defer func() { webPushSendTimeout = previousTimeout }()
+
+	ctx := context.Background()
+	st, owner, channel, databasePath := newWebPushTestStore(t)
+	message, _, err := st.CreateMessage(ctx, store.CreateMessageInput{ChannelID: channel.ID, AuthorID: owner.ID, Body: "slow but delivered"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	relay := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(180 * time.Millisecond)
+		w.WriteHeader(http.StatusCreated)
+	}))
+	t.Cleanup(relay.Close)
+	endpoint := relay.URL + "/send/device"
+	registerKeyedDevice(t, st, owner.ID, endpoint, "")
+	publicKey, privateKey, err := webpush.GenerateKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	notifier := newWebPushNotifier(&webpush.Sender{
+		PublicKey:  publicKey,
+		PrivateKey: privateKey,
+		Subject:    "https://chat.example.com",
+		Client:     relay.Client(),
+	}, st, "")
+	if err := notifier.Notify(ctx, PushNotification{
+		UserID:        owner.ID,
+		MessageID:     message.ID,
+		Subscriptions: []store.PushSubscriptionTarget{{Endpoint: endpoint}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	notifier.Close()
+
+	db, err := sql.Open("sqlite", "file:"+databasePath+"?_pragma=busy_timeout(5000)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var failures int64
+	var failingSince, lastSuccess, nextAttempt sql.NullString
+	if err := db.QueryRow(
+		`SELECT failure_count, failing_since, last_success_at, next_attempt_at FROM user_push_subscriptions WHERE endpoint = ?`,
+		endpoint,
+	).Scan(&failures, &failingSince, &lastSuccess, &nextAttempt); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("failure_count=%d failing_since_set=%t last_success_set=%t next_attempt_set=%t", failures, failingSince.Valid, lastSuccess.Valid, nextAttempt.Valid)
+	if failures != 0 || failingSince.Valid || !lastSuccess.Valid || nextAttempt.Valid {
+		t.Fatalf("row failure_count=%d failing_since=%q last_success=%q next_attempt=%q", failures, failingSince.String, lastSuccess.String, nextAttempt.String)
 	}
 }
 

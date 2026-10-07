@@ -18,6 +18,10 @@ const (
 	// webPushWorkers bounds how many pushes are in flight at once. Delivery is
 	// off the request path, so this is the only backpressure the relay sees.
 	webPushWorkers = 4
+	// webPushInFlightPerSubscription bounds how many of those workers one
+	// endpoint may hold. Further pushes for that endpoint wait behind the
+	// one already in flight, so a slow relay cannot occupy the whole pool.
+	webPushInFlightPerSubscription = 1
 	// webPushQueueSize bounds the memory a wedged push service can cost. Chat
 	// notifications are not durable mail: an overflow is dropped and counted.
 	webPushQueueSize = 1024
@@ -90,6 +94,15 @@ type WebPushNotifier struct {
 	droppedLogged time.Time
 	stopPruning   context.CancelFunc
 	pruning       sync.WaitGroup
+	// flightMu guards inflight, pending, and pendingCount. inflight counts
+	// Sends in progress for an endpoint. pending holds later pushes for an
+	// endpoint that is already sending; the worker that owns the slot runs
+	// them. pendingCount is the shared channel plus every waiting list, and
+	// it stops at webPushQueueSize.
+	flightMu     sync.Mutex
+	inflight     map[string]int
+	pending      map[string][]webPushDelivery
+	pendingCount int
 }
 
 // NewWebPushNotifier builds a notifier that sends through the same outbound
@@ -122,6 +135,8 @@ func newWebPushNotifier(sender webPushSender, subscriptions WebPushSubscriptionS
 		keyID:         keyID,
 		queue:         make(chan webPushDelivery, webPushQueueSize),
 		stopPruning:   stopPruning,
+		inflight:      map[string]int{},
+		pending:       map[string][]webPushDelivery{},
 	}
 	notifier.workers.Add(webPushWorkers)
 	for range webPushWorkers {
@@ -153,9 +168,14 @@ func (n *WebPushNotifier) Notify(_ context.Context, notification PushNotificatio
 			messageID: notification.MessageID,
 			message:   message,
 		}
+		if !n.reservePending() {
+			dropped++
+			continue
+		}
 		select {
 		case n.queue <- delivery:
 		default:
+			n.releasePending()
 			dropped++
 		}
 	}
@@ -228,8 +248,76 @@ func (n *WebPushNotifier) prune(parent context.Context) {
 func (n *WebPushNotifier) work() {
 	defer n.workers.Done()
 	for delivery := range n.queue {
-		n.deliver(delivery)
+		n.deliverSubscription(delivery)
 	}
+}
+
+// deliverSubscription runs delivery, then the pushes waiting for that
+// endpoint. Another worker does not block inside Send for an endpoint that
+// is already in flight.
+func (n *WebPushNotifier) deliverSubscription(delivery webPushDelivery) {
+	if !n.claimSubscription(delivery) {
+		return
+	}
+	for {
+		n.releasePending()
+		n.deliver(delivery)
+		next, ok := n.takeNextSubscription(delivery.endpoint)
+		if !ok {
+			return
+		}
+		delivery = next
+	}
+}
+
+func (n *WebPushNotifier) claimSubscription(delivery webPushDelivery) bool {
+	n.flightMu.Lock()
+	defer n.flightMu.Unlock()
+	if n.inflight[delivery.endpoint] >= webPushInFlightPerSubscription {
+		n.pending[delivery.endpoint] = append(n.pending[delivery.endpoint], delivery)
+		return false
+	}
+	n.inflight[delivery.endpoint]++
+	return true
+}
+
+func (n *WebPushNotifier) reservePending() bool {
+	n.flightMu.Lock()
+	defer n.flightMu.Unlock()
+	if n.pendingCount >= webPushQueueSize {
+		return false
+	}
+	n.pendingCount++
+	return true
+}
+
+func (n *WebPushNotifier) releasePending() {
+	n.flightMu.Lock()
+	defer n.flightMu.Unlock()
+	if n.pendingCount > 0 {
+		n.pendingCount--
+	}
+}
+
+func (n *WebPushNotifier) takeNextSubscription(endpoint string) (webPushDelivery, bool) {
+	n.flightMu.Lock()
+	defer n.flightMu.Unlock()
+	pending := n.pending[endpoint]
+	if len(pending) == 0 {
+		n.inflight[endpoint]--
+		if n.inflight[endpoint] == 0 {
+			delete(n.inflight, endpoint)
+		}
+		return webPushDelivery{}, false
+	}
+	next := pending[0]
+	pending[0] = webPushDelivery{}
+	if len(pending) == 1 {
+		delete(n.pending, endpoint)
+	} else {
+		n.pending[endpoint] = pending[1:]
+	}
+	return next, true
 }
 
 // Detached workers recover panics so a notification failure cannot crash the server.

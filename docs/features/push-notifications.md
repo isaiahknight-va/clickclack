@@ -109,8 +109,10 @@ or not the app is open:
   still starting can arrive before the app is listening.
 
 Delivery happens off the request path in a small worker pool, so posting a
-message never waits on a push service. The queue in front of that pool holds
-1,024 pending pushes and lives in memory. When a push service stalls or a
+message never waits on a push service. Each device endpoint can occupy only
+one worker; its later alerts wait without blocking workers for other devices.
+The shared queue and endpoint waiting lists together hold at most 1,024
+pending pushes in memory. A delayed successful delivery does not add a cooldown. When a push service stalls or a
 burst of messages outgrows it, further pushes are dropped and counted, with
 one log line a minute giving the count; the messages themselves are
 unaffected and are read in the app as usual. Phone alerts are best effort by
