@@ -10,6 +10,9 @@ A workspace is the top-level container. It owns channels, direct conversations,
 events, uploads, and invites. Membership lives in `workspace_members` with a
 role of `owner`, `moderator`, `member`, `guest`, or `bot`.
 
+Long workspace and account names truncate with an ellipsis so channel and
+direct-message creation controls stay reachable in the sidebar and mobile drawer.
+
 ## Workspaces
 
 ```http

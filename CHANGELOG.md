@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep sidebar creation and collapse controls reachable with long workspace or account names by constraining the grid column. Thanks @isaiahknight-va and @NOLXII for the report.
+
 - Prevent a slow browser push endpoint from occupying every delivery worker, while keeping one shared limit of 1,024 pending alerts and normal success bookkeeping. Thanks @SebTardif.
 
 - Keep startup available during default OpenClaw ID discovery server errors while custom issuers still fail closed. Thanks @SebTardif.
